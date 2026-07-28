@@ -1,0 +1,6 @@
+{
+  "name": "Jite Auto Deals",
+  "description": "Premium vehicle consultation and lead qualification portal matching buyers with quality vehicles from trusted dealerships.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
