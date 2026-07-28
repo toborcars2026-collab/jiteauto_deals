@@ -30,6 +30,16 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
       alert('Please fill in your Name and Phone Number to proceed.');
       return;
     }
+    if (step === 2) {
+      if (!formData.budget || formData.budget < 3000000) {
+        alert('Minimum budget must be at least ₦3,000,000 (3 Million Naira). Please enter an amount within this range.');
+        return;
+      }
+      if (formData.budget > 1000000000) {
+        alert('Maximum budget limit is ₦1,000,000,000 (1 Billion Naira). Please enter an amount within this limit.');
+        return;
+      }
+    }
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
@@ -233,12 +243,19 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
                       <input
                         type="number"
                         inputMode="numeric"
+                        min={3000000}
+                        max={1000000000}
                         step={100000}
-                        placeholder={`e.g. ${vehicle.price}`}
+                        placeholder={`e.g. ${vehicle.price} (Min ₦3M - Max ₦1 Billion)`}
                         value={formData.budget || ''}
                         onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) || 0 })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-3.5 text-base font-mono text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
                       />
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono px-1">
+                      <span>Min: ₦3,000,000 (3M)</span>
+                      <span>Max: ₦1,000,000,000 (1 Billion)</span>
                     </div>
 
                     {/* Quick presets */}

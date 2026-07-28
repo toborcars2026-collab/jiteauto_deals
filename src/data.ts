@@ -2,6 +2,48 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'ford-explorer-limited-2015-red',
+    make: 'Ford',
+    model: 'Explorer Limited',
+    year: 2015,
+    price: 13000000,
+    mileage: 58000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://i.ibb.co/0yh8B7Qf/IMG-20260728-WA0040.jpg'
+    ],
+    description: "✨ 2015 Ford Explorer Limited ✨\n🇺🇸 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience comfort, power, and versatility with this 2015 Ford Explorer Limited. It offers a refined interior, smooth automatic transmission, 3.5L V6 engine with 4WD/AWD capability, excellent road presence, and ample space for family or business use. This 7-seater SUV is exceptionally clean inside and out, offering outstanding luxury value.\n\nKey Features & Highlights:\n🔑 Keyless Entry & 🔘 Push Start\n🛋️ Premium Leather Interior & 🧳 Spacious 7-Seater Cabin\n📷 Reverse Camera & 🅿️ Parking Sensors\n🌡️ Dual-Zone Climate Control & 🎵 Premium Audio System\n🛞 Alloy Wheels & 💡 LED Daytime Running Lights\n🛣️ Cruise Control, 🪟 Tinted Glass & 3.5L V6 Engine",
+    engine: '3.5L V6 Petrol',
+    color: 'Red',
+    condition: 'Extremely Clean',
+    isFeatured: true
+  },
+  {
+    id: 'toyota-rav4-2012-black',
+    make: 'Toyota',
+    model: 'RAV4',
+    year: 2012,
+    price: 15000000,
+    mileage: 62000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://i.ibb.co/vCqpr68F/IMG-20260728-WA0038.jpg'
+    ],
+    description: "✨ 2012 Toyota RAV4 Last Batch (XA30 Facelift) ✨\n💎 Condition: Foreign Used | 🖤 Sleek Black Exterior | 📄 Customs Duty Paid\n\nVehicle Overview:\nExperience the perfect blend of reliability, comfort, and practicality with this foreign-used 2012 Toyota RAV4 Last Batch. Finished in a sleek black exterior, this SUV is exceptionally clean inside and out, making it an excellent choice for daily commuting, family trips, or business use. Renowned for its durability, fuel efficiency, and low maintenance costs.\n\nKey Features & Specifications:\n⚙️ Efficient 2.5L 4-Cylinder Petrol Engine & Smooth Automatic Transmission\n❄️ Air Conditioning & Climate Control\n🔑 Remote Keyless Entry & Power Windows/Door Locks\n🎵 Audio System with AUX, USB & Bluetooth Connectivity\n🛞 Alloy Wheels, Fog Lights, Roof Rails & Rear Window Wiper\n🪑 Split Folding Rear Seats (60:40) & Spacious Cargo Area\n🛡️ Multiple Airbags, ABS & Traction Control",
+    engine: '2.5L 4-Cylinder Petrol',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true
+  },
+  {
     id: 'mercedes-benz-e300-2017-black',
     make: 'Mercedes-Benz',
     model: 'E300',
