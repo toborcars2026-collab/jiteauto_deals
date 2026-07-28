@@ -60,10 +60,10 @@ export function getVehicles(): Vehicle[] {
       return v;
     });
 
-    // Ensure all items from INITIAL_VEHICLES exist in synced
-    INITIAL_VEHICLES.forEach(initial => {
+    // Ensure all items from INITIAL_VEHICLES exist in synced (insert new ones at the beginning)
+    [...INITIAL_VEHICLES].reverse().forEach(initial => {
       if (!synced.some(v => v.id === initial.id)) {
-        synced.push(initial);
+        synced.unshift(initial);
         updated = true;
       }
     });
@@ -172,28 +172,64 @@ export function getVehicleInquiryMessage(vehicle: Vehicle): string {
 }
 
 export function getLeadQualificationMessage(
-  vehicleName: string,
+  vehicle: Vehicle | string,
   budget: number,
   paymentMethod: string,
   readyToBuy: string,
-  name: string
+  name: string,
+  phone?: string
 ): string {
-  return `Hello Jite Auto Deals!\n\nI have qualified my request on your website. Here are my details:\n\n` +
-         `👤 *Name:* ${name}\n` +
-         `🚗 *Vehicle Interested:* ${vehicleName}\n` +
-         `💰 *My Budget:* ${formatCurrency(budget)}\n` +
-         `💳 *Payment Method:* ${paymentMethod}\n` +
-         `📅 *Ready to Buy:* ${readyToBuy}\n\n` +
-         `Please match me with the right dealership or let me know the availability!`;
+  if (typeof vehicle === 'string') {
+    return (
+      `*NEW VEHICLE INQUIRY* 🚗✨\n` +
+      `Hello Jite Auto Deals! I qualified my acquisition request on your website. Here are my details:\n\n` +
+      `👤 *BUYER INFORMATION:*\n` +
+      `• *Full Name:* ${name}\n` +
+      (phone ? `• *Phone Number:* ${phone}\n` : '') +
+      `\n🚗 *SELECTED VEHICLE:*\n` +
+      `• *Model:* ${vehicle}\n\n` +
+      `💳 *BUYER CRITERIA:*\n` +
+      `• *Target Budget:* ${formatCurrency(budget)}\n` +
+      `• *Payment Method:* ${paymentMethod === 'Cash' ? 'Outright Cash Purchase' : 'Vehicle Finance Program'}\n` +
+      `• *Purchase Timeline:* ${readyToBuy}\n\n` +
+      `Please review my request and connect me with a verified specialist to proceed with inspection and acquisition!`
+    );
+  }
+
+  return (
+    `*NEW VEHICLE ACQUISITION INQUIRY* 🚗✨\n` +
+    `Hello Jite Auto Deals! I just completed the "Get This Car" inquiry on your website for a catalog vehicle.\n\n` +
+    `📋 *SELECTED VEHICLE DETAILS:*\n` +
+    `• *Car:* ${vehicle.year} ${vehicle.make} ${vehicle.model}\n` +
+    `• *Listed Price:* ${formatCurrency(vehicle.price)}\n` +
+    `• *Condition:* ${vehicle.condition}\n` +
+    `• *Color:* ${vehicle.color}\n` +
+    `• *Transmission:* ${vehicle.transmission}\n` +
+    `• *Location:* ${vehicle.location}\n\n` +
+    `👤 *BUYER INFORMATION:*\n` +
+    `• *Full Name:* ${name}\n` +
+    `• *Phone Number:* ${phone || 'Not provided'}\n\n` +
+    `💳 *BUYER SOURCING CRITERIA:*\n` +
+    `• *Target Budget:* ${formatCurrency(budget)}\n` +
+    `• *Payment Method:* ${paymentMethod === 'Cash' ? 'Outright Cash Purchase' : 'Vehicle Finance Program'}\n` +
+    `• *Purchase Timeline:* ${readyToBuy}\n\n` +
+    `Please confirm vehicle availability and guide me on the next steps for purchase/inspection!`
+  );
 }
 
 export function getHelpMeFindCarMessage(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): string {
-  return `Hello Jite Auto Deals!\n\nI need help finding a vehicle! Here are my preferences:\n\n` +
-         `👤 *Name:* ${lead.name}\n` +
-         `📱 *Phone:* ${lead.phone}\n` +
-         `🚗 *Vehicle Type:* ${lead.vehicleType}\n` +
-         `⭐ *Preferred Brand:* ${lead.brand}\n` +
-         `💰 *Budget:* ${formatCurrency(lead.budget)}\n` +
-         `💳 *Payment Method:* ${lead.paymentMethod}\n\n` +
-         `Please help me find this vehicle!`;
+  return (
+    `*CUSTOM VEHICLE HUNT REQUEST* 🚗✨\n` +
+    `Hello Jite Auto Deals! I need help sourcing a vehicle. Here are my selected preferences:\n\n` +
+    `👤 *BUYER INFORMATION:*\n` +
+    `• *Full Name:* ${lead.name}\n` +
+    `• *Phone Number:* ${lead.phone}\n\n` +
+    `🚗 *DESIRED VEHICLE SPECIFICATIONS:*\n` +
+    `• *Body Category:* ${lead.vehicleType}\n` +
+    `• *Preferred Brand:* ${lead.brand}\n\n` +
+    `💳 *ACQUISITION CRITERIA:*\n` +
+    `• *Target Budget:* ${formatCurrency(lead.budget)}\n` +
+    `• *Payment Strategy:* ${lead.paymentMethod === 'Cash' ? 'Outright Cash Purchase' : 'Vehicle Finance Program'}\n\n` +
+    `Please help me find and match a verified vehicle meeting these criteria!`
+  );
 }

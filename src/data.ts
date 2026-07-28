@@ -2,6 +2,31 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'honda-crv-limited-edition-2021-white',
+    make: 'Honda',
+    model: 'CR-V Limited Edition',
+    year: 2021,
+    price: 25000000,
+    mileage: 22000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://i.ibb.co/6c9x4xK9/IMG-20260728-WA0011.jpg',
+      'https://i.ibb.co/M5fgMvt4/IMG-20260728-WA0012.jpg',
+      'https://i.ibb.co/qMsZnCFP/IMG-20260728-WA0010.jpg',
+      'https://i.ibb.co/XZQqJ3NY/IMG-20260728-WA0016.jpg',
+      'https://i.ibb.co/mFh4cKD9/IMG-20260728-WA0018.jpg'
+    ],
+    description: "✨ 2021 Honda CR-V Limited Edition (Slightly Used, Unregistered) ✨\n🌍 Slightly Used, Unregistered | 📄 Original Papers Available 📜 | 💎 Excellent Condition\n\nVehicle Overview:\nThe 2021 Honda CR-V Limited Edition is a premium compact SUV that blends modern styling, exceptional comfort, advanced safety, and fuel-efficient performance. This unregistered Nigerian unit is in excellent condition and comes with sought-after features including keyless entry and a panoramic sunroof, making it an ideal SUV for families and professionals alike.\n\nKey Features:\n⚙️ 1.5L Turbocharged Petrol Engine\n🏎️ Automatic Transmission (CVT) & Front-Wheel Drive (FWD)\n🌟 Limited Edition Trim\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🌅 Panoramic Sunroof\n💡 LED Headlights, Daytime Running Lights & LED Fog Lights\n🛞 Alloy Wheels\n📷 Reverse Camera & Front & Rear Parking Sensors\n📱 Touchscreen Infotainment System with Apple CarPlay, Android Auto & Bluetooth\n⚡ USB Charging Ports & Power Tailgate\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n🅿️ Electric Parking Brake with Auto Hold\n🪑 Premium Interior Finish\n🛡️ Multiple Airbags, ABS, Vehicle Stability Assist (VSA) & Traction Control",
+    engine: '1.5L Turbocharged Petrol',
+    color: 'White',
+    condition: 'Slightly Used',
+    isFeatured: true
+  },
+  {
     id: 'toyota-tacoma-2017-full-option',
     make: 'Toyota',
     model: 'Tacoma Full Option',

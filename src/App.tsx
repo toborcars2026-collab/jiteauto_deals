@@ -250,17 +250,19 @@ export default function App() {
                       <p className="text-slate-500 text-sm">No vehicles added to featured catalog yet.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {homepageVehicles.map((vehicle) => (
-                        <VehicleCard
-                          key={vehicle.id}
-                          vehicle={vehicle}
-                          onViewDetails={handleViewDetails}
-                          onGetThisCar={handleOpenQualifier}
-                          onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {homepageVehicles.slice(0, 8).map((vehicle) => (
+                          <VehicleCard
+                            key={vehicle.id}
+                            vehicle={vehicle}
+                            onViewDetails={handleViewDetails}
+                            onGetThisCar={handleOpenQualifier}
+                            onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
+                          />
+                        ))}
+                      </div>
+                    </>
                   )
                 ) : (
                   vehicles.filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id)).length === 0 ? (
@@ -282,23 +284,26 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {vehicles
-                        .filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id))
-                        .map((vehicle) => (
-                          <VehicleCard
-                            key={vehicle.id}
-                            vehicle={vehicle}
-                            onViewDetails={handleViewDetails}
-                            onGetThisCar={handleOpenQualifier}
-                            onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
-                          />
-                        ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {vehicles
+                          .filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id))
+                          .slice(0, 8)
+                          .map((vehicle) => (
+                            <VehicleCard
+                              key={vehicle.id}
+                              vehicle={vehicle}
+                              onViewDetails={handleViewDetails}
+                              onGetThisCar={handleOpenQualifier}
+                              onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
+                            />
+                          ))}
+                      </div>
+                    </>
                   )
                 )}
 
-                <div className="flex justify-center mt-12">
+                <div className="flex flex-col items-center justify-center mt-10 gap-2">
                   <button
                     onClick={() => {
                       const url = new URL(window.location.href);
@@ -307,7 +312,7 @@ export default function App() {
                     }}
                     className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-amber-500 font-extrabold rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl border border-amber-500/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
                   >
-                    <span>View All Vehicles in a New Tab</span>
+                    <span>View All ({vehicles.length}) Vehicles in a New Tab</span>
                     <span className="text-amber-500 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">↗</span>
                   </button>
                 </div>

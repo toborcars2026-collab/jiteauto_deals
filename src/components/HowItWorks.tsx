@@ -55,9 +55,8 @@ export default function HowItWorks({ onOpenConsultant }: HowItWorksProps) {
         <div className="mt-12 text-center">
           <button
             onClick={onOpenConsultant}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md transition-all hover:scale-105"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md transition-all hover:scale-105 cursor-pointer"
           >
-            <Sparkles size={16} className="text-amber-500 animate-pulse" />
             <span>Ready to start? Speak with our vehicle consultant now</span>
           </button>
         </div>

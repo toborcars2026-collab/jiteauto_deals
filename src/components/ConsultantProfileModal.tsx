@@ -47,9 +47,9 @@ export default function ConsultantProfileModal({
   const CONSULTANT_PHOTO = 'https://i.ibb.co/qY6x6Lg3/IMG-20260728-WA0002.jpg';
 
   // Construct default WhatsApp message if none provided
-  const defaultMsg = vehicleContext
+  const defaultMsg = customMessage || (vehicleContext
     ? `Hello ${CONSULTANT_NAME}, I am interested in inquiring about the ${vehicleContext.year} ${vehicleContext.make} ${vehicleContext.model} (${formatCurrency(vehicleContext.price)}). I would like your guidance as my vehicle consultant.`
-    : customMessage || `Hello ${CONSULTANT_NAME}! I'm looking to consult with a vehicle specialist regarding sourcing a quality car. Please guide me through the available options.`;
+    : `Hello ${CONSULTANT_NAME}! I'm looking to consult with a vehicle specialist regarding sourcing a quality car. Please guide me through the available options.`);
 
   const waUrl = `https://wa.me/${CONSULTANT_PHONE_INTL}?text=${encodeURIComponent(defaultMsg)}`;
 

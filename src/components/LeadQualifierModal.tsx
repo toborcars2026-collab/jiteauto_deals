@@ -60,11 +60,12 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
 
     // Get WhatsApp prefilled message
     const waText = getLeadQualificationMessage(
-      `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+      vehicle,
       formData.budget,
       formData.paymentMethod,
       formData.readyToBuy,
-      formData.name
+      formData.name,
+      formData.phone
     );
 
     if (onOpenConsultantModal) {
@@ -131,7 +132,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <a
-                href={getWhatsAppLink(getLeadQualificationMessage(`${vehicle.year} ${vehicle.make} ${vehicle.model}`, formData.budget, formData.paymentMethod, formData.readyToBuy, formData.name))}
+                href={getWhatsAppLink(getLeadQualificationMessage(vehicle, formData.budget, formData.paymentMethod, formData.readyToBuy, formData.name, formData.phone))}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
