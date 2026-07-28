@@ -214,32 +214,46 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
               {step === 2 && (
                 <div className="space-y-4 animate-fadeIn">
                   <div className="text-center pb-2">
-                    <p className="text-sm text-slate-300">Confirm or adjust your budget range for this vehicle model:</p>
+                    <p className="text-sm text-slate-300">Enter your target budget in digits for this vehicle:</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold font-sans">
-                        My Budget
+                        Target Budget (₦)
                       </label>
-                      <span className="font-mono text-base text-amber-500 font-extrabold">
-                        {formatCurrency(formData.budget)}
+                      <span className="font-mono text-xs sm:text-sm text-amber-400 font-extrabold bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                        {formatCurrency(formData.budget || 0)}
                       </span>
                     </div>
-                    <input
-                      type="range"
-                      min={vehicle.price * 0.8}
-                      max={vehicle.price * 1.2}
-                      step={100000}
-                      value={formData.budget}
-                      onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) })}
-                      className="w-full accent-amber-500 cursor-pointer h-2 bg-slate-800 rounded-lg appearance-none"
-                    />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                      <span>Min: {formatCurrency(vehicle.price * 0.8)}</span>
-                      <span>Max: {formatCurrency(vehicle.price * 1.2)}</span>
+
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
+                        ₦
+                      </div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step={100000}
+                        placeholder={`e.g. ${vehicle.price}`}
+                        value={formData.budget || ''}
+                        onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) || 0 })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-3.5 text-base font-mono text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                      />
                     </div>
-                    <p className="text-[10px] text-slate-400 text-center italic">
-                      We negotiate with dealerships to match within this targeted threshold.
+
+                    {/* Quick presets */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, budget: vehicle.price })}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-950 border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors font-medium cursor-pointer"
+                      >
+                        Autofill Listed Price ({formatCurrency(vehicle.price)})
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 italic">
+                      Type your exact budget in digits. We negotiate directly with dealerships to match within this targeted threshold.
                     </p>
                   </div>
                 </div>

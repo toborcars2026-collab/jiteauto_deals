@@ -2,6 +2,56 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'mercedes-benz-e300-2017-black',
+    make: 'Mercedes-Benz',
+    model: 'E300',
+    year: 2017,
+    price: 26000000,
+    mileage: 45000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://i.ibb.co/gqVm8Vk/IMG-20260728-WA0028.jpg',
+      'https://i.ibb.co/xSRC0fdx/IMG-20260728-WA0030.jpg',
+      'https://i.ibb.co/SLyYjtd/IMG-20260728-WA0032.jpg',
+      'https://i.ibb.co/67bXyBCX/IMG-20260728-WA0034.jpg',
+      'https://i.ibb.co/v6HKh71B/IMG-20260728-WA0036.jpg'
+    ],
+    description: "✨ 2017 Mercedes-Benz E300 (4-door Luxury Sedan) ✨\n💎 Condition: Extremely Clean Used (as advertised) | 📄 Customs Duty Paid 📜 | 🖤 Obsidian Black Exterior\n\nVehicle Overview:\nThe 2017 Mercedes-Benz E300 represents the benchmark of executive luxury sedans. Powered by a responsive 2.0L Turbocharged Inline-4 engine paired with a 9-Speed Automatic 9G-TRONIC transmission delivering 241 hp, this unit is extremely clean, well-maintained, and fully duty paid.\n\nKey Performance & Luxury Features:\n⚙️ 2.0L Turbocharged Inline-4 (241 hp / 273 lb-ft Torque)\n🕹️ 9-Speed Automatic Transmission (9G-TRONIC)\n💡 LED Intelligent Headlamps & Daytime Running Lights\n🔑 Keyless Start & Smart Access\n🛋️ Premium Leather Interior with Power Front Seats & Memory\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n📱 Large High-Resolution Infotainment Display with Bluetooth\n📷 Reverse Camera with Front & Rear Parking Sensors\n🛞 Executive Alloy Wheels\n🛡️ Collision Prevention Assist, Attention Assist, ESP, Traction Control & Multiple Airbags",
+    engine: '2.0L Turbocharged Inline-4 (241 hp)',
+    color: 'Black',
+    condition: 'Extremely Clean',
+    isFeatured: true
+  },
+  {
+    id: 'toyota-hilux-2024-white',
+    make: 'Toyota',
+    model: 'Hilux',
+    year: 2024,
+    price: 59000000,
+    mileage: 5000,
+    transmission: 'Automatic',
+    fuelType: 'Diesel',
+    bodyType: 'Truck',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://i.ibb.co/TNDxQB3/IMG-20260728-WA0026.jpg',
+      'https://i.ibb.co/DfP9xWTp/IMG-20260728-WA0020.jpg',
+      'https://i.ibb.co/nsZm53b8/IMG-20260728-WA0024.jpg',
+      'https://i.ibb.co/m5Hdg2S1/IMG-20260728-WA0022.jpg',
+      'https://i.ibb.co/v4Lh1pfV/IMG-20260728-WA0014.jpg'
+    ],
+    description: "✨ 2024 Toyota Hilux (Registered, Like New) ✨\n🌍 Registered, Bought Brand New in 2024 | 📄 Duty Paid 📜 | 💎 Like New Condition\n\nVehicle Overview:\nThe 2024 Toyota Hilux is one of the most dependable pickup trucks on the market, renowned for its rugged durability, exceptional performance, and outstanding reliability. This unit was purchased brand new last year, is Nigerian registered, and remains in like-new condition with genuine duty paid. It is ideal for both commercial operations and personal use.\n\nKey Features:\n⚙️ 2.8L Turbo Diesel Engine\n🏎️ Automatic Transmission & 4WD Capability\n🔑 Smart Key / Keyless Entry & Push-Button Start\n📱 Touchscreen Infotainment System with Apple CarPlay & Android Auto\n📶 Bluetooth Connectivity\n📷 Reverse Camera & Rear Parking Sensors\n🏎️ Multifunction Steering Wheel & Cruise Control\n❄️ Automatic Climate Control\n💡 LED Headlights, Daytime Running Lights & Fog Lights\n🛞 Alloy Wheels, Side Steps, Bed Cover (Tonneau Cover) & Sports Bar\n⚡ Power Windows & Mirrors\n🛡️ Multiple Airbags, ABS, Vehicle Stability Control (VSC) & Traction Control",
+    engine: '2.8L Turbo Diesel',
+    color: 'White',
+    condition: 'Like New',
+    isFeatured: true
+  },
+  {
     id: 'honda-crv-limited-edition-2021-white',
     make: 'Honda',
     model: 'CR-V Limited Edition',
