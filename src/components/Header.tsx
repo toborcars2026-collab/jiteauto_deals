@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Menu, X, Phone, Car, LayoutDashboard, HelpCircle, ShieldCheck, MessageSquare } from 'lucide-react';
-import logoImg from '../assets/images/jite_auto_deals_logo_1785026063050.jpg';
 
 interface HeaderProps {
   currentTab: 'home' | 'browse' | 'admin';
@@ -42,13 +41,10 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation }
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex py-3 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => handleNavClick('home')}>
-            <img 
-              src={logoImg} 
-              alt="JITE AUTO DEALS" 
-              className="h-12 sm:h-16 lg:h-18 w-auto max-w-[200px] sm:max-w-[260px] lg:max-w-[320px] object-contain transition-transform duration-300 hover:scale-105 rounded-lg shadow-sm border border-slate-800/60"
-              referrerPolicy="no-referrer"
-            />
+          <div className="flex items-center gap-2 cursor-pointer shrink-0 select-none" onClick={() => handleNavClick('home')}>
+            <span className="font-display font-black text-2xl sm:text-3xl tracking-tight text-white hover:text-amber-400 transition-colors">
+              Jite Auto <span className="text-amber-500">Deals</span>
+            </span>
           </div>
 
           {/* Desktop Navigation */}

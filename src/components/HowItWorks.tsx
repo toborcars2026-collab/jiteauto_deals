@@ -42,6 +42,7 @@ export default function HowItWorks({ onOpenConsultant }: HowItWorksProps) {
                 </p>
               </div>
 
+              {/* Connecting arrow for desktop */}
               {index < HOW_IT_WORKS_STEPS.length - 1 && (
                 <div className="hidden lg:block absolute top-1/2 -right-4 -translate-y-1/2 z-10 text-slate-300">
                   <ArrowRight size={20} />

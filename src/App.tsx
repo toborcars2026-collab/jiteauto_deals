@@ -24,7 +24,6 @@ import LeadQualifierModal from './components/LeadQualifierModal';
 import ConsultantProfileModal from './components/ConsultantProfileModal';
 import AdminPanel from './components/AdminPanel';
 import { Vehicle } from './types';
-import logoImg from './assets/images/jite_auto_deals_logo_1785026063050.jpg';
 import { getVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
@@ -612,13 +611,10 @@ export default function App() {
           
           {/* Brand */}
           <div className="md:col-span-4 space-y-4">
-            <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => setCurrentTab('home')}>
-              <img 
-                src={logoImg} 
-                alt="JITE AUTO DEALS" 
-                className="h-14 sm:h-18 w-auto max-w-[240px] object-contain transition-transform duration-300 hover:scale-105 rounded-lg border border-slate-900 shadow-sm"
-                referrerPolicy="no-referrer"
-              />
+            <div className="flex items-center gap-2 cursor-pointer shrink-0 select-none" onClick={() => setCurrentTab('home')}>
+              <span className="font-display font-black text-2xl tracking-tight text-white hover:text-amber-400 transition-colors">
+                Jite Auto <span className="text-amber-500">Deals</span>
+              </span>
             </div>
             <p className="text-slate-450 leading-relaxed max-w-xs font-light">
               Premium vehicle consulting matching buyers with quality, mechanical-audit certified cars from reputable dealerships across Nigeria.
