@@ -38,7 +38,9 @@ import {
   fetchInquiries,
   updateInquiry,
   formatCurrency,
-  formatMileage
+  formatMileage,
+  normalizeImageInput,
+  getImageUrl
 } from '../utils';
 
 interface AdminPanelProps {
@@ -109,6 +111,30 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   });
 
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
+  const [totalSlots, setTotalSlots] = useState<number>(5);
+  const [showBulkBox, setShowBulkBox] = useState<boolean>(false);
+  const [bulkLinksText, setBulkLinksText] = useState<string>('');
+
+  const handleApplyBulkLinks = () => {
+    if (!bulkLinksText.trim()) return;
+    const rawLinks = bulkLinksText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    if (rawLinks.length === 0) return;
+
+    const normalized = rawLinks.map(l => normalizeImageInput(l));
+    const currentImgs = [...(newCar.images || [])];
+    normalized.forEach((link, idx) => {
+      currentImgs[idx] = link;
+    });
+
+    if (normalized.length > totalSlots) {
+      setTotalSlots(Math.min(10, normalized.length));
+    }
+
+    setNewCar({ ...newCar, images: currentImgs });
+    setBulkLinksText('');
+    setShowBulkBox(false);
+    alert(`Successfully applied ${normalized.length} image link(s) to vehicle slots!`);
+  };
 
   // Stats calculation
   const totalLeadsCount = leads.length;
@@ -907,67 +933,132 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <label className="text-xs uppercase tracking-wider text-slate-700 font-bold">
-                        Vehicle Images (5 Slots Available)
-                      </label>
-                      <span className="text-[10px] text-amber-600 font-bold">100% Original Quality Preserved</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-slate-800 font-extrabold block">
+                          Vehicle Images ({totalSlots} Slots Available)
+                        </label>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Supports high-res files, ImgBB, Google Drive, Imgur, and direct image links with 100% original quality.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowBulkBox(!showBulkBox)}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 text-xs font-bold transition-colors border border-amber-500/20"
+                        >
+                          {showBulkBox ? 'Hide Bulk Paste' : 'Bulk Paste Links'}
+                        </button>
+                        {totalSlots < 10 && (
+                          <button
+                            type="button"
+                            onClick={() => setTotalSlots(prev => Math.min(10, prev + 1))}
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors flex items-center gap-1"
+                          >
+                            <Plus size={14} />
+                            <span>Add Slot ({totalSlots + 1}/10)</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {[
-                      { index: 0, label: 'Primary Image (Spot 1) *', required: true },
-                      { index: 1, label: 'Second Image (Spot 2)', required: false },
-                      { index: 2, label: 'Third Image (Spot 3)', required: false },
-                      { index: 3, label: 'Fourth Image (Spot 4)', required: false },
-                      { index: 4, label: 'Fifth Image (Spot 5)', required: false },
-                    ].map((slot) => {
-                      const imgUrl = newCar.images?.[slot.index] || '';
+                    {/* Bulk Links Entry Box */}
+                    {showBulkBox && (
+                      <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2 animate-fadeIn">
+                        <label className="text-xs font-bold text-amber-900 uppercase tracking-wider block">
+                          Paste Multiple Image Links (One link per line or separated by commas)
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={bulkLinksText}
+                          onChange={(e) => setBulkLinksText(e.target.value)}
+                          placeholder={"https://ibb.co/cSpyPtnL\nhttps://ibb.co/FZrShZx\nhttps://ibb.co/9mNR3GPP"}
+                          className="w-full bg-white border border-amber-300 rounded-lg p-3 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowBulkBox(false)}
+                            className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 font-medium"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleApplyBulkLinks}
+                            className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-extrabold shadow-sm transition-colors"
+                          >
+                            Apply All Links to Slots
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image Slots List */}
+                    {Array.from({ length: totalSlots }).map((_, idx) => {
+                      const rawUrl = newCar.images?.[idx] || '';
+                      const displayUrl = getImageUrl(rawUrl);
+                      const isPrimary = idx === 0;
+
                       return (
-                        <div key={slot.index} className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div key={idx} className={`space-y-1.5 p-3 rounded-xl border transition-all ${rawUrl ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-50 border-slate-200/80'}`}>
                           <div className="flex items-center justify-between">
-                            <label className="text-xs uppercase tracking-wider text-slate-500 font-bold">
-                              {slot.label}
+                            <label className="text-xs uppercase tracking-wider font-extrabold flex items-center gap-1.5 text-slate-700">
+                              <span>Spot {idx + 1} {isPrimary ? '(Primary Cover) *' : ''}</span>
+                              {rawUrl && <span className="text-[10px] text-emerald-600 font-mono font-bold">✓ Loaded</span>}
                             </label>
-                            {imgUrl && (
+                            {rawUrl && (
                               <button
                                 type="button"
                                 onClick={() => {
                                   const imgs = [...(newCar.images || [])];
-                                  imgs[slot.index] = '';
+                                  imgs[idx] = '';
                                   setNewCar({ ...newCar, images: imgs });
                                 }}
-                                className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold"
+                                className="text-[10px] text-rose-600 hover:text-rose-800 font-bold hover:underline"
                               >
-                                Clear Spot {slot.index + 1}
+                                Clear Spot {idx + 1}
                               </button>
                             )}
                           </div>
-                          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                            {imgUrl ? (
-                              <img
-                                src={imgUrl}
-                                alt={`Spot ${slot.index + 1}`}
-                                className="h-12 w-16 object-cover rounded-lg border border-slate-200 shrink-0 bg-white"
-                                referrerPolicy="no-referrer"
-                              />
+
+                          <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
+                            {rawUrl ? (
+                              <div className="relative h-14 w-20 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-900 group">
+                                <img
+                                  src={displayUrl}
+                                  alt={`Spot ${idx + 1}`}
+                                  className="h-full w-full object-cover"
+                                  style={{ imageRendering: '-webkit-optimize-contrast' }}
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                                  }}
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
                             ) : (
-                              <div className="h-12 w-16 rounded-lg border border-dashed border-slate-300 bg-white flex items-center justify-center text-[10px] text-slate-400 font-mono shrink-0">
-                                Slot {slot.index + 1}
+                              <div className="h-14 w-20 rounded-lg border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-[10px] text-slate-400 font-mono shrink-0">
+                                <span>Slot {idx + 1}</span>
+                                <span className="text-[9px] text-slate-300">Empty</span>
                               </div>
                             )}
+
                             <input
                               type="text"
-                              required={slot.required}
-                              placeholder={`Paste image URL (e.g. https://ibb.co/...) for Spot ${slot.index + 1}`}
-                              value={imgUrl}
+                              required={isPrimary}
+                              placeholder={`Paste image URL (e.g. https://ibb.co/...) for Spot ${idx + 1}`}
+                              value={rawUrl}
                               onChange={(e) => {
+                                const formatted = normalizeImageInput(e.target.value);
                                 const imgs = [...(newCar.images || [])];
-                                imgs[slot.index] = e.target.value;
+                                imgs[idx] = formatted;
                                 setNewCar({ ...newCar, images: imgs });
                               }}
-                              className="flex-1 bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500 w-full"
+                              className="flex-1 bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-mono w-full"
                             />
-                            <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-800 transition-colors shrink-0 w-full sm:w-auto">
+
+                            <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-800 transition-colors shrink-0 w-full sm:w-auto">
                               <span>Upload File</span>
                               <input
                                 type="file"
@@ -980,7 +1071,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                                     reader.onload = (evt) => {
                                       if (evt.target?.result) {
                                         const imgs = [...(newCar.images || [])];
-                                        imgs[slot.index] = evt.target.result as string;
+                                        imgs[idx] = evt.target.result as string;
                                         setNewCar({ ...newCar, images: imgs });
                                       }
                                     };
@@ -994,9 +1085,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                       );
                     })}
 
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      Upload high-resolution image files directly from device or paste direct image links for up to 5 vehicle spots. Original resolution and quality will be preserved without compression.
-                    </p>
+                    <div className="p-3 rounded-xl bg-slate-100/80 border border-slate-200 text-[11px] text-slate-600 space-y-1 font-mono">
+                      <p className="font-bold text-slate-800">💡 Image Tips for Maximum Resolution:</p>
+                      <p>• Paste any ImgBB link (e.g., <code className="bg-slate-200 px-1 rounded text-slate-900">https://ibb.co/xyz</code>) and it will automatically convert into a direct high-res CDN link.</p>
+                      <p>• Uploading image files from your computer or phone preserves 100% original full pixel quality.</p>
+                      <p>• Click <strong>Add Slot</strong> to add up to 10 photos for any car listing.</p>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">

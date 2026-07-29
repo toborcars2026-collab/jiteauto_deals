@@ -14,11 +14,11 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     location: 'Abuja',
     dealership: 'Verified Private Sourcing',
     images: [
-      'https://ibb.co/cSpyPtnL',
-      'https://ibb.co/FZrShZx',
-      'https://ibb.co/9mNR3GPP',
-      'https://ibb.co/fVTsmby2',
-      'https://ibb.co/JjVTdnSP'
+      'https://i.ibb.co/cSpyPtnL/image.jpg',
+      'https://i.ibb.co/FZrShZx/image.jpg',
+      'https://i.ibb.co/9mNR3GPP/image.jpg',
+      'https://i.ibb.co/fVTsmby2/image.jpg',
+      'https://i.ibb.co/JjVTdnSP/image.jpg'
     ],
     description: "🚘 VEHICLE PROFILE SHEET\n2014 Toyota Yaris LE\n📍 Location: Abuja\n💰 Price: ₦14,000,000\n🎨 Color: White\n📦 Condition: Direct Belgium (Foreign Used) 🇧🇪\n📄 Duty: Paid\n\n📝 Description\nLooking for a reliable, fuel-efficient, and low-maintenance car? This 2014 Toyota Yaris LE is an excellent choice. Directly imported from Belgium and finished in a clean White exterior, this hatchback offers Toyota's legendary durability, impressive fuel economy, and practical design. Perfect for daily commuting, ride-hailing, or first-time car owners.\n\n⭐ Key Features\n✅ LE Trim\n✅ Fuel-Efficient 1.5L 4-Cylinder Engine\n✅ Automatic Transmission\n✅ Air Conditioning\n✅ Power Steering\n✅ Power Windows\n✅ Power Door Locks\n✅ Remote Keyless Entry\n✅ Multi-Function Steering Wheel\n✅ Bluetooth Hands-Free Connectivity\n✅ USB & AUX Audio Input\n✅ Factory Audio System\n✅ Touchscreen Display (where equipped)\n✅ Rear View Camera (where equipped)\n✅ Electric Side Mirrors\n✅ Split Folding Rear Seats\n✅ ABS Braking System\n✅ Vehicle Stability Control (VSC)\n✅ Traction Control\n✅ Multiple Airbags\n✅ Daytime Running Lights\n✅ Excellent Fuel Economy",
     engine: '1.5L 4-Cylinder Engine',

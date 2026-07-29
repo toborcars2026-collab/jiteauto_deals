@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign } from 'lucide-react';
+import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2 } from 'lucide-react';
 import { Vehicle } from '../types';
 import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
 
@@ -13,6 +13,7 @@ interface VehicleDetailsModalProps {
 
 export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQualifier, onOpenConsultantModal }: VehicleDetailsModalProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isFullscreenZoom, setIsFullscreenZoom] = useState(false);
 
   if (!isOpen || !vehicle) return null;
 
@@ -70,29 +71,41 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
             
             {/* Gallery Left Column */}
             <div className="lg:col-span-6 space-y-4">
-              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 group">
+              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group">
                 <img
                   src={getImageUrl(images[currentImageIndex])}
                   alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
-                  className="w-full h-full object-cover transition-all"
+                  className="w-full h-full object-cover transition-all cursor-zoom-in"
                   style={{ imageRendering: '-webkit-optimize-contrast' }}
+                  onClick={() => setIsFullscreenZoom(true)}
                   onError={(e) => {
                     e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
                   }}
                   referrerPolicy="no-referrer"
                 />
 
+                {/* Top Right Fullscreen Zoom Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenZoom(true)}
+                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-amber-400 border border-amber-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md backdrop-blur-sm"
+                  title="View 100% Original Resolution Photo"
+                >
+                  <Maximize2 size={14} />
+                  <span>100% Quality Zoom</span>
+                </button>
+
                 {images.length > 1 && (
                   <>
                     <button
                       onClick={handlePrevImage}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md"
                     >
                       <ChevronLeft size={18} />
                     </button>
                     <button
                       onClick={handleNextImage}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md"
                     >
                       <ChevronRight size={18} />
                     </button>
@@ -100,7 +113,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 )}
 
                 {/* Counter Tag */}
-                <div className="absolute bottom-4 right-4 bg-black/75 backdrop-blur-sm px-2.5 py-1 rounded text-[11px] text-white font-mono font-medium">
+                <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white font-mono font-medium border border-white/10">
                   {currentImageIndex + 1} / {images.length}
                 </div>
               </div>
@@ -245,6 +258,75 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
           </div>
         </div>
       </div>
+
+      {/* Fullscreen High-Res Image Lightbox Modal */}
+      {isFullscreenZoom && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
+          {/* Top Control Bar */}
+          <div className="flex items-center justify-between text-white z-10 border-b border-white/10 pb-4">
+            <div>
+              <span className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold">100% Original Resolution Viewer</span>
+              <h3 className="text-sm font-bold text-slate-200">
+                {vehicle.year} {vehicle.make} {vehicle.model} • Photo {currentImageIndex + 1} of {images.length}
+              </h3>
+            </div>
+            <button
+              onClick={() => setIsFullscreenZoom(false)}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20"
+              aria-label="Close Lightbox"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Center Image Container */}
+          <div className="relative flex-1 flex items-center justify-center my-4 overflow-hidden">
+            <img
+              src={getImageUrl(images[currentImageIndex])}
+              alt={`${vehicle.make} ${vehicle.model} full high-res view`}
+              className="max-h-full max-w-full object-contain rounded-xl shadow-2xl transition-all"
+              style={{ imageRendering: '-webkit-optimize-contrast' }}
+              referrerPolicy="no-referrer"
+            />
+
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={handlePrevImage}
+                  className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl"
+                  aria-label="Previous Image"
+                >
+                  <ChevronLeft size={28} />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl"
+                  aria-label="Next Image"
+                >
+                  <ChevronRight size={28} />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Bottom Thumbnails */}
+          {images.length > 1 && (
+            <div className="flex gap-2 justify-center overflow-x-auto py-2 z-10">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`h-12 w-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    currentImageIndex === idx ? 'border-amber-400 scale-105 ring-2 ring-amber-400/50' : 'border-slate-700 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={getImageUrl(img)} alt="thumb" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

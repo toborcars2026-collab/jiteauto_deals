@@ -20,31 +20,64 @@ export function formatMileage(km: number): string {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
-// Normalize image URLs (convert ImgBB webpage links to direct CDN links with high-res fallbacks while maintaining 100% original quality)
+// Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
+export function normalizeImageInput(url: string | undefined | null): string {
+  if (!url || typeof url !== 'string') return '';
+  let trimmed = url.trim();
+
+  if (!trimmed) return '';
+
+  // Data URLs or blob URLs
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+
+  // ImgBB webpage links like https://ibb.co/cSpyPtnL or https://ibb.co/cSpyPtnL/
+  if (trimmed.includes('ibb.co/') && !trimmed.includes('i.ibb.co/')) {
+    const match = trimmed.match(/ibb\.co\/([a-zA-Z0-9]+)/);
+    if (match && match[1]) {
+      return `https://i.ibb.co/${match[1]}/image.jpg`;
+    }
+  }
+
+  // Google Drive share links
+  if (trimmed.includes('drive.google.com/file/d/')) {
+    const match = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+  }
+
+  // Imgur page links like https://imgur.com/a/ABC or https://imgur.com/ABC
+  if (trimmed.includes('imgur.com/') && !trimmed.includes('i.imgur.com/')) {
+    const match = trimmed.match(/imgur\.com\/(?:a\/)?([a-zA-Z0-9]+)/);
+    if (match && match[1]) {
+      return `https://i.imgur.com/${match[1]}.jpg`;
+    }
+  }
+
+  // Dropbox links
+  if (trimmed.includes('dropbox.com/s/')) {
+    return trimmed.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+  }
+
+  // Postimg.cc links
+  if (trimmed.includes('postimg.cc/') && !trimmed.includes('i.postimg.cc/')) {
+    const match = trimmed.match(/postimg\.cc\/([a-zA-Z0-9]+)/);
+    if (match && match[1]) {
+      return `https://i.postimg.cc/${match[1]}/image.jpg`;
+    }
+  }
+
+  return trimmed;
+}
+
 export function getImageUrl(url: string | undefined | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
     return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
   }
 
-  const trimmed = url.trim();
-
-  // If it's a direct base64 image or blob URL, maintain original full quality
-  if (trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
-    return trimmed;
-  }
-
-  // If it's an ImgBB page URL like https://ibb.co/XxKM73bw or https://ibb.co/M5P2KMSR or https://ibb.co/LXYxBBcL
-  if (trimmed.includes('ibb.co/') && !trimmed.includes('i.ibb.co/')) {
-    const parts = trimmed.split('ibb.co/');
-    if (parts[1]) {
-      const code = parts[1].split('/')[0];
-      if (code) {
-        return `https://i.ibb.co/${code}/image.jpg`;
-      }
-    }
-  }
-
-  return trimmed;
+  return normalizeImageInput(url);
 }
 
 // Async fetch vehicles from server with fallback to localStorage
