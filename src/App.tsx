@@ -22,6 +22,7 @@ import VehicleCard from './components/VehicleCard';
 import VehicleDetailsModal from './components/VehicleDetailsModal';
 import LeadQualifierModal from './components/LeadQualifierModal';
 import ConsultantProfileModal from './components/ConsultantProfileModal';
+import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
 import { Vehicle } from './types';
 import { getVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage } from './utils';
@@ -738,6 +739,20 @@ export default function App() {
             : undefined
         }
         initialChannel={consultantChannel}
+      />
+
+      {/* Exit Intent Popup */}
+      <ExitIntentModal
+        onContinueBrowsing={() => {
+          if (currentTab !== 'browse') {
+            setCurrentTab('browse');
+          }
+          const inventoryEl = document.getElementById('inventory');
+          if (inventoryEl) {
+            inventoryEl.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+        onOpenConsultantModal={() => handleGeneralConsultation()}
       />
     </div>
   );
