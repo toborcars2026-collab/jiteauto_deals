@@ -20,6 +20,33 @@ export function formatMileage(km: number): string {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
+// Normalize image URLs (convert ImgBB webpage links to direct CDN links with high-res fallbacks while maintaining 100% original quality)
+export function getImageUrl(url: string | undefined | null): string {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
+  }
+
+  const trimmed = url.trim();
+
+  // If it's a direct base64 image or blob URL, maintain original full quality
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+
+  // If it's an ImgBB page URL like https://ibb.co/XxKM73bw or https://ibb.co/M5P2KMSR or https://ibb.co/LXYxBBcL
+  if (trimmed.includes('ibb.co/') && !trimmed.includes('i.ibb.co/')) {
+    const parts = trimmed.split('ibb.co/');
+    if (parts[1]) {
+      const code = parts[1].split('/')[0];
+      if (code) {
+        return `https://i.ibb.co/${code}/image.jpg`;
+      }
+    }
+  }
+
+  return trimmed;
+}
+
 // Get loaded vehicles from localStorage or seed
 export function getVehicles(): Vehicle[] {
   const data = localStorage.getItem(VEHICLES_KEY);
@@ -33,6 +60,7 @@ export function getVehicles(): Vehicle[] {
 
     // Filter out old pre-populated initial vehicles we want to remove
     const OLD_INITIAL_IDS = [
+      'hyundai-genesis-g80-2018-white',
       'lexus-rx350-2018',
       'mercedes-benz-c300-2017',
       'toyota-hilux-2021',
@@ -48,19 +76,9 @@ export function getVehicles(): Vehicle[] {
       updated = true;
     }
 
-    const synced = filtered.map((v) => {
-      const match = INITIAL_VEHICLES.find(i => i.id === v.id);
-      if (match) {
-        // If initial vehicle was updated in code, update it in localStorage as well
-        if (JSON.stringify(v) !== JSON.stringify(match)) {
-          updated = true;
-          return match;
-        }
-      }
-      return v;
-    });
+    const synced = [...filtered];
 
-    // Ensure all items from INITIAL_VEHICLES exist in synced (insert new ones at the beginning)
+    // Ensure all items from INITIAL_VEHICLES exist in synced (insert new ones at the beginning if not present)
     [...INITIAL_VEHICLES].reverse().forEach(initial => {
       if (!synced.some(v => v.id === initial.id)) {
         synced.unshift(initial);

@@ -901,51 +901,126 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Primary Image URL (Spot 1) *</label>
-                      <input
-                        type="url"
-                        required
-                        placeholder="e.g. https://images.unsplash.com/photo-..."
-                        value={newCar.images?.[0] || ''}
-                        onChange={(e) => {
-                          const imgs = [...(newCar.images || [])];
-                          imgs[0] = e.target.value;
-                          setNewCar({ ...newCar, images: imgs });
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
-                      />
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Primary Image (Spot 1) *</label>
+                        <span className="text-[10px] text-amber-600 font-medium">100% Original Quality Preserved</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Paste image URL (e.g. https://ibb.co/...)"
+                          value={newCar.images?.[0] || ''}
+                          onChange={(e) => {
+                            const imgs = [...(newCar.images || [])];
+                            imgs[0] = e.target.value;
+                            setNewCar({ ...newCar, images: imgs });
+                          }}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
+                        />
+                        <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-200 transition-colors">
+                          <span>Upload File</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  if (evt.target?.result) {
+                                    const imgs = [...(newCar.images || [])];
+                                    imgs[0] = evt.target.result as string;
+                                    setNewCar({ ...newCar, images: imgs });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
                     
                     <div className="space-y-1.5">
-                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Second Image URL (Spot 2)</label>
-                      <input
-                        type="url"
-                        placeholder="e.g. https://images.unsplash.com/photo-..."
-                        value={newCar.images?.[1] || ''}
-                        onChange={(e) => {
-                          const imgs = [...(newCar.images || [])];
-                          imgs[1] = e.target.value;
-                          setNewCar({ ...newCar, images: imgs });
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
-                      />
+                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Second Image (Spot 2)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Paste image URL (e.g. https://ibb.co/...)"
+                          value={newCar.images?.[1] || ''}
+                          onChange={(e) => {
+                            const imgs = [...(newCar.images || [])];
+                            imgs[1] = e.target.value;
+                            setNewCar({ ...newCar, images: imgs });
+                          }}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
+                        />
+                        <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-200 transition-colors">
+                          <span>Upload File</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  if (evt.target?.result) {
+                                    const imgs = [...(newCar.images || [])];
+                                    imgs[1] = evt.target.result as string;
+                                    setNewCar({ ...newCar, images: imgs });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Third Image URL (Spot 3)</label>
-                      <input
-                        type="url"
-                        placeholder="e.g. https://images.unsplash.com/photo-..."
-                        value={newCar.images?.[2] || ''}
-                        onChange={(e) => {
-                          const imgs = [...(newCar.images || [])];
-                          imgs[2] = e.target.value;
-                          setNewCar({ ...newCar, images: imgs });
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
-                      />
+                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Third Image (Spot 3)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Paste image URL (e.g. https://ibb.co/...)"
+                          value={newCar.images?.[2] || ''}
+                          onChange={(e) => {
+                            const imgs = [...(newCar.images || [])];
+                            imgs[2] = e.target.value;
+                            setNewCar({ ...newCar, images: imgs });
+                          }}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
+                        />
+                        <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-200 transition-colors">
+                          <span>Upload File</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  if (evt.target?.result) {
+                                    const imgs = [...(newCar.images || [])];
+                                    imgs[2] = evt.target.result as string;
+                                    setNewCar({ ...newCar, images: imgs });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-slate-400">Specify precise image links for each spot (thumbnails). If you leave Second and Third blank, the primary image will be used for all spots.</p>
+                    <p className="text-[10px] text-slate-400">Upload high-resolution image files directly or paste direct image links. Original resolution and quality will be strictly preserved without compression.</p>
                   </div>
 
                   <div className="space-y-1.5">

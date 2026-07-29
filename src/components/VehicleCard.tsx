@@ -1,7 +1,7 @@
 import React from 'react';
 import { MapPin, Calendar, MessageCircle, Phone, ArrowUpRight } from 'lucide-react';
 import { Vehicle } from '../types';
-import { formatCurrency, getWhatsAppLink, getVehicleInquiryMessage } from '../utils';
+import { formatCurrency, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
 
 interface VehicleCardProps {
   key?: React.Key;
@@ -37,9 +37,13 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
       {/* Image with Tag Overlay */}
       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         <img
-          src={vehicle.images[0] || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'}
+          src={getImageUrl(vehicle.images[0])}
           alt={`${vehicle.make} ${vehicle.model}`}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ imageRendering: '-webkit-optimize-contrast' }}
+          onError={(e) => {
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+          }}
           referrerPolicy="no-referrer"
         />
 

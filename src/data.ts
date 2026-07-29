@@ -2,6 +2,69 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'toyota-avalon-2014-red-limited',
+    make: 'Toyota',
+    model: 'Avalon',
+    year: 2014,
+    price: 14500000,
+    mileage: 62000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    images: [
+      'https://ibb.co/XxKM73bw'
+    ],
+    description: "🚘 VEHICLE PROFILE SHEET\n2014 Toyota Avalon Limited\n📍 Location: Abuja\n💰 Price: ₦14,500,000\n🎨 Color: Red\n📦 Condition: Abuja Used (Extremely Clean)\n📄 Duty: Paid\n\n📝 Description\nDrive in comfort and class with this 2014 Toyota Avalon Limited. This extremely clean Abuja-used luxury sedan offers a premium driving experience with a powerful V6 engine, spacious cabin, and advanced comfort features. Finished in a stunning Red exterior, it is perfect for executives, families, and anyone seeking Toyota's renowned reliability with luxury.\n\n⭐ Key Features\n✅ Limited (Full Option) Trim\n✅ 3.5L V6 Engine\n✅ Smooth Automatic Transmission\n✅ Smart Keyless Entry\n✅ Push-to-Start Ignition\n✅ Premium Leather Interior\n✅ Heated & Ventilated Front Seats\n✅ Power Adjustable Memory Driver's Seat\n✅ Dual-Zone Automatic Climate Control\n✅ Touchscreen Infotainment System\n✅ Bluetooth, USB & AUX Connectivity\n✅ JBL Premium Sound System\n✅ Reverse Camera\n✅ Front & Rear Parking Sensors\n✅ Blind Spot Monitoring\n✅ Cruise Control\n✅ Xenon/LED Headlights\n✅ Fog Lights\n✅ Multi-Function Steering Wheel\n✅ Alloy Wheels\n✅ ABS, Vehicle Stability Control & Multiple Airbags",
+    engine: '3.5L V6 Engine',
+    color: 'Red',
+    condition: 'Nigerian Used',
+    isFeatured: true
+  },
+  {
+    id: 'hyundai-santa-fe-2009-white',
+    make: 'Hyundai',
+    model: 'Santa Fe',
+    year: 2009,
+    price: 7000000,
+    mileage: 85000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Coscharis Certified Sourcing',
+    images: [
+      'https://ibb.co/M5P2KMSR'
+    ],
+    description: "🚘 VEHICLE PROFILE SHEET\n2009 Hyundai Santa Fe\n📍 Location: Abuja\n💰 Price: ₦7,000,000\n🎨 Color: White\n📦 Condition: Foreign Used (Unregistered)\n📄 Duty: Fully Paid\n🔑 Status: Buy & Drive\n\n📝 Description\nOwn this clean, unregistered 2009 Hyundai Santa Fe at an unbeatable price. This SUV is well-maintained, spacious, and built for both city driving and long-distance trips. With its solid engine, smooth automatic transmission, and comfortable interior, it's a great choice for families, business owners, or anyone looking for a reliable SUV without breaking the bank.\n\n⭐ Key Features\n✅ Automatic Transmission\n✅ Reliable 2.7L/3.3L V6 Engine (Variant Dependent)\n✅ Spacious 5-Seater Interior\n✅ Premium Fabric/Leather Interior (Trim Dependent)\n✅ Ice-Cold Air Conditioning\n✅ Factory Audio System\n✅ Steering Wheel Audio Controls\n✅ Power Steering\n✅ Power Windows & Power Mirrors\n✅ Central Locking\n✅ Alloy Wheels\n✅ Roof Rails\n✅ Fog Lights\n✅ ABS Braking System\n✅ Multiple Airbags\n✅ Good Ground Clearance\n✅ Large Cargo Space\n✅ Strong Suspension for Nigerian Roads",
+    engine: 'V6 Petrol Engine',
+    color: 'White',
+    condition: 'Foreign Used',
+    isFeatured: true
+  },
+  {
+    id: 'kia-optima-2019-black-5x',
+    make: 'Kia',
+    model: 'Optima',
+    year: 2019,
+    price: 22000000,
+    mileage: 38000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    images: [
+      'https://ibb.co/LXYxBBcL'
+    ],
+    description: "🚘 VEHICLE PROFILE SHEET\n2019 Kia Optima 2.0T (5X) – Fullest Option\n📍 Location: Abuja\n💰 Price: ₦22,000,000\n🎨 Color: Black\n📦 Condition: Foreign Used\n📄 Duty: Valid until 2026\n\n📝 Description\nTurn heads wherever you go with this 2019 Kia Optima 5X (2.0 Turbo) Fullest Option. This luxury sports sedan blends aggressive styling, premium comfort, and turbocharged performance into one outstanding package. Finished in a sleek Black exterior, it delivers an exciting driving experience while offering top-tier technology, comfort, and safety features.\n\n⭐ Key Features\n✅ Fullest Option (Top Trim)\n✅ 2.0L Turbocharged Engine\n✅ Automatic Transmission\n✅ Smart Keyless Entry\n✅ Push-to-Start Ignition\n✅ Panoramic Sunroof\n✅ Premium Leather Interior\n✅ Heated & Ventilated Front Seats\n✅ Driver Memory Seat\n✅ Dual-Zone Automatic Climate Control\n✅ Large Touchscreen Infotainment System\n✅ Apple CarPlay & Android Auto\n✅ Bluetooth, USB & AUX Connectivity\n✅ Premium Sound System\n✅ Reverse Camera\n✅ Front & Rear Parking Sensors\n✅ Blind Spot Monitoring\n✅ Lane Keep Assist\n✅ Adaptive Cruise Control\n✅ LED Headlights & Daytime Running Lights\n✅ Sport Alloy Wheels\n✅ ABS, Traction Control, ESC & Multiple Airbags",
+    engine: '2.0L Turbocharged Engine',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true
+  },
+  {
     id: 'mercedes-benz-gla250-2017-red',
     make: 'Mercedes-Benz',
     model: 'GLA 250',

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign } from 'lucide-react';
 import { Vehicle } from '../types';
-import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage } from '../utils';
+import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -16,12 +16,17 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
 
   if (!isOpen || !vehicle) return null;
 
+  // Ensure unique image list
+  const uniqueImages = Array.from(new Set(vehicle.images.filter(Boolean)));
+  const images = uniqueImages.length > 0 ? uniqueImages : ['https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200'];
+  const currentImageIndex = activeImageIndex >= images.length ? 0 : activeImageIndex;
+
   const handleNextImage = () => {
-    setActiveImageIndex((prev) => (prev + 1) % vehicle.images.length);
+    setActiveImageIndex((prev) => (prev + 1) % images.length);
   };
 
   const handlePrevImage = () => {
-    setActiveImageIndex((prev) => (prev - 1 + vehicle.images.length) % vehicle.images.length);
+    setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
   const waInquiryLink = getWhatsAppLink(getVehicleInquiryMessage(vehicle));
@@ -67,13 +72,17 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
             <div className="lg:col-span-6 space-y-4">
               <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 group">
                 <img
-                  src={vehicle.images[activeImageIndex] || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'}
-                  alt={`${vehicle.make} ${vehicle.model} - view ${activeImageIndex + 1}`}
+                  src={getImageUrl(images[currentImageIndex])}
+                  alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
                   className="w-full h-full object-cover transition-all"
+                  style={{ imageRendering: '-webkit-optimize-contrast' }}
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                  }}
                   referrerPolicy="no-referrer"
                 />
 
-                {vehicle.images.length > 1 && (
+                {images.length > 1 && (
                   <>
                     <button
                       onClick={handlePrevImage}
@@ -92,25 +101,29 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
 
                 {/* Counter Tag */}
                 <div className="absolute bottom-4 right-4 bg-black/75 backdrop-blur-sm px-2.5 py-1 rounded text-[11px] text-white font-mono font-medium">
-                  {activeImageIndex + 1} / {vehicle.images.length}
+                  {currentImageIndex + 1} / {images.length}
                 </div>
               </div>
 
               {/* Thumbnails Row */}
-              {vehicle.images.length > 1 && (
+              {images.length > 1 && (
                 <div className="flex gap-2.5 overflow-x-auto pb-1">
-                  {vehicle.images.map((img, idx) => (
+                  {images.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setActiveImageIndex(idx)}
                       className={`relative h-14 w-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
-                        activeImageIndex === idx ? 'border-amber-500 scale-95 shadow-sm' : 'border-slate-100 hover:border-slate-300'
+                        currentImageIndex === idx ? 'border-amber-500 scale-95 shadow-sm' : 'border-slate-100 hover:border-slate-300'
                       }`}
                     >
                       <img
-                        src={img}
+                        src={getImageUrl(img)}
                         alt="thumbnail"
                         className="h-full w-full object-cover"
+                        style={{ imageRendering: '-webkit-optimize-contrast' }}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                        }}
                         referrerPolicy="no-referrer"
                       />
                     </button>
