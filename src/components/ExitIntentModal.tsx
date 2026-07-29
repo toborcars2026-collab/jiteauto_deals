@@ -20,35 +20,69 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
 
     let isDisposed = false;
 
-    // Desktop exit intent: detect mouse moving out of the top of the viewport
-    const handleMouseLeave = (e: MouseEvent) => {
-      // clientY <= 15 indicates mouse moved towards tab bar/address bar
-      if (e.clientY <= 15 && !isDisposed) {
-        triggerPopup();
-      }
-    };
-
-    // Mobile fallback: idle timer or back button intent trigger
-    let idleTimer: NodeJS.Timeout;
-    const resetIdleTimer = () => {
-      clearTimeout(idleTimer);
-      // If user is idle for 45 seconds on mobile/touch, present the prompt
-      idleTimer = setTimeout(() => {
-        if (!isDisposed && !sessionStorage.getItem('jite_exit_intent_shown')) {
-          triggerPopup();
-        }
-      }, 45000);
-    };
+    // Push dummy history state for mobile back button / navigation gesture trap
+    try {
+      window.history.pushState({ jite_intent_trap: true }, '');
+    } catch {
+      // Ignore if iframe history restrictions apply
+    }
 
     const triggerPopup = () => {
       const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
-      if (!alreadyShown) {
+      if (!alreadyShown && !isDisposed) {
         sessionStorage.setItem('jite_exit_intent_shown', 'true');
         setIsOpen(true);
       }
     };
 
+    // 1. Desktop exit intent: mouse moving out top of viewport
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 20 && !isDisposed) {
+        triggerPopup();
+      }
+    };
+
+    // 2. Mobile back button navigation / back gesture intent
+    const handlePopState = () => {
+      const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
+      if (!alreadyShown) {
+        triggerPopup();
+      }
+    };
+
+    // 3. Mobile touch swipe down/up intent at top of page
+    let lastTouchY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        lastTouchY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0 && window.scrollY <= 10) {
+        const currentY = e.touches[0].clientY;
+        // Swiping down rapidly at the top of the screen often indicates intent to reload/pull-down or navigate away
+        if (currentY - lastTouchY > 80) {
+          triggerPopup();
+        }
+      }
+    };
+
+    // 4. Mobile fallback idle timer
+    let idleTimer: NodeJS.Timeout;
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!isDisposed && !sessionStorage.getItem('jite_exit_intent_shown')) {
+          triggerPopup();
+        }
+      }, 40000);
+    };
+
     document.addEventListener('mouseleave', handleMouseLeave);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
     window.addEventListener('mousemove', resetIdleTimer);
     window.addEventListener('touchstart', resetIdleTimer);
     resetIdleTimer();
@@ -56,6 +90,9 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
     return () => {
       isDisposed = true;
       document.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('mousemove', resetIdleTimer);
       window.removeEventListener('touchstart', resetIdleTimer);
       clearTimeout(idleTimer);
