@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getWhatsAppLink, getGeneralConsultationMessage } from '../utils';
 
 interface ExitIntentModalProps {
+  isAtHomePage: boolean;
   onContinueBrowsing?: () => void;
   onOpenConsultantModal?: () => void;
 }
 
-export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantModal }: ExitIntentModalProps) {
+export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOpenConsultantModal }: ExitIntentModalProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -20,16 +21,18 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
 
     let isDisposed = false;
 
-    // Push dummy history state for mobile back button / navigation gesture trap
-    try {
-      window.history.pushState({ jite_intent_trap: true }, '');
-    } catch {
-      // Ignore if iframe history restrictions apply
+    // Push dummy history state for mobile back button / exit trap when on home page
+    if (isAtHomePage) {
+      try {
+        window.history.pushState({ jite_exit_trap: true }, '');
+      } catch {
+        // Ignore if iframe history restrictions apply
+      }
     }
 
     const triggerPopup = () => {
       const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
-      if (!alreadyShown && !isDisposed) {
+      if (!alreadyShown && !isDisposed && isAtHomePage) {
         sessionStorage.setItem('jite_exit_intent_shown', 'true');
         setIsOpen(true);
       }
@@ -37,20 +40,20 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
 
     // 1. Desktop exit intent: mouse moving out top of viewport
     const handleMouseLeave = (e: MouseEvent) => {
-      if (e.clientY <= 20 && !isDisposed) {
+      if (e.clientY <= 20 && !isDisposed && isAtHomePage) {
         triggerPopup();
       }
     };
 
-    // 2. Mobile back button navigation / back gesture intent
+    // 2. Mobile back button navigation / back gesture intent when on home page
     const handlePopState = () => {
       const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
-      if (!alreadyShown) {
+      if (!alreadyShown && isAtHomePage) {
         triggerPopup();
       }
     };
 
-    // 3. Mobile touch swipe down/up intent at top of page
+    // 3. Mobile touch swipe down intent at top of page
     let lastTouchY = 0;
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length > 0) {
@@ -59,24 +62,25 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0 && window.scrollY <= 10) {
+      if (e.touches.length > 0 && window.scrollY <= 10 && isAtHomePage) {
         const currentY = e.touches[0].clientY;
-        // Swiping down rapidly at the top of the screen often indicates intent to reload/pull-down or navigate away
-        if (currentY - lastTouchY > 80) {
+        if (currentY - lastTouchY > 90) {
           triggerPopup();
         }
       }
     };
 
-    // 4. Mobile fallback idle timer
+    // 4. Mobile fallback idle timer on home page
     let idleTimer: NodeJS.Timeout;
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        if (!isDisposed && !sessionStorage.getItem('jite_exit_intent_shown')) {
-          triggerPopup();
-        }
-      }, 40000);
+      if (isAtHomePage) {
+        idleTimer = setTimeout(() => {
+          if (!isDisposed && !sessionStorage.getItem('jite_exit_intent_shown') && isAtHomePage) {
+            triggerPopup();
+          }
+        }, 45000);
+      }
     };
 
     document.addEventListener('mouseleave', handleMouseLeave);
@@ -97,7 +101,7 @@ export default function ExitIntentModal({ onContinueBrowsing, onOpenConsultantMo
       window.removeEventListener('touchstart', resetIdleTimer);
       clearTimeout(idleTimer);
     };
-  }, []);
+  }, [isAtHomePage]);
 
   const handleClose = () => {
     setIsOpen(false);

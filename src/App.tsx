@@ -92,6 +92,52 @@ export default function App() {
     };
   }, []);
 
+  // Handle phone back button / browser history navigation for sections and modals
+  useEffect(() => {
+    if (isDetailsOpen || isQualifierOpen || isConsultantOpen || currentTab !== 'home') {
+      try {
+        window.history.pushState(
+          {
+            modal: isDetailsOpen ? 'details' : isQualifierOpen ? 'qualifier' : isConsultantOpen ? 'consultant' : null,
+            tab: currentTab,
+          },
+          ''
+        );
+      } catch {
+        // Ignore if sandbox limits history
+      }
+    }
+  }, [isDetailsOpen, isQualifierOpen, isConsultantOpen, currentTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      // Step-by-step back navigation when pressing phone back button
+      if (isConsultantOpen) {
+        setIsConsultantOpen(false);
+        return;
+      }
+      if (isQualifierOpen) {
+        setIsQualifierOpen(false);
+        setQualifierVehicle(null);
+        return;
+      }
+      if (isDetailsOpen) {
+        setIsDetailsOpen(false);
+        setSelectedVehicle(null);
+        return;
+      }
+      if (currentTab !== 'home') {
+        setCurrentTab('home');
+        return;
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isConsultantOpen, isQualifierOpen, isDetailsOpen, currentTab]);
+
   // Sync state when tab changes or admin edits listings
   const handleReloadVehicles = () => {
     setVehicles(getVehicles());
@@ -743,6 +789,7 @@ export default function App() {
 
       {/* Exit Intent Popup */}
       <ExitIntentModal
+        isAtHomePage={currentTab === 'home' && !isDetailsOpen && !isQualifierOpen && !isConsultantOpen}
         onContinueBrowsing={() => {
           if (currentTab !== 'browse') {
             setCurrentTab('browse');
