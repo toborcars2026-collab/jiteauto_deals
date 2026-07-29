@@ -32,8 +32,10 @@ import {
   getVehicles,
   saveVehicles,
   getLeads,
+  fetchLeads,
   updateLead,
   getInquiries,
+  fetchInquiries,
   updateInquiry,
   formatCurrency,
   formatMileage
@@ -78,10 +80,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   // Automatically lock the section whenever the user leaves / unmounts the component
   useEffect(() => {
+    fetchLeads().then(l => setLeads(l));
+    fetchInquiries().then(i => setInquiries(i));
+
     return () => {
       sessionStorage.removeItem('jite_console_unlocked');
     };
-  }, []);
+  }, [isUnlocked]);
 
   // Form State for Adding/Editing Cars
   const [newCar, setNewCar] = useState<Partial<Vehicle>>({
@@ -212,9 +217,11 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   // Reset to seeds
   const handleResetSeeds = () => {
-    if (confirm('This will wipe all custom additions and reset the catalog back to the original 8 curated vehicles. Proceed?')) {
+    if (confirm('This will wipe all custom additions and reset the catalog back to the original curated vehicles. Proceed?')) {
       localStorage.removeItem('jite_vehicles_v1');
-      window.location.reload();
+      fetch('/api/vehicles/reset', { method: 'POST' }).finally(() => {
+        window.location.reload();
+      });
     }
   };
 

@@ -25,7 +25,7 @@ import ConsultantProfileModal from './components/ConsultantProfileModal';
 import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
 import { Vehicle } from './types';
-import { getVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage } from './utils';
+import { getVehicles, fetchVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
 export default function App() {
@@ -66,16 +66,39 @@ export default function App() {
   const [showOnlyCustom, setShowOnlyCustom] = useState(false);
   const [homeActiveTab, setHomeActiveTab] = useState<'featured' | 'added'>('featured');
 
-  // Populate state on load & listen for real-time storage/custom events
+  // Populate state on load & listen for real-time storage/custom events and server updates
   useEffect(() => {
     const handleSync = () => {
       setVehicles(getVehicles());
     };
 
     handleSync();
+    fetchVehicles().then(v => {
+      if (Array.isArray(v) && v.length > 0) {
+        setVehicles(v);
+      }
+    });
 
     window.addEventListener('vehiclesUpdated', handleSync);
     window.addEventListener('storage', handleSync);
+
+    // Periodically sync with backend server so all devices get live updates when edits are made in Partner Console
+    const interval = setInterval(() => {
+      fetchVehicles().then(v => {
+        if (Array.isArray(v) && v.length > 0) {
+          setVehicles(v);
+        }
+      });
+    }, 5000);
+
+    const handleFocus = () => {
+      fetchVehicles().then(v => {
+        if (Array.isArray(v) && v.length > 0) {
+          setVehicles(v);
+        }
+      });
+    };
+    window.addEventListener('focus', handleFocus);
 
     // Check if we should switch to browse or admin tab from URL query params
     const params = new URLSearchParams(window.location.search);
@@ -89,6 +112,8 @@ export default function App() {
     return () => {
       window.removeEventListener('vehiclesUpdated', handleSync);
       window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
     };
   }, []);
 

@@ -47,6 +47,26 @@ export function getImageUrl(url: string | undefined | null): string {
   return trimmed;
 }
 
+// Async fetch vehicles from server with fallback to localStorage
+export async function fetchVehicles(): Promise<Vehicle[]> {
+  try {
+    const res = await fetch('/api/vehicles');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(VEHICLES_KEY, JSON.stringify(data));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: data }));
+        }
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch vehicles from server, using local storage cache:', e);
+  }
+  return getVehicles();
+}
+
 // Get loaded vehicles from localStorage or seed
 export function getVehicles(): Vehicle[] {
   const data = localStorage.getItem(VEHICLES_KEY);
@@ -96,12 +116,38 @@ export function getVehicles(): Vehicle[] {
   }
 }
 
-// Save vehicles to localStorage
+// Save vehicles to localStorage AND sync to backend server
 export function saveVehicles(vehicles: Vehicle[]): void {
   localStorage.setItem(VEHICLES_KEY, JSON.stringify(vehicles));
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: vehicles }));
   }
+
+  // Sync to server asynchronously so all devices see the changes
+  fetch('/api/vehicles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(vehicles)
+  }).catch(err => {
+    console.error('Failed to sync vehicles to server:', err);
+  });
+}
+
+// Fetch leads from server
+export async function fetchLeads(): Promise<Lead[]> {
+  try {
+    const res = await fetch('/api/leads');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        localStorage.setItem(LEADS_KEY, JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+  return getLeads();
 }
 
 // Get leads from localStorage
@@ -126,6 +172,13 @@ export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead 
   };
   leads.unshift(newLead);
   localStorage.setItem(LEADS_KEY, JSON.stringify(leads));
+
+  fetch('/api/leads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(leads)
+  }).catch(() => {});
+
   return newLead;
 }
 
@@ -134,7 +187,31 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
   const leads = getLeads();
   const updatedLeads = leads.map(l => l.id === leadId ? { ...l, ...updates } : l);
   localStorage.setItem(LEADS_KEY, JSON.stringify(updatedLeads));
+
+  fetch('/api/leads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updatedLeads)
+  }).catch(() => {});
+
   return updatedLeads;
+}
+
+// Fetch inquiries from server
+export async function fetchInquiries(): Promise<Inquiry[]> {
+  try {
+    const res = await fetch('/api/inquiries');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        localStorage.setItem(INQUIRIES_KEY, JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+  return getInquiries();
 }
 
 // Get inquiries from localStorage
@@ -159,6 +236,13 @@ export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'
   };
   inquiries.unshift(newInquiry);
   localStorage.setItem(INQUIRIES_KEY, JSON.stringify(inquiries));
+
+  fetch('/api/inquiries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(inquiries)
+  }).catch(() => {});
+
   return newInquiry;
 }
 
@@ -167,6 +251,13 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
   const inquiries = getInquiries();
   const updated = inquiries.map(i => i.id === inquiryId ? { ...i, ...updates } : i);
   localStorage.setItem(INQUIRIES_KEY, JSON.stringify(updated));
+
+  fetch('/api/inquiries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updated)
+  }).catch(() => {});
+
   return updated;
 }
 
