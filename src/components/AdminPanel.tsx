@@ -40,6 +40,7 @@ import {
   formatCurrency,
   formatMileage,
   normalizeImageInput,
+  resolveImageLink,
   getImageUrl
 } from '../utils';
 
@@ -115,25 +116,25 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [showBulkBox, setShowBulkBox] = useState<boolean>(false);
   const [bulkLinksText, setBulkLinksText] = useState<string>('');
 
-  const handleApplyBulkLinks = () => {
+  const handleApplyBulkLinks = async () => {
     if (!bulkLinksText.trim()) return;
     const rawLinks = bulkLinksText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     if (rawLinks.length === 0) return;
 
-    const normalized = rawLinks.map(l => normalizeImageInput(l));
+    const resolvedLinks = await Promise.all(rawLinks.map(l => resolveImageLink(l)));
     const currentImgs = [...(newCar.images || [])];
-    normalized.forEach((link, idx) => {
+    resolvedLinks.forEach((link, idx) => {
       currentImgs[idx] = link;
     });
 
-    if (normalized.length > totalSlots) {
-      setTotalSlots(Math.min(10, normalized.length));
+    if (resolvedLinks.length > totalSlots) {
+      setTotalSlots(Math.min(10, resolvedLinks.length));
     }
 
     setNewCar({ ...newCar, images: currentImgs });
     setBulkLinksText('');
     setShowBulkBox(false);
-    alert(`Successfully applied ${normalized.length} image link(s) to vehicle slots!`);
+    alert(`Successfully applied ${resolvedLinks.length} high-resolution image link(s)!`);
   };
 
   // Stats calculation

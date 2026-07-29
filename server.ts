@@ -85,6 +85,25 @@ function saveInquiriesStore(inquiries: any[]) {
 }
 
 // API Routes
+app.get("/api/resolve-image", async (req, res) => {
+  const targetUrl = req.query.url as string;
+  if (!targetUrl) return res.status(400).json({ error: "Missing url parameter" });
+  
+  try {
+    if (targetUrl.includes("ibb.co/") && !targetUrl.includes("i.ibb.co/")) {
+      const response = await fetch(targetUrl);
+      const text = await response.text();
+      const match = text.match(/meta property="og:image" content="([^"]+)"/);
+      if (match && match[1]) {
+        return res.json({ resolvedUrl: match[1] });
+      }
+    }
+    return res.json({ resolvedUrl: targetUrl });
+  } catch (err) {
+    return res.json({ resolvedUrl: targetUrl });
+  }
+});
+
 app.get("/api/vehicles", (req, res) => {
   const vehicles = readVehiclesStore();
   res.json(vehicles);

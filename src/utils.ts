@@ -20,6 +20,16 @@ export function formatMileage(km: number): string {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
+// Map of known ImgBB page codes to 100% full original resolution direct CDN URLs
+const KNOWN_IMGBB_MAP: Record<string, string> = {
+  'yBs2zzW9': 'https://i.ibb.co/rfy9BB4j/IMG-20260729-WA0012.jpg',
+  'gbBdws3x': 'https://i.ibb.co/fVP9tm2s/IMG-20260729-WA0016.jpg',
+  'SXj7gSSZ': 'https://i.ibb.co/5W0x3ZZJ/IMG-20260729-WA0017.jpg',
+  'vvkG4czB': 'https://i.ibb.co/n8jvMwk0/IMG-20260729-WA0018.jpg',
+  'vx10V7m6': 'https://i.ibb.co/gMykm5wL/IMG-20260729-WA0022.jpg',
+  'cSpyPtnL': 'https://i.ibb.co/cSpyPtnL/image.jpg',
+};
+
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
 export function normalizeImageInput(url: string | undefined | null): string {
   if (!url || typeof url !== 'string') return '';
@@ -32,11 +42,15 @@ export function normalizeImageInput(url: string | undefined | null): string {
     return trimmed;
   }
 
-  // ImgBB webpage links like https://ibb.co/cSpyPtnL or https://ibb.co/cSpyPtnL/
+  // ImgBB webpage links like https://ibb.co/yBs2zzW9
   if (trimmed.includes('ibb.co/') && !trimmed.includes('i.ibb.co/')) {
     const match = trimmed.match(/ibb\.co\/([a-zA-Z0-9]+)/);
     if (match && match[1]) {
-      return `https://i.ibb.co/${match[1]}/image.jpg`;
+      const code = match[1];
+      if (KNOWN_IMGBB_MAP[code]) {
+        return KNOWN_IMGBB_MAP[code];
+      }
+      return `https://i.ibb.co/${code}/image.jpg`;
     }
   }
 
@@ -48,7 +62,7 @@ export function normalizeImageInput(url: string | undefined | null): string {
     }
   }
 
-  // Imgur page links like https://imgur.com/a/ABC or https://imgur.com/ABC
+  // Imgur page links
   if (trimmed.includes('imgur.com/') && !trimmed.includes('i.imgur.com/')) {
     const match = trimmed.match(/imgur\.com\/(?:a\/)?([a-zA-Z0-9]+)/);
     if (match && match[1]) {
@@ -70,6 +84,23 @@ export function normalizeImageInput(url: string | undefined | null): string {
   }
 
   return trimmed;
+}
+
+// Async helper to resolve ImgBB og:image direct CDN links dynamically via server API
+export async function resolveImageLink(url: string): Promise<string> {
+  const syncNormalized = normalizeImageInput(url);
+  if (syncNormalized.includes('ibb.co/') && !syncNormalized.includes('i.ibb.co/')) {
+    try {
+      const res = await fetch(`/api/resolve-image?url=${encodeURIComponent(syncNormalized)}`);
+      const data = await res.json();
+      if (data && data.resolvedUrl) {
+        return data.resolvedUrl;
+      }
+    } catch (e) {
+      console.warn('Failed to resolve image link via server API:', e);
+    }
+  }
+  return syncNormalized;
 }
 
 export function getImageUrl(url: string | undefined | null): string {
@@ -131,11 +162,17 @@ export function getVehicles(): Vehicle[] {
 
     const synced = [...filtered];
 
-    // Ensure all items from INITIAL_VEHICLES exist in synced (insert new ones at the beginning if not present)
+    // Ensure all items from INITIAL_VEHICLES exist in synced and have latest initial images
     [...INITIAL_VEHICLES].reverse().forEach(initial => {
-      if (!synced.some(v => v.id === initial.id)) {
+      const idx = synced.findIndex(v => v.id === initial.id);
+      if (idx === -1) {
         synced.unshift(initial);
         updated = true;
+      } else if (initial.id === 'toyota-yaris-2014-white-le-belgium') {
+        if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images)) {
+          synced[idx].images = initial.images;
+          updated = true;
+        }
       }
     });
 
