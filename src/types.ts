@@ -14,7 +14,7 @@ export interface Vehicle {
   description: string;
   engine: string;
   color: string;
-  condition: 'Foreign Used' | 'Nigerian Used' | 'Brand New' | 'Direct Belgium' | 'Clean Used' | 'Extremely Clean' | 'Slightly Used' | 'Like New';
+  condition: 'Foreign Used' | 'Nigerian Used' | 'Brand New' | 'Direct Belgium' | 'Clean Used' | 'Extremely Clean' | 'Extremely Clean Nigerian Used' | 'Slightly Used' | 'Like New';
   isFeatured: boolean;
 }
 

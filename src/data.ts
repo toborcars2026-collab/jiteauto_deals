@@ -2,6 +2,184 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'mercedes-benz-gle400-2016-red-4matic',
+    make: 'Mercedes-Benz',
+    model: 'GLE 400',
+    year: 2016,
+    price: 36500000,
+    mileage: 55000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    images: [
+      'https://i.ibb.co/zHhVWvV2/IMG-20260730-WA0041.jpg',
+      'https://i.ibb.co/v4XnrxZr/IMG-20260730-WA0048.jpg',
+      'https://i.ibb.co/zWZfPkcR/IMG-20260730-WA0049.jpg',
+      'https://i.ibb.co/5XxQr60q/IMG-20260730-WA0050.jpg',
+      'https://i.ibb.co/4nPkPtkh/IMG-20260730-WA0052.jpg',
+      'https://i.ibb.co/wNzrygKZ/IMG-20260730-WA0051.jpg',
+      'https://i.ibb.co/Gv4SzCrG/IMG-20260730-WA0047.jpg'
+    ],
+    description: `🚘 VEHICLE PROFILE SHEET
+2016 Mercedes-Benz GLE 400 4MATIC (Full Option)
+📍 Location: Abuja
+💰 Price: ₦36,500,000
+🎨 Color: Red
+📦 Condition: Foreign Used
+📄 Duty: Fully Paid
+
+📝 Description
+Stand out in style with this 2016 Mercedes-Benz GLE 400 4MATIC Full Option, finished in a striking Red exterior. This luxury SUV combines powerful twin-turbo performance with premium comfort, advanced technology, and world-class safety. Featuring a Full Panoramic Roof, refined leather cabin, and intelligent 4MATIC all-wheel drive, it delivers an exceptional driving experience for both city roads and long-distance journeys. Fully duty paid and ready for immediate registration.
+
+⭐ Key Features
+✅ 3.0L V6 Twin-Turbo Petrol Engine
+✅ 9G-TRONIC Automatic Transmission
+✅ 4MATIC Intelligent All-Wheel Drive
+✅ Full Panoramic Glass Sunroof
+✅ Smart Keyless Entry & Push Start
+✅ Premium Leather Interior
+✅ Electrically Adjustable Front Seats
+✅ Memory Seats
+✅ Heated Front Seats
+✅ Dual-Zone Automatic Climate Control
+✅ Power Tailgate
+✅ Reverse Camera
+✅ Front & Rear Parking Sensors
+✅ Blind Spot Assist
+✅ Lane Keeping Assist
+✅ Adaptive Cruise Control
+✅ LED Intelligent Headlights & Daytime Running Lights
+✅ Navigation System
+✅ Bluetooth & USB Connectivity
+✅ Premium Surround Sound System
+✅ Multifunction Steering Wheel
+✅ Alloy Wheels
+✅ Multiple Airbags
+✅ ABS, ESP & Traction Control`,
+    engine: '3.0L V6 Twin-Turbo Petrol Engine',
+    color: 'Red',
+    condition: 'Foreign Used',
+    isFeatured: true
+  },
+  {
+    id: 'mercedes-benz-ml350-2015-white-4matic',
+    make: 'Mercedes-Benz',
+    model: 'ML350',
+    year: 2015,
+    price: 20000000,
+    mileage: 65000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    images: [
+      'https://i.ibb.co/hxVMVf37/IMG-20260730-WA0032.jpg',
+      'https://i.ibb.co/rKLNX5XL/IMG-20260730-WA0035.jpg',
+      'https://i.ibb.co/KxDPj60g/IMG-20260730-WA0036.jpg',
+      'https://i.ibb.co/MkFvwgyr/IMG-20260730-WA0039.jpg',
+      'https://i.ibb.co/1Gkmhj7W/IMG-20260730-WA0040.jpg'
+    ],
+    description: `🚘 VEHICLE PROFILE SHEET
+2015 Mercedes-Benz ML350 4MATIC
+📍 Location: Abuja
+💰 Price: ₦20,000,000
+🎨 Color: White
+📦 Condition: Extremely Clean Nigerian Used
+📄 Duty: Fully Paid
+
+📝 Description
+Own a premium luxury SUV at an unbeatable value with this 2015 Mercedes-Benz ML350. Finished in a stunning White exterior, this SUV delivers the perfect combination of elegance, comfort, performance, and reliability. It features a refined interior, smooth V6 engine, advanced safety technologies, and exceptional ride quality, making it ideal for both city driving and long-distance trips. Fully duty paid and ready to drive.
+
+⭐ Key Features
+✅ 3.5L V6 Petrol Engine
+✅ 7-Speed Automatic Transmission
+✅ 4MATIC All-Wheel Drive
+✅ Leather Interior
+✅ Electrically Adjustable Front Seats
+✅ Memory Seats
+✅ Heated Front Seats
+✅ Panoramic Sunroof
+✅ Power Tailgate
+✅ Keyless Entry & Push Start
+✅ Dual-Zone Automatic Climate Control
+✅ Reverse Camera
+✅ Front & Rear Parking Sensors
+✅ Bluetooth Connectivity
+✅ Premium Audio System
+✅ Multifunction Steering Wheel
+✅ Cruise Control
+✅ Xenon/LED Headlamps with Daytime Running Lights
+✅ Alloy Wheels
+✅ ABS, ESP & Traction Control
+✅ Multiple Airbags`,
+    engine: '3.5L V6 Petrol Engine',
+    color: 'White',
+    condition: 'Extremely Clean Nigerian Used',
+    isFeatured: true
+  },
+  {
+    id: 'toyota-camry-2019-blue-xse',
+    make: 'Toyota',
+    model: 'Camry',
+    year: 2019,
+    price: 32000000,
+    mileage: 45000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    images: [
+      'https://i.ibb.co/Jj0LR4zr/IMG-20260730-WA0022.jpg',
+      'https://i.ibb.co/20DDg0Tq/IMG-20260730-WA0024.jpg',
+      'https://i.ibb.co/4g2yv9Bw/IMG-20260730-WA0026.jpg',
+      'https://i.ibb.co/v6cPQTp8/IMG-20260730-WA0028.jpg',
+      'https://i.ibb.co/KcRtngpc/IMG-20260730-WA0030.jpg'
+    ],
+    description: `🚘 VEHICLE PROFILE SHEET
+2019 Toyota Camry XSE (Full Option)
+📍 Location: Abuja
+💰 Price: ₦32,000,000
+🎨 Color: Blue
+📦 Condition: Foreign Used
+📄 Duty: Fully Paid
+
+📝 Description
+Experience luxury, performance, and cutting-edge technology in this 2019 Toyota Camry XSE Full Option. Finished in a stunning Blue exterior, this premium sedan combines sporty styling with Toyota's legendary reliability. Equipped with a Heads-Up Display, Full Panoramic Roof, and Keyless Entry, it offers an exceptional driving experience with outstanding comfort and safety. Fully duty paid and ready for immediate registration.
+
+⭐ Key Features
+✅ Heads-Up Display (HUD)
+✅ Full Panoramic Glass Roof
+✅ Smart Keyless Entry & Push Start
+✅ Leather Sport Interior
+✅ Electrically Adjustable Front Seats
+✅ Seat Memory Function
+✅ Heated Front Seats
+✅ Dual-Zone Automatic Climate Control
+✅ Large Touchscreen Infotainment System
+✅ Apple CarPlay & Android Auto (where equipped)
+✅ Premium JBL Sound System (Full Option)
+✅ Reverse Camera
+✅ Front & Rear Parking Sensors
+✅ Blind Spot Monitoring
+✅ Lane Departure Alert
+✅ Adaptive Cruise Control
+✅ Pre-Collision Safety System
+✅ LED Headlights & Daytime Running Lights
+✅ Sport Alloy Wheels
+✅ Paddle Shifters
+✅ Steering Wheel Audio & Cruise Controls
+✅ Multiple Airbags
+✅ ABS, Traction Control & Vehicle Stability Control`,
+    engine: '2.5L 4-Cylinder Engine',
+    color: 'Blue',
+    condition: 'Foreign Used',
+    isFeatured: true
+  },
+  {
     id: 'toyota-yaris-2014-white-le-belgium',
     make: 'Toyota',
     model: 'Yaris',
