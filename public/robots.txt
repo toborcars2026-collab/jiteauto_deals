@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /api/
+Allow: /assets/
+
+Sitemap: https://jiteautodeals.com/sitemap.xml
+Host: https://jiteautodeals.com

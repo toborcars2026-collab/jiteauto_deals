@@ -50,10 +50,13 @@ export default function HomepageStats({ vehicles }: HomepageStatsProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="font-display text-lg sm:text-xl font-extrabold text-white">
-                    {activeCount} Active Cars
+                  <span className="font-display text-xl sm:text-2xl font-black text-amber-400 tracking-tight flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-sm font-mono">
+                      {activeCount}
+                    </span>
+                    <span className="text-white font-extrabold">Active Cars</span>
                   </span>
-                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-600">•</span>
                   <span
                     onMouseEnter={(e) => { e.stopPropagation(); setShowTickerTooltip(true); }}
                     onMouseLeave={(e) => { e.stopPropagation(); setShowTickerTooltip(false); }}
@@ -61,7 +64,7 @@ export default function HomepageStats({ vehicles }: HomepageStatsProps) {
                       e.stopPropagation();
                       setShowTickerTooltip(!showTickerTooltip);
                     }}
-                    className="relative font-display text-lg sm:text-xl font-extrabold text-amber-400 cursor-pointer hover:text-amber-300 transition-colors inline-flex items-center gap-1.5"
+                    className="relative font-display text-sm sm:text-base font-bold text-slate-300 hover:text-white cursor-pointer transition-colors inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600"
                   >
                     <span>{formatPortfolioValue(totalPortfolioValue)} Value</span>
                     <AnimatePresence>

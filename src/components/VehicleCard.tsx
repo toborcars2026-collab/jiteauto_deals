@@ -37,12 +37,14 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
       {/* Image with Tag Overlay */}
       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         <img
-          src={getImageUrl(vehicle.images[0])}
-          alt={`${vehicle.make} ${vehicle.model}`}
+          src={getImageUrl(vehicle.images[0], 800, 80)}
+          alt={`${vehicle.make} ${vehicle.model} - Jite Auto Deals Nigeria`}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ imageRendering: '-webkit-optimize-contrast' }}
+          loading="lazy"
+          decoding="async"
           onError={(e) => {
-            e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800';
           }}
           referrerPolicy="no-referrer"
         />

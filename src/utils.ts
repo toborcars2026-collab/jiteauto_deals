@@ -25,23 +25,23 @@ export function isVehicleActive(v: Vehicle): boolean {
   return !v.status || v.status === 'Active';
 }
 
-// Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.6B+, ₦2.3T+)
+// Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.5B+, ₦2.3T+)
 export function formatPortfolioValue(totalNGN: number): string {
   if (!totalNGN || isNaN(totalNGN) || totalNGN <= 0) return '₦0';
   if (totalNGN >= 1_000_000_000_000) {
-    const val = (totalNGN / 1_000_000_000_000).toFixed(1).replace(/\.0$/, '');
+    const val = (Math.floor((totalNGN / 1_000_000_000_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return `₦${val}T+`;
   }
   if (totalNGN >= 1_000_000_000) {
-    const val = (totalNGN / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    const val = (Math.floor((totalNGN / 1_000_000_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return `₦${val}B+`;
   }
   if (totalNGN >= 1_000_000) {
-    const val = (totalNGN / 1_000_000).toFixed(1).replace(/\.0$/, '');
+    const val = (Math.floor((totalNGN / 1_000_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return `₦${val}M+`;
   }
   if (totalNGN >= 1_000) {
-    const val = (totalNGN / 1_000).toFixed(1).replace(/\.0$/, '');
+    const val = (Math.floor((totalNGN / 1_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return `₦${val}K+`;
   }
   return formatCurrency(totalNGN);
@@ -149,12 +149,17 @@ export async function resolveImageLink(url: string): Promise<string> {
   return syncNormalized;
 }
 
-export function getImageUrl(url: string | undefined | null): string {
+export function getImageUrl(url: string | undefined | null, width: number = 900, quality: number = 80): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
+    return `https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=${quality}&w=${width}`;
   }
 
-  return normalizeImageInput(url);
+  const normalized = normalizeImageInput(url);
+  if (normalized.includes('images.unsplash.com') && !normalized.includes('w=')) {
+    const separator = normalized.includes('?') ? '&' : '?';
+    return `${normalized}${separator}auto=format&fit=crop&q=${quality}&w=${width}`;
+  }
+  return normalized;
 }
 
 // Async fetch vehicles from server with fallback to localStorage
