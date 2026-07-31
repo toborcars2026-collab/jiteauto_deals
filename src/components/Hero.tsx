@@ -27,6 +27,8 @@ const SLIDESHOW_IMAGES = [
 
 export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }: HeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [isPaused, setIsPaused] = useState(false);
   const [showPortfolioTooltip, setShowPortfolioTooltip] = useState(false);
 
   const activeVehicles = vehicles.filter(isVehicleActive);
@@ -37,20 +39,41 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
   );
 
   useEffect(() => {
+    if (isPaused) return;
     const timer = setInterval(() => {
+      setDirection(1);
       setCurrentIndex((prevIndex) => (prevIndex + 1) % SLIDESHOW_IMAGES.length);
-    }, 4500);
+    }, 3500);
     return () => clearInterval(timer);
-  }, []);
+  }, [isPaused]);
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setDirection(-1);
     setCurrentIndex((prevIndex) => (prevIndex - 1 + SLIDESHOW_IMAGES.length) % SLIDESHOW_IMAGES.length);
   };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setDirection(1);
     setCurrentIndex((prevIndex) => (prevIndex + 1) % SLIDESHOW_IMAGES.length);
+  };
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      zIndex: 0,
+      x: dir < 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
   };
 
   return (
@@ -155,49 +178,59 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
           </div>
 
           {/* Hero Banner Image Graphic / Card Showcase */}
-          <div className="lg:col-span-5 relative">
+          <div
+            className="lg:col-span-5 relative"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
             <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-2 shadow-2xl shadow-black/50 aspect-[4/3] group">
-              <div className="relative w-full h-full overflow-hidden rounded-xl">
-                <AnimatePresence>
+              <div className="relative w-full h-full overflow-hidden rounded-xl bg-slate-950">
+                <AnimatePresence initial={false} custom={direction} mode="popLayout">
                   <motion.img
                     key={currentIndex}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      x: { type: 'spring', stiffness: 260, damping: 30 },
+                      opacity: { duration: 0.3 }
+                    }}
                     src={SLIDESHOW_IMAGES[currentIndex]}
                     alt={`Luxury vehicle slide ${currentIndex + 1}`}
                     className="absolute inset-0 w-full h-full object-cover rounded-xl"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1.2, ease: "easeInOut" }}
                     referrerPolicy="no-referrer"
                   />
                 </AnimatePresence>
 
                 {/* Ambient dark gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-slate-950/20 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/30 to-slate-950/20 pointer-events-none" />
 
                 {/* Left/Right controls (shown on hover) */}
                 <button
                   onClick={handlePrev}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/60 hover:bg-slate-950/95 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-slate-800/80 focus:outline-none z-20"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/60 hover:bg-slate-950/95 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-slate-800/80 focus:outline-none z-30"
                   aria-label="Previous slide"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
                   onClick={handleNext}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/60 hover:bg-slate-950/95 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-slate-800/80 focus:outline-none z-20"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/60 hover:bg-slate-950/95 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-slate-800/80 focus:outline-none z-30"
                   aria-label="Next slide"
                 >
                   <ChevronRight size={20} />
                 </button>
 
                 {/* Slider Indicators (dots) */}
-                <div className="absolute top-4 right-4 flex gap-1.5 z-25 bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/10">
+                <div className="absolute top-4 right-4 flex gap-1.5 z-30 bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/10">
                   {SLIDESHOW_IMAGES.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={(e) => {
                         e.stopPropagation();
+                        setDirection(idx > currentIndex ? 1 : -1);
                         setCurrentIndex(idx);
                       }}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -208,18 +241,60 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
                   ))}
                 </div>
 
+                {/* Automatically Scrolling Horizontal Marquee Strip */}
+                <div className="absolute bottom-20 left-3 right-3 overflow-hidden rounded-xl bg-slate-950/70 backdrop-blur-md border border-white/10 p-1.5 z-25 pointer-events-auto">
+                  <motion.div
+                    className="flex gap-2 w-max"
+                    animate={{ x: [0, -600] }}
+                    transition={{
+                      x: {
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        duration: 20,
+                        ease: "linear",
+                      },
+                    }}
+                  >
+                    {[...SLIDESHOW_IMAGES, ...SLIDESHOW_IMAGES].map((imgUrl, idx) => {
+                      const realIndex = idx % SLIDESHOW_IMAGES.length;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDirection(realIndex > currentIndex ? 1 : -1);
+                            setCurrentIndex(realIndex);
+                          }}
+                          className={`relative flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all duration-300 ${
+                            realIndex === currentIndex
+                              ? 'border-amber-500 scale-105 shadow-md shadow-amber-500/40'
+                              : 'border-slate-700/60 opacity-65 hover:opacity-100'
+                          }`}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`thumb ${realIndex + 1}`}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                </div>
+
                 {/* Float Trust Widget */}
-                <div className="absolute bottom-6 left-6 right-6 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-lg z-20">
+                <div className="absolute bottom-4 left-4 right-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-xl p-3 flex items-center justify-between shadow-lg z-30">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/30">
-                      <Shield size={18} className="text-amber-500" />
+                    <div className="h-9 w-9 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/30">
+                      <Shield size={16} className="text-amber-500" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-200">Independent Sourcing</h4>
                       <p className="text-[10px] text-slate-400">Guaranteed mechanics audit check</p>
                     </div>
                   </div>
-                  <span className="px-2 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded">
+                  <span className="px-2 py-0.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded">
                     Secure Sourced
                   </span>
                 </div>
