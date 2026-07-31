@@ -9,7 +9,7 @@ interface HomepageStatsProps {
 }
 
 export default function HomepageStats({ vehicles }: HomepageStatsProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showPortfolioTooltip, setShowPortfolioTooltip] = useState(false);
   const [showTickerTooltip, setShowTickerTooltip] = useState(false);
 
