@@ -24,8 +24,9 @@ import LeadQualifierModal from './components/LeadQualifierModal';
 import ConsultantProfileModal from './components/ConsultantProfileModal';
 import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
+import HomepageStats from './components/HomepageStats';
 import { Vehicle } from './types';
-import { getVehicles, fetchVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage } from './utils';
+import { getVehicles, fetchVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage, isVehicleActive } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
 export default function App() {
@@ -214,6 +215,7 @@ export default function App() {
     // Check if it's a custom-added vehicle
     const isCustom = !INITIAL_VEHICLES.some(initial => initial.id === v.id);
     const matchesCustom = !showOnlyCustom || isCustom;
+    const matchesActive = isVehicleActive(v);
 
     return (
       matchesSearch &&
@@ -223,17 +225,20 @@ export default function App() {
       matchesTransmission &&
       matchesFuelType &&
       matchesPrice &&
-      matchesCustom
+      matchesCustom &&
+      matchesActive
     );
   });
 
-  // Extract unique brands, locations for filters
-  const uniqueBrands = Array.from(new Set(vehicles.map((v) => v.make)));
-  const uniqueLocations = Array.from(new Set(vehicles.map((v) => v.location)));
-  const uniqueBodyTypes = Array.from(new Set(vehicles.map((v) => v.bodyType)));
+  const activeVehicles = vehicles.filter(isVehicleActive);
 
-  // Show all featured vehicles on homepage
-  const homepageVehicles = vehicles.filter(v => v.isFeatured);
+  // Extract unique brands, locations for filters
+  const uniqueBrands = Array.from(new Set(activeVehicles.map((v) => v.make)));
+  const uniqueLocations = Array.from(new Set(activeVehicles.map((v) => v.location)));
+  const uniqueBodyTypes = Array.from(new Set(activeVehicles.map((v) => v.bodyType)));
+
+  // Show all featured active vehicles on homepage
+  const homepageVehicles = activeVehicles.filter(v => v.isFeatured);
 
   return (
     <div id="app_root" className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
@@ -258,9 +263,13 @@ export default function App() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onConsultantClick={handleGeneralConsultation}
+              vehicles={vehicles}
             />
 
-            {/* 2. Featured Inventory Grid */}
+            {/* 2. Live Homepage Statistics Section */}
+            <HomepageStats vehicles={vehicles} />
+
+            {/* 3. Featured Inventory Grid */}
             <section className="py-20 bg-slate-50">
               <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
@@ -297,7 +306,7 @@ export default function App() {
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                   >
-                    All Curated Picks ({vehicles.length})
+                    All Curated Picks ({activeVehicles.length})
                   </button>
                   <button
                     onClick={() => setHomeActiveTab('added')}
@@ -383,7 +392,7 @@ export default function App() {
                     }}
                     className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-amber-500 font-extrabold rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl border border-amber-500/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
                   >
-                    <span>View All ({vehicles.length}) Vehicles in a New Tab</span>
+                    <span>View All ({activeVehicles.length}) Vehicles in a New Tab</span>
                     <span className="text-amber-500 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">↗</span>
                   </button>
                 </div>

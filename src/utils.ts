@@ -20,6 +20,33 @@ export function formatMileage(km: number): string {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
+// Check if a vehicle is active (defaulting to true if status is undefined or 'Active')
+export function isVehicleActive(v: Vehicle): boolean {
+  return !v.status || v.status === 'Active';
+}
+
+// Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.6B+, ₦2.3T+)
+export function formatPortfolioValue(totalNGN: number): string {
+  if (!totalNGN || totalNGN === 0) return '₦0';
+  if (totalNGN >= 1_000_000_000_000) {
+    const val = (totalNGN / 1_000_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `₦${val}T+`;
+  }
+  if (totalNGN >= 1_000_000_000) {
+    const val = (totalNGN / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `₦${val}B+`;
+  }
+  if (totalNGN >= 1_000_000) {
+    const val = (totalNGN / 1_000_000).toFixed(1).replace(/\.0$/, '');
+    return `₦${val}M+`;
+  }
+  if (totalNGN >= 1_000) {
+    const val = (totalNGN / 1_000).toFixed(1).replace(/\.0$/, '');
+    return `₦${val}K+`;
+  }
+  return formatCurrency(totalNGN);
+}
+
 // Map of known ImgBB page codes to 100% full original resolution direct CDN URLs
 const KNOWN_IMGBB_MAP: Record<string, string> = {
   'S7XwDCwm': 'https://i.ibb.co/zHhVWvV2/IMG-20260730-WA0041.jpg',

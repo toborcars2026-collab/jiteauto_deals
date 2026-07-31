@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Sparkles, HelpCircle, ArrowRight, MessageSquare, PhoneCall, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Vehicle } from '../types';
+import { isVehicleActive, formatPortfolioValue } from '../utils';
 
 interface HeroProps {
   onBrowseClick: () => void;
   onConsultantClick: () => void;
+  vehicles?: Vehicle[];
 }
 
 const SLIDESHOW_IMAGES = [
@@ -22,8 +25,15 @@ const SLIDESHOW_IMAGES = [
   'https://i.ibb.co/DHbSRV1n/IMG-20260611-WA0012.jpg'
 ];
 
-export default function Hero({ onBrowseClick, onConsultantClick }: HeroProps) {
+export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }: HeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  const activeVehicles = vehicles.filter(isVehicleActive);
+  const activeCount = activeVehicles.length;
+  const totalPortfolioValue = activeVehicles.reduce(
+    (sum, v) => sum + (Number(v.price) || 0),
+    0
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -85,12 +95,20 @@ export default function Hero({ onBrowseClick, onConsultantClick }: HeroProps) {
             {/* Core Trust Indicators */}
             <div className="grid grid-cols-3 gap-4 pt-8 border-t border-slate-800/60 max-w-lg">
               <div className="text-left">
-                <span className="block font-display text-2xl font-bold text-amber-500">100%</span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Verified Dealers</span>
+                <span className="block font-display text-2xl font-bold text-amber-500">
+                  {activeCount > 0 ? activeCount : '100%'}
+                </span>
+                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                  {activeCount > 0 ? 'Active Cars' : 'Verified Dealers'}
+                </span>
               </div>
               <div className="text-left">
-                <span className="block font-display text-2xl font-bold text-white">4.9★</span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Client Rating</span>
+                <span className="block font-display text-2xl font-bold text-white">
+                  {activeCount > 0 ? formatPortfolioValue(totalPortfolioValue) : '4.9★'}
+                </span>
+                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                  {activeCount > 0 ? 'Portfolio Value' : 'Client Rating'}
+                </span>
               </div>
               <div className="text-left">
                 <span className="block font-display text-2xl font-bold text-white">₦0</span>
