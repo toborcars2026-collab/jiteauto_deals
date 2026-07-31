@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Sparkles, HelpCircle, ArrowRight, MessageSquare, PhoneCall, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { isVehicleActive, formatPortfolioValue } from '../utils';
+import { isVehicleActive, formatPortfolioValue, formatCurrency } from '../utils';
 
 interface HeroProps {
   onBrowseClick: () => void;
@@ -27,6 +27,7 @@ const SLIDESHOW_IMAGES = [
 
 export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }: HeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showPortfolioTooltip, setShowPortfolioTooltip] = useState(false);
 
   const activeVehicles = vehicles.filter(isVehicleActive);
   const activeCount = activeVehicles.length;
@@ -102,13 +103,49 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
                   {activeCount > 0 ? 'Active Cars' : 'Verified Dealers'}
                 </span>
               </div>
-              <div className="text-left">
-                <span className="block font-display text-2xl font-bold text-white">
-                  {activeCount > 0 ? formatPortfolioValue(totalPortfolioValue) : '4.9★'}
+              <div className="text-left relative">
+                <span
+                  onMouseEnter={() => setShowPortfolioTooltip(true)}
+                  onMouseLeave={() => setShowPortfolioTooltip(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPortfolioTooltip(!showPortfolioTooltip);
+                  }}
+                  className="block font-display text-2xl font-bold text-white cursor-pointer hover:text-amber-400 transition-colors inline-flex items-center gap-1"
+                >
+                  <span>{activeCount > 0 ? formatPortfolioValue(totalPortfolioValue) : '4.9★'}</span>
                 </span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">
                   {activeCount > 0 ? 'Portfolio Value' : 'Client Rating'}
                 </span>
+
+                <AnimatePresence>
+                  {showPortfolioTooltip && activeCount > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute z-50 left-0 -top-32 bg-slate-950/98 border border-amber-500/80 rounded-xl p-3 shadow-2xl shadow-black/80 backdrop-blur-xl whitespace-nowrap min-w-[240px]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Exact Portfolio Total
+                        </span>
+                      </div>
+                      <div className="py-1.5">
+                        <div className="text-lg font-display font-extrabold text-white">
+                          {formatCurrency(totalPortfolioValue)}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          Across {activeCount} active vehicles
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="text-left">
                 <span className="block font-display text-2xl font-bold text-white">₦0</span>

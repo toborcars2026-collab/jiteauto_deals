@@ -27,7 +27,7 @@ export function isVehicleActive(v: Vehicle): boolean {
 
 // Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.6B+, ₦2.3T+)
 export function formatPortfolioValue(totalNGN: number): string {
-  if (!totalNGN || totalNGN === 0) return '₦0';
+  if (!totalNGN || isNaN(totalNGN) || totalNGN <= 0) return '₦0';
   if (totalNGN >= 1_000_000_000_000) {
     const val = (totalNGN / 1_000_000_000_000).toFixed(1).replace(/\.0$/, '');
     return `₦${val}T+`;

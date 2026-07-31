@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { Car, TrendingUp, Award, ShieldCheck, Radio, Layers, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { isVehicleActive, formatPortfolioValue } from '../utils';
+import { isVehicleActive, formatPortfolioValue, formatCurrency } from '../utils';
 
 interface HomepageStatsProps {
   vehicles: Vehicle[];
 }
 
 export default function HomepageStats({ vehicles }: HomepageStatsProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [showPortfolioTooltip, setShowPortfolioTooltip] = useState(false);
+  const [showTickerTooltip, setShowTickerTooltip] = useState(false);
 
   // Filter only active vehicles (defaults to true when status is undefined or 'Active')
   const activeVehicles = vehicles.filter(isVehicleActive);
@@ -52,8 +54,43 @@ export default function HomepageStats({ vehicles }: HomepageStatsProps) {
                     {activeCount} Active Cars
                   </span>
                   <span className="text-slate-500">•</span>
-                  <span className="font-display text-lg sm:text-xl font-extrabold text-amber-400">
-                    {formatPortfolioValue(totalPortfolioValue)} Value
+                  <span
+                    onMouseEnter={(e) => { e.stopPropagation(); setShowTickerTooltip(true); }}
+                    onMouseLeave={(e) => { e.stopPropagation(); setShowTickerTooltip(false); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTickerTooltip(!showTickerTooltip);
+                    }}
+                    className="relative font-display text-lg sm:text-xl font-extrabold text-amber-400 cursor-pointer hover:text-amber-300 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <span>{formatPortfolioValue(totalPortfolioValue)} Value</span>
+                    <AnimatePresence>
+                      {showTickerTooltip && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute z-50 left-0 top-full mt-2 bg-slate-950/98 border border-amber-500/80 rounded-xl p-3 shadow-2xl shadow-black/80 backdrop-blur-xl whitespace-nowrap min-w-[240px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Exact Portfolio Total
+                            </span>
+                          </div>
+                          <div className="py-1.5">
+                            <div className="text-lg font-display font-extrabold text-white">
+                              {formatCurrency(totalPortfolioValue)}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              Across {activeCount} active vehicles
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </span>
                 </div>
               </div>
@@ -133,23 +170,69 @@ export default function HomepageStats({ vehicles }: HomepageStatsProps) {
                   </div>
 
                   {/* Stat 2: Total Portfolio Value */}
-                  <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-6 shadow-xl flex flex-col justify-between">
+                  <div
+                    onMouseEnter={() => setShowPortfolioTooltip(true)}
+                    onMouseLeave={() => setShowPortfolioTooltip(false)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPortfolioTooltip(!showPortfolioTooltip);
+                    }}
+                    className="relative rounded-2xl bg-slate-800/95 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/60 p-6 shadow-xl hover:shadow-2xl hover:shadow-amber-500/10 flex flex-col justify-between cursor-pointer transition-all duration-200 group"
+                  >
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Portfolio Value
                       </span>
-                      <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                      <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
                         <TrendingUp size={18} />
                       </div>
                     </div>
                     <div>
-                      <div className="font-display text-4xl font-extrabold text-white tracking-tight">
+                      <div className="font-display text-4xl font-extrabold text-white tracking-tight group-hover:text-amber-400 transition-colors">
                         {formatPortfolioValue(totalPortfolioValue)}
                       </div>
                       <p className="text-slate-300 text-sm font-semibold mt-1">
                         Total Combined Asset Value
                       </p>
+                      <p className="text-slate-400 text-xs mt-2 group-hover:text-slate-300 transition-colors">
+                        Hover or tap to view exact NGN valuation.
+                      </p>
                     </div>
+
+                    {/* Premium Hover/Tap Tooltip Popup */}
+                    <AnimatePresence>
+                      {showPortfolioTooltip && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute z-50 left-2 right-2 bottom-full mb-3 bg-slate-950/98 border-2 border-amber-500/80 rounded-2xl p-4 shadow-2xl shadow-amber-500/25 backdrop-blur-xl"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                              Live Inventory Audit
+                            </span>
+                            <span className="text-[10px] font-mono text-emerald-400 font-bold">100% Sync</span>
+                          </div>
+                          <div className="py-2.5">
+                            <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
+                              {formatCurrency(totalPortfolioValue)}
+                            </div>
+                            <div className="text-xs text-slate-300 font-medium mt-1">
+                              Exact combined value of {activeCount} active vehicles
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                            <span>Avg: {formatCurrency(averagePrice)} / car</span>
+                            <span className="text-emerald-400 font-bold">● Active</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Stat 3: Curated Automotive Brands */}
