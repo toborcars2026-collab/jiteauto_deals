@@ -697,13 +697,9 @@ export default function App() {
                 Jite Auto <span className="text-amber-500">Deals</span>
               </span>
             </div>
-            <p className="text-slate-400 leading-relaxed max-w-xs font-light">
-              Nigeria's premier automotive dealership matching buyers with luxury, bulletproof, and certified foreign used vehicles in Lagos & Abuja.
+            <p className="text-slate-450 leading-relaxed max-w-xs font-light">
+              Premium vehicle consulting matching buyers with quality, mechanical-audit certified cars from reputable dealerships across Nigeria.
             </p>
-            <div className="text-slate-400 text-xs space-y-1.5 font-light pt-1">
-              <p className="flex items-center gap-1.5"><MapPin size={13} className="text-amber-400 shrink-0" /> Lagos &amp; Abuja Showrooms, Nigeria</p>
-              <p className="flex items-center gap-1.5"><Phone size={13} className="text-emerald-400 shrink-0" /> +234 818 082 3197 (VIP Sourcing &amp; Sales)</p>
-            </div>
           </div>
 
           {/* Sourcing Links */}

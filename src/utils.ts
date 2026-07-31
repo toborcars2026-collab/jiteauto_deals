@@ -149,17 +149,12 @@ export async function resolveImageLink(url: string): Promise<string> {
   return syncNormalized;
 }
 
-export function getImageUrl(url: string | undefined | null, width: number = 900, quality: number = 80): string {
+export function getImageUrl(url: string | undefined | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    return `https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=${quality}&w=${width}`;
+    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
   }
 
-  const normalized = normalizeImageInput(url);
-  if (normalized.includes('images.unsplash.com') && !normalized.includes('w=')) {
-    const separator = normalized.includes('?') ? '&' : '?';
-    return `${normalized}${separator}auto=format&fit=crop&q=${quality}&w=${width}`;
-  }
-  return normalized;
+  return normalizeImageInput(url);
 }
 
 // Async fetch vehicles from server with fallback to localStorage
