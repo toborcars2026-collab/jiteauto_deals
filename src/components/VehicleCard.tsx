@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { MapPin, Calendar, MessageCircle, Phone, ArrowUpRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
 import { formatCurrency, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
 
@@ -12,7 +13,59 @@ interface VehicleCardProps {
 }
 
 export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOpenConsultantModal }: VehicleCardProps) {
+  const [currentImgIdx, setCurrentImgIdx] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const lastWheelTimeRef = useRef(0);
   const waLink = getWhatsAppLink(getVehicleInquiryMessage(vehicle));
+
+  const images = (vehicle.images && vehicle.images.length > 0)
+    ? Array.from(new Set(vehicle.images.filter(Boolean)))
+    : ['https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000'];
+
+  const handleDragEnd = (_event: any, info: any) => {
+    const swipe = info.offset.x;
+    const velocity = info.velocity.x;
+    if (swipe < -15 || velocity < -50) {
+      setDirection(1);
+      setCurrentImgIdx((prev) => (prev + 1) % images.length);
+    } else if (swipe > 15 || velocity > 50) {
+      setDirection(-1);
+      setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (images.length <= 1) return;
+    const now = Date.now();
+    if (now - lastWheelTimeRef.current < 250) return;
+    if (Math.abs(e.deltaX) > 15 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      lastWheelTimeRef.current = now;
+      if (e.deltaX > 0) {
+        setDirection(1);
+        setCurrentImgIdx((prev) => (prev + 1) % images.length);
+      } else {
+        setDirection(-1);
+        setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
+      }
+    }
+  };
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      zIndex: 0,
+      x: dir < 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+  };
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -35,20 +88,41 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-amber-200 hover:shadow-xl transition-all duration-300">
       {/* Image with Tag Overlay */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-        <img
-          src={getImageUrl(vehicle.images[0])}
-          alt={`${vehicle.make} ${vehicle.model}`}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          style={{ imageRendering: '-webkit-optimize-contrast' }}
-          onError={(e) => {
-            e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
-          }}
-          referrerPolicy="no-referrer"
-        />
+      <div
+        className="relative aspect-[16/10] overflow-hidden bg-slate-100 select-none"
+        onWheel={handleWheel}
+      >
+        <AnimatePresence initial={false} custom={direction} mode="popLayout">
+          <motion.img
+            key={currentImgIdx}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
+              opacity: { duration: 0.1 },
+            }}
+            src={getImageUrl(images[currentImgIdx])}
+            alt={`${vehicle.make} ${vehicle.model}`}
+            className="h-full w-full object-cover cursor-grab active:cursor-grabbing transition-transform duration-500 group-hover:scale-105"
+            style={{ imageRendering: '-webkit-optimize-contrast' }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.85}
+            dragMomentum={false}
+            dragTransition={{ bounceStiffness: 900, bounceDamping: 45 }}
+            onDragEnd={handleDragEnd}
+            onError={(e) => {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+            }}
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
 
         {/* Condition Tag overlay */}
-        <div className="absolute top-4 left-4 flex gap-1.5">
+        <div className="absolute top-4 left-4 flex gap-1.5 z-10 pointer-events-none">
           <span className={`px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider rounded-lg shadow-sm border ${
             vehicle.condition === 'Brand New'
               ? 'bg-emerald-500 text-white border-emerald-400'
@@ -60,8 +134,29 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
           </span>
         </div>
 
+        {/* Slide Indicator Dots (when multiple images exist) */}
+        {images.length > 1 && (
+          <div className="absolute top-4 right-4 flex items-center gap-1 z-10 bg-slate-950/70 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 pointer-events-auto">
+            {images.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDirection(idx > currentImgIdx ? 1 : -1);
+                  setCurrentImgIdx(idx);
+                }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  currentImgIdx === idx ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/50 hover:bg-white'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Transmission & Fuel Overlay */}
-        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-slate-950/75 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium">
+        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-slate-950/75 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium z-10 pointer-events-none">
           <span>{vehicle.transmission}</span>
           <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
           <span>{vehicle.fuelType}</span>

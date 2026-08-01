@@ -194,8 +194,8 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
                     animate="center"
                     exit="exit"
                     transition={{
-                      x: { type: 'spring', stiffness: 260, damping: 30 },
-                      opacity: { duration: 0.3 }
+                      x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
+                      opacity: { duration: 0.15 }
                     }}
                     src={SLIDESHOW_IMAGES[currentIndex]}
                     alt={`Luxury vehicle slide ${currentIndex + 1}`}
@@ -239,48 +239,6 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
                       aria-label={`Go to slide ${idx + 1}`}
                     />
                   ))}
-                </div>
-
-                {/* Automatically Scrolling Horizontal Marquee Strip */}
-                <div className="absolute bottom-20 left-3 right-3 overflow-hidden rounded-xl bg-slate-950/70 backdrop-blur-md border border-white/10 p-1.5 z-25 pointer-events-auto">
-                  <motion.div
-                    className="flex gap-2 w-max"
-                    animate={{ x: [0, -600] }}
-                    transition={{
-                      x: {
-                        repeat: Infinity,
-                        repeatType: "loop",
-                        duration: 20,
-                        ease: "linear",
-                      },
-                    }}
-                  >
-                    {[...SLIDESHOW_IMAGES, ...SLIDESHOW_IMAGES].map((imgUrl, idx) => {
-                      const realIndex = idx % SLIDESHOW_IMAGES.length;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDirection(realIndex > currentIndex ? 1 : -1);
-                            setCurrentIndex(realIndex);
-                          }}
-                          className={`relative flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all duration-300 ${
-                            realIndex === currentIndex
-                              ? 'border-amber-500 scale-105 shadow-md shadow-amber-500/40'
-                              : 'border-slate-700/60 opacity-65 hover:opacity-100'
-                          }`}
-                        >
-                          <img
-                            src={imgUrl}
-                            alt={`thumb ${realIndex + 1}`}
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </button>
-                      );
-                    })}
-                  </motion.div>
                 </div>
 
                 {/* Float Trust Widget */}
