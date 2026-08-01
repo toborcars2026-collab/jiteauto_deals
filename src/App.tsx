@@ -24,7 +24,6 @@ import LeadQualifierModal from './components/LeadQualifierModal';
 import ConsultantProfileModal from './components/ConsultantProfileModal';
 import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
-import HomepageStats from './components/HomepageStats';
 import { Vehicle } from './types';
 import { getVehicles, fetchVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage, isVehicleActive } from './utils';
 import { INITIAL_VEHICLES } from './data';
@@ -266,10 +265,7 @@ export default function App() {
               vehicles={vehicles}
             />
 
-            {/* 2. Live Homepage Statistics Section */}
-            <HomepageStats vehicles={vehicles} />
-
-            {/* 3. Featured Inventory Grid */}
+            {/* Featured Inventory Grid */}
             <section className="py-20 bg-slate-50">
               <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Sparkles, HelpCircle, ArrowRight, MessageSquare, PhoneCall, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Sparkles, HelpCircle, ArrowRight, MessageSquare, PhoneCall, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { isVehicleActive, formatPortfolioValue, formatCurrency } from '../utils';
 
 interface HeroProps {
   onBrowseClick: () => void;
@@ -25,18 +24,10 @@ const SLIDESHOW_IMAGES = [
   'https://i.ibb.co/DHbSRV1n/IMG-20260611-WA0012.jpg'
 ];
 
-export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }: HeroProps) {
+export default function Hero({ onBrowseClick, onConsultantClick }: HeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
-  const [showPortfolioTooltip, setShowPortfolioTooltip] = useState(false);
-
-  const activeVehicles = vehicles.filter(isVehicleActive);
-  const activeCount = activeVehicles.length;
-  const totalPortfolioValue = activeVehicles.reduce(
-    (sum, v) => sum + (Number(v.price) || 0),
-    0
-  );
 
   useEffect(() => {
     if (isPaused) return;
@@ -116,63 +107,34 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
               </button>
             </div>
 
-            {/* Core Trust Indicators */}
-            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-slate-800/60 max-w-lg">
-              <div className="text-left">
-                <span className="block font-display text-2xl font-bold text-amber-500">
-                  {activeCount > 0 ? activeCount : '100%'}
-                </span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-                  {activeCount > 0 ? 'Active Cars' : 'Verified Dealers'}
-                </span>
-              </div>
-              <div className="text-left relative">
-                <span
-                  onMouseEnter={() => setShowPortfolioTooltip(true)}
-                  onMouseLeave={() => setShowPortfolioTooltip(false)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowPortfolioTooltip(!showPortfolioTooltip);
-                  }}
-                  className="block font-display text-2xl font-bold text-white cursor-pointer hover:text-amber-400 transition-colors inline-flex items-center gap-1"
-                >
-                  <span>{activeCount > 0 ? formatPortfolioValue(totalPortfolioValue) : '4.9★'}</span>
-                </span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">
-                  {activeCount > 0 ? 'Portfolio Value' : 'Client Rating'}
-                </span>
-
-                <AnimatePresence>
-                  {showPortfolioTooltip && activeCount > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute z-50 left-0 -top-32 bg-slate-950/98 border border-amber-500/80 rounded-xl p-3 shadow-2xl shadow-black/80 backdrop-blur-xl whitespace-nowrap min-w-[240px]"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Exact Portfolio Total
-                        </span>
-                      </div>
-                      <div className="py-1.5">
-                        <div className="text-lg font-display font-extrabold text-white">
-                          {formatCurrency(totalPortfolioValue)}
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          Across {activeCount} active vehicles
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-              <div className="text-left">
-                <span className="block font-display text-2xl font-bold text-white">₦0</span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Hidden Agency Fees</span>
+            {/* Clean Lightweight Trust Section */}
+            <div className="pt-8 border-t border-slate-800/60 max-w-xl">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 mt-0.5 w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                  <ShieldCheck size={22} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-display text-lg font-bold text-white tracking-tight">
+                    100% Verified Dealers
+                  </h3>
+                  <p className="text-slate-400 text-sm font-light leading-relaxed">
+                    Every dealership featured on Jite Auto Deals is carefully verified before being listed, helping you connect with trusted sellers and genuine vehicle listings.
+                  </p>
+                  <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs font-medium text-slate-300">
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>Verified Dealerships</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>Genuine Vehicle Listings</span>
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>Trusted Buying Experience</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
