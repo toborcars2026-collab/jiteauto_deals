@@ -35,35 +35,19 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
     setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  const lastWheelTimeRef = useRef(0);
-
   const handleDragEnd = (_event: any, info: any) => {
     const swipe = info.offset.x;
     const velocity = info.velocity.x;
-    if (swipe < -15 || velocity < -50) {
+    if (swipe < -35 || velocity < -150) {
       dragOccurredRef.current = true;
       handleNextImage();
-    } else if (swipe > 15 || velocity > 50) {
+    } else if (swipe > 35 || velocity > 150) {
       dragOccurredRef.current = true;
       handlePrevImage();
     } else {
       setTimeout(() => {
         dragOccurredRef.current = false;
       }, 50);
-    }
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (images.length <= 1) return;
-    const now = Date.now();
-    if (now - lastWheelTimeRef.current < 250) return;
-    if (Math.abs(e.deltaX) > 15 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      lastWheelTimeRef.current = now;
-      if (e.deltaX > 0) {
-        handleNextImage();
-      } else {
-        handlePrevImage();
-      }
     }
   };
 
@@ -125,10 +109,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
             
             {/* Gallery Left Column */}
             <div className="lg:col-span-6 space-y-4">
-              <div
-                className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none"
-                onWheel={handleWheel}
-              >
+              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none">
                 <AnimatePresence initial={false} custom={direction} mode="popLayout">
                   <motion.img
                     key={currentImageIndex}
@@ -138,8 +119,8 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                     animate="center"
                     exit="exit"
                     transition={{
-                      x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
-                      opacity: { duration: 0.1 },
+                      x: { type: 'spring', stiffness: 300, damping: 30 },
+                      opacity: { duration: 0.2 },
                     }}
                     src={getImageUrl(images[currentImageIndex])}
                     alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
@@ -147,9 +128,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                     style={{ imageRendering: '-webkit-optimize-contrast' }}
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.85}
-                    dragMomentum={false}
-                    dragTransition={{ bounceStiffness: 900, bounceDamping: 45 }}
+                    dragElastic={0.2}
                     onDragStart={() => {
                       dragOccurredRef.current = false;
                     }}
@@ -369,10 +348,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
           </div>
 
           {/* Center Image Container */}
-          <div
-            className="relative flex-1 flex items-center justify-center my-4 overflow-hidden select-none"
-            onWheel={handleWheel}
-          >
+          <div className="relative flex-1 flex items-center justify-center my-4 overflow-hidden select-none">
             <AnimatePresence initial={false} custom={direction} mode="popLayout">
               <motion.img
                 key={currentImageIndex}
@@ -382,8 +358,8 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 animate="center"
                 exit="exit"
                 transition={{
-                  x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
-                  opacity: { duration: 0.1 },
+                  x: { type: 'spring', stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.2 },
                 }}
                 src={getImageUrl(images[currentImageIndex])}
                 alt={`${vehicle.make} ${vehicle.model} full high-res view`}
@@ -391,9 +367,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 style={{ imageRendering: '-webkit-optimize-contrast' }}
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.85}
-                dragMomentum={false}
-                dragTransition={{ bounceStiffness: 900, bounceDamping: 45 }}
+                dragElastic={0.2}
                 onDragEnd={handleDragEnd}
                 referrerPolicy="no-referrer"
               />

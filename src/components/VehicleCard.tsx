@@ -15,7 +15,7 @@ interface VehicleCardProps {
 export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOpenConsultantModal }: VehicleCardProps) {
   const [currentImgIdx, setCurrentImgIdx] = useState(0);
   const [direction, setDirection] = useState(1);
-  const lastWheelTimeRef = useRef(0);
+  const dragOccurredRef = useRef(false);
   const waLink = getWhatsAppLink(getVehicleInquiryMessage(vehicle));
 
   const images = (vehicle.images && vehicle.images.length > 0)
@@ -25,28 +25,14 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
   const handleDragEnd = (_event: any, info: any) => {
     const swipe = info.offset.x;
     const velocity = info.velocity.x;
-    if (swipe < -15 || velocity < -50) {
+    if (swipe < -35 || velocity < -150) {
+      dragOccurredRef.current = true;
       setDirection(1);
       setCurrentImgIdx((prev) => (prev + 1) % images.length);
-    } else if (swipe > 15 || velocity > 50) {
+    } else if (swipe > 35 || velocity > 150) {
+      dragOccurredRef.current = true;
       setDirection(-1);
       setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
-    }
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (images.length <= 1) return;
-    const now = Date.now();
-    if (now - lastWheelTimeRef.current < 250) return;
-    if (Math.abs(e.deltaX) > 15 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      lastWheelTimeRef.current = now;
-      if (e.deltaX > 0) {
-        setDirection(1);
-        setCurrentImgIdx((prev) => (prev + 1) % images.length);
-      } else {
-        setDirection(-1);
-        setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
-      }
     }
   };
 
@@ -88,10 +74,7 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-amber-200 hover:shadow-xl transition-all duration-300">
       {/* Image with Tag Overlay */}
-      <div
-        className="relative aspect-[16/10] overflow-hidden bg-slate-100 select-none"
-        onWheel={handleWheel}
-      >
+      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 select-none">
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
           <motion.img
             key={currentImgIdx}
@@ -101,19 +84,25 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
             animate="center"
             exit="exit"
             transition={{
-              x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
-              opacity: { duration: 0.1 },
+              x: { type: 'spring', stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 },
             }}
             src={getImageUrl(images[currentImgIdx])}
             alt={`${vehicle.make} ${vehicle.model}`}
-            className="h-full w-full object-cover cursor-grab active:cursor-grabbing transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
             style={{ imageRendering: '-webkit-optimize-contrast' }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.85}
-            dragMomentum={false}
-            dragTransition={{ bounceStiffness: 900, bounceDamping: 45 }}
+            dragElastic={0.2}
+            onDragStart={() => {
+              dragOccurredRef.current = false;
+            }}
             onDragEnd={handleDragEnd}
+            onClick={() => {
+              if (!dragOccurredRef.current) {
+                onViewDetails(vehicle);
+              }
+            }}
             onError={(e) => {
               e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
             }}
@@ -154,6 +143,13 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
             ))}
           </div>
         )}
+
+        {/* Tap to View Full Gallery Hint */}
+        <div className="absolute inset-0 bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none z-10">
+          <span className="px-3 py-1.5 bg-slate-900/90 text-white text-xs font-bold rounded-full shadow-lg border border-white/20 backdrop-blur-sm flex items-center gap-1.5">
+            <span>Tap for full photos ({images.length})</span>
+          </span>
+        </div>
 
         {/* Transmission & Fuel Overlay */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-slate-950/75 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium z-10 pointer-events-none">

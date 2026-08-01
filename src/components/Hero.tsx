@@ -194,8 +194,8 @@ export default function Hero({ onBrowseClick, onConsultantClick, vehicles = [] }
                     animate="center"
                     exit="exit"
                     transition={{
-                      x: { type: 'spring', stiffness: 900, damping: 45, mass: 0.4 },
-                      opacity: { duration: 0.15 }
+                      x: { type: 'spring', stiffness: 260, damping: 30 },
+                      opacity: { duration: 0.3 }
                     }}
                     src={SLIDESHOW_IMAGES[currentIndex]}
                     alt={`Luxury vehicle slide ${currentIndex + 1}`}
