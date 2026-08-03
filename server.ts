@@ -34,7 +34,24 @@ function readVehiclesStore() {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data) && data.length > 0) {
-      return data;
+      let updated = false;
+      const synced = [...data];
+      [...INITIAL_VEHICLES].reverse().forEach(initial => {
+        const idx = synced.findIndex(v => v.id === initial.id);
+        if (idx === -1) {
+          synced.unshift(initial);
+          updated = true;
+        } else if (initial.id === 'toyota-yaris-2014-white-le-belgium' || initial.id === 'toyota-camry-xse-2020-blue-full-option') {
+          if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images) || synced[idx].description !== initial.description) {
+            synced[idx] = initial;
+            updated = true;
+          }
+        }
+      });
+      if (updated) {
+        fs.writeFileSync(VEHICLES_FILE, JSON.stringify(synced, null, 2), "utf-8");
+      }
+      return synced;
     }
   } catch (e) {
     console.error("Failed to parse vehicles.json, falling back to seed data", e);

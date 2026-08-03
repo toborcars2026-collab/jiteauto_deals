@@ -2,6 +2,57 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'toyota-camry-xse-2020-blue-full-option',
+    make: 'Toyota',
+    model: 'Camry XSE',
+    year: 2020,
+    price: 35000000,
+    mileage: 48000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.5L Inline-4',
+    color: 'Blue',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/BHnZ5FPD/IMG-20260803-WA0012.jpg',
+      'https://i.ibb.co/1GgQbTVj/IMG-20260803-WA0014.jpg',
+      'https://i.ibb.co/7tHWj13q/IMG-20260803-WA0016.jpg',
+      'https://i.ibb.co/gLgvnJ5Y/IMG-20260803-WA0018.jpg',
+      'https://i.ibb.co/bjtFsVSr/IMG-20260803-WA0020.jpg'
+    ],
+    description: `✨ 2020 Toyota Camry XSE ✨
+🇯🇵 Foreign Used | New Arrival | 2026 Duty Paid 🇳🇬
+🔑 Keyless Entry | 🌅 Panoramic Roof | 📉 Low Mileage | 💙 Elegant Blue Exterior
+
+Experience the perfect combination of sporty styling, premium comfort, and cutting-edge technology with this 2020 Toyota Camry XSE. This low-mileage, foreign-used sedan offers an exceptional driving experience, outstanding fuel economy, and the legendary reliability Toyota is known for.
+
+⭐ Key Features
+✅ Panoramic Glass Roof
+✅ Smart Keyless Entry & Push Start Button
+✅ Reverse Camera
+✅ Bluetooth Connectivity & Touchscreen Infotainment System
+✅ Apple CarPlay & Android Auto
+✅ Premium Leather Interior
+✅ Power Driver & Passenger Seats
+✅ Dual-Zone Automatic Climate Control
+✅ Multifunction Steering Wheel & Cruise Control
+✅ Sport Alloy Wheels
+✅ LED Headlamps & Daytime Running Lights
+✅ Front & Rear Parking Sensors
+✅ Blind Spot Monitor & Lane Departure Alert
+✅ ABS, Vehicle Stability Control & Multiple Airbags
+✅ Power Windows & Power Mirrors
+✅ Factory Tinted Glass
+✅ Low Mileage
+✅ Excellent Engine & Transmission
+✅ Ready to Drive`,
+  },
+  {
     id: 'mercedes-benz-gle400-2016-red-4matic',
     make: 'Mercedes-Benz',
     model: 'GLE 400',

@@ -73,7 +73,12 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'SXj7gSSZ': 'https://i.ibb.co/5W0x3ZZJ/IMG-20260729-WA0017.jpg',
   'vvkG4czB': 'https://i.ibb.co/n8jvMwk0/IMG-20260729-WA0018.jpg',
   'vx10V7m6': 'https://i.ibb.co/gMykm5wL/IMG-20260729-WA0022.jpg',
-  'cSpyPtnL': 'https://i.ibb.co/cSpyPtnL/image.jpg',
+  'cSpyPtnL': 'https://i.ibb.co/sdDghQYH/IMG-20260729-WA0012.jpg',
+  'cKYFSVv5': 'https://i.ibb.co/BHnZ5FPD/IMG-20260803-WA0012.jpg',
+  'XxQLVtBM': 'https://i.ibb.co/1GgQbTVj/IMG-20260803-WA0014.jpg',
+  'v4bPVjNS': 'https://i.ibb.co/7tHWj13q/IMG-20260803-WA0016.jpg',
+  'XrJywthH': 'https://i.ibb.co/gLgvnJ5Y/IMG-20260803-WA0018.jpg',
+  'RG8N3KxC': 'https://i.ibb.co/bjtFsVSr/IMG-20260803-WA0020.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -214,9 +219,9 @@ export function getVehicles(): Vehicle[] {
       if (idx === -1) {
         synced.unshift(initial);
         updated = true;
-      } else if (initial.id === 'toyota-yaris-2014-white-le-belgium') {
-        if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images)) {
-          synced[idx].images = initial.images;
+      } else if (initial.id === 'toyota-yaris-2014-white-le-belgium' || initial.id === 'toyota-camry-xse-2020-blue-full-option') {
+        if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images) || synced[idx].description !== initial.description) {
+          synced[idx] = initial;
           updated = true;
         }
       }
