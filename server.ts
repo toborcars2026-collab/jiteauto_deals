@@ -41,7 +41,7 @@ function readVehiclesStore() {
         if (idx === -1) {
           synced.unshift(initial);
           updated = true;
-        } else if (initial.id === 'toyota-yaris-2014-white-le-belgium' || initial.id === 'toyota-camry-xse-2020-blue-full-option') {
+        } else if (initial.id === 'toyota-yaris-2014-white-le-belgium' || initial.id === 'toyota-camry-xse-2020-blue-full-option' || initial.id === 'toyota-corolla-s-2015-silver-few-months-used' || initial.id === 'mercedes-benz-glk-350-4matic-2014-deep-blue' || initial.id === 'mercedes-benz-glb250-2022-white' || initial.id === 'toyota-c-hr-2024-black-foreign-used' || initial.id === 'mercedes-benz-cla-250-2014-grey' || initial.id === 'mercedes-benz-ml350-2014-grey-belgium') {
           if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images) || synced[idx].description !== initial.description) {
             synced[idx] = initial;
             updated = true;

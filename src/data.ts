@@ -2,6 +2,278 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'mercedes-benz-ml350-2014-grey-belgium',
+    make: 'Mercedes-Benz',
+    model: 'ML350',
+    year: 2014,
+    price: 21500000,
+    mileage: 68000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '3.5L V6',
+    color: 'Grey',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/QsG9kCD/IMG-20260807-WA0019.jpg',
+      'https://i.ibb.co/ZznYdM3N/IMG-20260807-WA0027.jpg',
+      'https://i.ibb.co/RGvC5dfW/IMG-20260807-WA0024.jpg',
+      'https://i.ibb.co/BH0CfhKV/IMG-20260807-WA0026.jpg',
+      'https://i.ibb.co/tTW3cyb0/IMG-20260807-WA0025.jpg'
+    ],
+    description: `✨ 2014 Mercedes-Benz ML350 ✨
+🇧🇪 Direct Belgium Import | July 2026 Duty Paid 🧾
+🩶 Classy Grey Exterior | 🔑 Keyless Entry | 🚘 Bold Luxury SUV Presence | 🚨 Urgent Sale: ₦21,500,000
+
+🚨 MONEY NEEDED URGENTLY! 🔥🔥
+Available is this 2014 Mercedes-Benz ML350 Direct Belgium 🇧🇪, finished in a classy Grey 🩶 and offering the bold, premium presence expected from the Mercedes-Benz ML-Class.
+
+The vehicle comes with keyless entry and July 2026 duty, making it an attractive option for anyone looking for a premium Mercedes SUV at a competitive price.
+
+⭐ Key Features
+✅ Direct Belgium 🇧🇪 Import
+✅ Elegant Grey Exterior
+✅ Keyless Entry
+✅ July 2026 Duty Paid
+✅ Premium Mercedes-Benz Luxury SUV
+✅ Premium Alloy Wheels
+✅ Sporty & Powerful V6 SUV Design
+✅ Urgent Sale Opportunity
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'mercedes-benz-cla-250-2014-grey',
+    make: 'Mercedes-Benz',
+    model: 'CLA 250',
+    year: 2014,
+    price: 11000000,
+    mileage: 65000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L Turbocharged Inline-4',
+    color: 'Grey',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/F4CRCs9C/IMG-20260807-WA0010.jpg',
+      'https://i.ibb.co/Wvg5ynhP/IMG-20260807-WA0017.jpg',
+      'https://i.ibb.co/Z6WLTvbM/IMG-20260807-WA0016.jpg',
+      'https://i.ibb.co/6RKh0Xdm/IMG-20260807-WA0015.jpg',
+      'https://i.ibb.co/dspnd2G4/IMG-20260807-WA0014.jpg'
+    ],
+    description: `✨ 2014 Mercedes-Benz CLA 250 ✨
+🇩🇪 Foreign Used | Original Duty Paid 🇳🇬 | Clean Title 📄
+🩶 Classy Grey Exterior | 🏁 Sporty Coupe-Sedan Styling | 🚨 Distress Price: ₦11,000,000
+
+🚨 MONEY NEEDED! DISTRESS SALE 🔥
+Here’s an opportunity to own a 2014 Mercedes-Benz CLA 250 at an attractive distress price of just ₦11,000,000.
+
+Finished in a classy Grey 🩶, this CLA 250 combines Mercedes-Benz luxury, sporty styling, and everyday practicality. The vehicle comes with Original Duty and a Clean Title, making it an excellent option for someone looking for a stylish Mercedes at a competitive price.
+
+⭐ Key Features
+✅ Foreign Used 🇩🇪 (Germany Import)
+✅ Premium Grey Exterior
+✅ Sporty CLA Coupe-Sedan Design
+✅ Mercedes-Benz Luxury Styling
+✅ Stylish Alloy Wheels & Premium Interior
+✅ Original Duty Paid
+✅ Clean Title
+✅ Distress Price — ₦11M
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'toyota-c-hr-2024-black-foreign-used',
+    make: 'Toyota',
+    model: 'C-HR',
+    year: 2024,
+    price: 30000000,
+    mileage: 15000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L 4-Cylinder',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/xKH6vbnb/IMG-20260807-WA0002.jpg',
+      'https://i.ibb.co/rKYnGW01/IMG-20260807-WA0003.jpg',
+      'https://i.ibb.co/5XL5YmyS/IMG-20260807-WA0005.jpg',
+      'https://i.ibb.co/TBqYGJhD/IMG-20260807-WA0007.jpg',
+      'https://i.ibb.co/CkFmJ4L/IMG-20260805-WA0081.jpg'
+    ],
+    description: `✨ 2024 Toyota C-HR ✨
+🇩🇪 Foreign Used | Just Arrived | Original Duty Paid 🇳🇬
+🖤 Elegant Black Exterior | ☀️ Sunroof | 🔑 Keyless Entry | 🚘 Modern Crossover
+
+Clean, classy and ready to go! 🔥 This 2024 Toyota C-HR Foreign Used 🇩🇪 is a stylish and modern crossover designed for buyers who want a combination of premium looks, comfort and everyday practicality.
+
+Finished in an elegant Black 🖤, this unit comes with desirable features including a sunroof and keyless entry. It is accident-free, clean title and original duty, giving you added confidence when purchasing.
+
+⭐ Key Features
+✅ Foreign Used 🇩🇪 (Germany Import)
+✅ Sunroof
+✅ Keyless Entry
+✅ Accident Free & Clean Title
+✅ Original Duty Paid
+✅ 2024 Model
+✅ Modern Crossover / SUV Design
+✅ Premium & Stylish Appearance
+✅ Just Arrived & Ready to Drive`,
+  },
+  {
+    id: 'mercedes-benz-glb250-2022-white',
+    make: 'Mercedes-Benz',
+    model: 'GLB250',
+    year: 2022,
+    price: 45000000,
+    mileage: 25000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L Turbocharged 4-Cylinder',
+    color: 'White',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/C3JRXPLq/IMG-20260805-WA0069.jpg',
+      'https://i.ibb.co/MyyxDxHS/IMG-20260805-WA0071.jpg',
+      'https://i.ibb.co/Lhtywnzw/IMG-20260805-WA0073.jpg',
+      'https://i.ibb.co/BK2ZNzGK/IMG-20260805-WA0075.jpg',
+      'https://i.ibb.co/sJQFgHDy/IMG-20260805-WA0077.jpg',
+      'https://i.ibb.co/gM2m6985/IMG-20260805-WA0079.jpg'
+    ],
+    description: `✨ 2022 Mercedes-Benz GLB250 ✨
+🇩🇪 Foreign Used | New Arrival | Original Duty Paid 🇳🇬
+🤍 Elegant White Exterior | 🚘 Compact Luxury SUV | ⚡ Accident Free & Clean Title
+
+Experience modern luxury, versatility, and advanced technology with this pristine 2022 Mercedes-Benz GLB250. Featuring a bold design, panoramic glass roof, 360° surround camera system, and a turbocharged engine, this compact luxury SUV offers exceptional comfort and performance.
+
+⭐ Features & Highlights
+✅ Panoramic Glass Roof
+✅ 360° Surround-View Camera
+✅ Keyless Entry & Push Button Start
+✅ Premium Mercedes-Benz Leather Interior
+✅ Digital Instrument Display & Touchscreen Infotainment
+✅ LED Lighting
+✅ Mercedes-Benz Safety & Driver-Assistance Features
+✅ Roof Rails & Alloy Wheels
+✅ 2.0L Turbocharged 4-Cylinder Engine
+✅ 8-Speed Automatic Transmission with AWD/4MATIC
+✅ Original Duty Paid`,
+  },
+  {
+    id: 'mercedes-benz-glk-350-4matic-2014-deep-blue',
+    make: 'Mercedes-Benz',
+    model: 'GLK 350 4MATIC',
+    year: 2014,
+    price: 20000000,
+    mileage: 58000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '3.5L V6',
+    color: 'Deep Blue',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/YFbhKVcK/IMG-20260805-WA0016.jpg',
+      'https://i.ibb.co/XfxK8TyX/IMG-20260805-WA0020.jpg',
+      'https://i.ibb.co/Dg7wJk39/IMG-20260805-WA0018.jpg',
+      'https://i.ibb.co/vCFqZtzr/IMG-20260805-WA0022-1.jpg',
+      'https://i.ibb.co/nN6TT680/IMG-20260805-WA0024.jpg'
+    ],
+    description: `✨ 2014 Mercedes-Benz GLK 350 4MATIC ✨
+🇩🇪 Foreign Used | 2026 Duty Paid 🇳🇬
+🌅 Full Panoramic Roof | 🔑 Keyless Entry | ⚡ Full Option | 💙 Elegant Deep Blue Exterior
+
+Experience luxury, performance, and commanding road presence with this 2014 Mercedes-Benz GLK 350 4MATIC. This full-option luxury SUV combines Mercedes-Benz comfort with the confidence of 4MATIC all-wheel drive, a powerful V6 engine, and a premium interior.
+
+⭐ Features & Highlights
+✅ Full Panoramic Roof
+✅ Keyless Entry & Push Start Button
+✅ 4MATIC All-Wheel Drive
+✅ 3.5L V6 Engine
+✅ Premium Leather Interior & Power Seats
+✅ Reverse Camera & Parking Sensors
+✅ Bluetooth Connectivity & Touchscreen Interface
+✅ Multifunction Steering Wheel & Cruise Control
+✅ Automatic Climate Control
+✅ Alloy Wheels
+✅ Power Windows & Mirrors
+✅ LED Lighting
+✅ Multiple Airbags & Stability Control
+✅ Spacious Premium Cabin
+✅ Full Option Specification
+✅ Excellent Engine & Transmission
+✅ Ready to Drive`,
+  },
+  {
+    id: 'toyota-corolla-s-2015-silver-few-months-used',
+    make: 'Toyota',
+    model: 'Corolla S',
+    year: 2015,
+    price: 12000000,
+    mileage: 62000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '1.8L Inline-4',
+    color: 'Silver',
+    condition: 'Few Months Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/6LVPB7w/IMG-20260805-WA0004.jpg',
+      'https://i.ibb.co/zWKYzJQ4/IMG-20260805-WA0008.jpg',
+      'https://i.ibb.co/5WQ4qB4v/IMG-20260805-WA0006.jpg',
+      'https://i.ibb.co/gxqhPjp/IMG-20260805-WA0010.jpg',
+      'https://i.ibb.co/QjkPFyBr/IMG-20260805-WA0012.jpg'
+    ],
+    description: `✨ 2015 Toyota Corolla S ✨
+🇳🇬 Few Months Used | Extremely Clean | 2026 Duty Paid
+🚘 Sporty Sedan | 🩶 Elegant Silver Exterior | 🔑 Keyless Entry
+
+Get behind the wheel of this extremely clean 2015 Toyota Corolla S, maintained in excellent condition and ready for immediate use. Combining Toyota's renowned reliability with sporty styling, excellent fuel economy, and a comfortable interior, this Corolla is an excellent choice for everyday driving.
+
+⭐ Key Features
+✅ Corolla S Sport Trim
+✅ Keyless Entry & Push Start Button
+✅ Reverse Camera
+✅ Bluetooth Connectivity & Touchscreen Multimedia System
+✅ Multifunction Steering Wheel & Cruise Control
+✅ Automatic Climate Control
+✅ Alloy Wheels & Sporty Exterior Styling
+✅ LED Daytime Running Lights
+✅ Power Windows & Power Mirrors
+✅ ABS & Multiple Airbags
+✅ Spacious Interior & Boot
+✅ Excellent Engine & Transmission
+✅ Extremely Clean Interior & Exterior
+✅ Ready to Drive`,
+  },
+  {
     id: 'toyota-camry-xse-2020-blue-full-option',
     make: 'Toyota',
     model: 'Camry XSE',
