@@ -2,6 +2,687 @@ import { Vehicle } from './types';
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    id: 'toyota-land-cruiser-prado-v6-2012-2023-upgrade-black',
+    make: 'Toyota',
+    model: 'Land Cruiser Prado',
+    year: 2012,
+    price: 26500000,
+    mileage: 75000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '4.0L V6',
+    color: 'Black',
+    condition: 'Clean Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/nqghkFzY/IMG-20260811-WA0166.jpg'
+    ],
+    description: `✨ Toyota Land Cruiser Prado V6 ✨
+🚘 2012 Model | Upgraded to 2023 Look
+🖤 Super Clean | Black Exterior | 📍 Abuja
+Consolidated Retail Price: ₦26,500,000
+
+Enjoy the legendary durability, comfort, and commanding road presence of the Toyota Land Cruiser Prado V6, featuring a 2023 exterior upgrade. This premium SUV combines a powerful 4.0L V6 engine with a spacious cabin and excellent road capability.
+
+⭐ Key Features
+✅ 2023 Exterior Body Upgrade 🚘
+✅ 4.0L V6 Engine & Automatic Transmission ⚡
+✅ Premium Leather Interior 🛋️
+✅ Keyless Entry & Push Start 🔑
+✅ Touchscreen Infotainment System, Bluetooth & Reverse Camera 📺
+✅ Parking Sensors & Cruise Control 🎯
+✅ Automatic Climate Control ❄️
+✅ Alloy Wheels & Roof Rails 🛞
+✅ LED Headlamps & Daytime Running Lights 💡
+✅ Power Windows & Mirrors 🪟
+✅ Multiple Airbags & Stability Control 🛡️
+✅ Spacious & Super Clean Interior & Exterior ✨
+✅ Excellent Engine & Transmission
+✅ Located in Abuja 📍
+✅ Ready to Drive`,
+  },
+  {
+    id: 'mercedes-benz-c300-2016-black-foreign-used',
+    make: 'Mercedes-Benz',
+    model: 'C300',
+    year: 2016,
+    price: 19500000,
+    mileage: 58000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L 4-Cylinder Turbo',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/Q4qnX22/IMG-20260811-WA0161.jpg',
+      'https://i.ibb.co/5hf72QW0/IMG-20260728-WA0030.jpg',
+      'https://i.ibb.co/RkZT1LBq/IMG-20260728-WA0032.jpg',
+      'https://i.ibb.co/8gJH58xT/IMG-20260811-WA0163.jpg',
+      'https://i.ibb.co/gLzBfWRv/IMG-20260811-WA0165.jpg'
+    ],
+    description: `✨ 2016 Mercedes-Benz C300 — Foreign Used 🌍 ✨
+🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🖤 Black Exterior | ⭐ Premium Mercedes-Benz Design | 🔥 Price: ₦19,500,000
+
+2016 Mercedes-Benz C300 — Foreign Used 🌍🔥
+Available is this 2016 Mercedes-Benz C300 Foreign Used, finished in an elegant Black 🖤 exterior with sophisticated executive styling.
+
+The C300 offers a great combination of luxury, performance, comfort, and executive appeal, delivering a smooth and sophisticated driving experience.
+
+The vehicle comes with duty paid and is currently available in Abuja, Nigeria 🇳🇬.
+
+⭐ Key Features
+✅ Foreign Used 🌍
+✅ Black Exterior 🖤
+✅ Duty Paid 🧾
+✅ Premium Mercedes-Benz Design ⭐
+✅ Stylish LED-Style Headlights 💡
+✅ Premium Alloy Wheels 🛞
+✅ Privacy-Tinted Windows 🪟
+✅ Elegant Executive Appearance ✨
+✅ Comfortable & Refined Interior 🛋️
+✅ Smooth & Sophisticated Driving Experience 🚘
+✅ Great Value at ₦19.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'honda-accord-2016-black-foreign-used',
+    make: 'Honda',
+    model: 'Accord',
+    year: 2016,
+    price: 18500000,
+    mileage: 62000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.4L 4-Cylinder i-VTEC',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/tp5GZ5BS/IMG-20260811-WA0154.jpg',
+      'https://i.ibb.co/Xx5t0cqb/IMG-20260811-WA0157.jpg',
+      'https://i.ibb.co/S4b6TKxh/IMG-20260811-WA0156.jpg',
+      'https://i.ibb.co/CpxD5Gtf/IMG-20260811-WA0155.jpg',
+      'https://i.ibb.co/GQ1TzHZC/IMG-20260811-WA0159.jpg'
+    ],
+    description: `✨ 2016 Honda Accord — Foreign Used 🌍 ✨
+🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🖤 Black Exterior | 🚘 Sleek Honda Accord Design | 🔥 Price: ₦18,500,000
+
+2016 Honda Accord — Foreign Used 🌍🔥
+Available is this 2016 Honda Accord Foreign Used, finished in a sleek Black 🖤 exterior with a clean and executive appearance.
+
+The Accord offers a strong combination of style, comfort, practicality, and reliability, making it an excellent choice for both personal and executive use.
+
+The vehicle comes with duty paid and is available in Abuja.
+
+⭐ Key Features
+✅ Foreign Used 🌍
+✅ Sleek Black Exterior 🖤
+✅ Duty Paid 🧾
+✅ Sleek Honda Accord Design 🚘
+✅ Alloy Wheels 🛞
+✅ Modern LED-Style Rear Lighting 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Premium & Executive Appearance ✨
+✅ Spacious & Comfortable Interior 🛋️
+✅ Practical & Reliable Sedan ⛽
+✅ Great Value at ₦18.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'mercedes-benz-c300-2015-black-nigeria-used',
+    make: 'Mercedes-Benz',
+    model: 'C300',
+    year: 2015,
+    price: 15800000,
+    mileage: 72000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L 4-Cylinder Turbo',
+    color: 'Black',
+    condition: 'Nigerian Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/n8QQdvCk/IMG-20260811-WA0139.jpg',
+      'https://i.ibb.co/b5Xcqdyd/IMG-20260811-WA0149.jpg',
+      'https://i.ibb.co/W9fPmXp/IMG-20260811-WA0144.jpg',
+      'https://i.ibb.co/JRJkvphV/IMG-20260811-WA0142.jpg',
+      'https://i.ibb.co/99tBncmX/IMG-20260811-WA0147.jpg',
+      'https://i.ibb.co/3y0FLhvc/IMG-20260811-WA0148.jpg'
+    ],
+    description: `✨ 2015 Mercedes-Benz C300 — Extremely Clean Nigerian Used 🔥 ✨
+🇳🇬 Nigerian Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🖤 Black Exterior | 🚘 Elegant C-Class Design | 🔥 Price: ₦15,800,000
+
+2015 Mercedes-Benz C300 — Extremely Clean Nigerian Used 🔥
+Available is this 2015 Mercedes-Benz C300, finished in a sleek Black 🖤 exterior with the sophisticated styling expected from the Mercedes-Benz C-Class.
+
+The C300 offers a great combination of luxury, performance, comfort, and executive appeal, making it an excellent choice for both personal and professional use.
+
+The vehicle comes with duty paid 🧾 and is currently available in Abuja, Nigeria 🇳🇬.
+
+⭐ Key Features
+✅ Extremely Clean Nigerian Used 🇳🇬
+✅ Sleek Black Exterior 🖤
+✅ Duty Paid 🧾
+✅ Elegant Mercedes-Benz C-Class Design 🚘
+✅ Sporty Alloy Wheels 🛞
+✅ LED-Style Lighting 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Premium & Executive Appearance ✨
+✅ Comfortable Interior 🛋️
+✅ Sporty Driving Experience 🏁
+✅ Great Value at ₦15.8M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'toyota-camry-se-2016-red-belgium',
+    make: 'Toyota',
+    model: 'Camry SE',
+    year: 2016,
+    price: 16000000,
+    mileage: 65000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.5L 4-Cylinder',
+    color: 'Red',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/Q30c18Qg/IMG-20260808-WA0015.jpg',
+      'https://i.ibb.co/xqrRbscs/IMG-20260811-WA0134.jpg',
+      'https://i.ibb.co/Kczc7g1F/IMG-20260811-WA0135.jpg',
+      'https://i.ibb.co/R4pSs4Jc/IMG-20260811-WA0136.jpg',
+      'https://i.ibb.co/23853WNt/IMG-20260811-WA0137.jpg',
+      'https://i.ibb.co/VWzvYDbd/IMG-20260808-WA0016.jpg'
+    ],
+    description: `✨ 2016 Toyota Camry SE — Direct Belgium 🇧🇪 ✨
+🦅 Foreign Used | Direct Belgium 🇧🇪 | Original Duty 2026 🧾 | Location: Abuja 🇳🇬
+❤️ Red Exterior | 🔥 Price: ₦16,000,000
+
+2016 Toyota Camry SE — Foreign Used 🇧🇪🔥
+Just arrived is this 2016 Toyota Camry SE, imported from Belgium 🇧🇪 and finished in a beautiful Red ❤️ exterior.
+
+The Camry SE combines sporty styling, comfort, practicality, and Toyota's reputation for reliability, making it an excellent choice for both personal and executive use.
+
+The vehicle comes with original duty for 2026 🧾 and is currently available in Abuja, Nigeria 🇳🇬.
+
+⭐ Key Features
+✅ Foreign Used 🦅
+✅ Direct Belgium 🇧🇪 Import
+✅ Striking Red Exterior ❤️
+✅ Original Duty 2026 Paid 🧾
+✅ Camry SE Sporty Design 🚘
+✅ Alloy Wheels 🛞
+✅ Modern LED-Style Lighting 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Sleek & Sporty Appearance ✨
+✅ Comfortable Interior 🛋️
+✅ Just Arrived 🔥
+✅ Great Value at ₦16M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'kia-rio-2017-black-foreign-used',
+    make: 'Kia',
+    model: 'Rio',
+    year: 2017,
+    price: 13500000,
+    mileage: 55000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '1.6L 4-Cylinder',
+    color: 'Black',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/cSwP1pB1/IMG-20260811-WA0121.jpg',
+      'https://i.ibb.co/397FH3X5/IMG-20260811-WA0127.jpg',
+      'https://i.ibb.co/VWP4Rwnm/IMG-20260811-WA0125.jpg',
+      'https://i.ibb.co/60PDYyxt/IMG-20260811-WA0128.jpg',
+      'https://i.ibb.co/cKTJZc0D/IMG-20260811-WA0129.jpg'
+    ],
+    description: `✨ 2017 Kia Rio — Foreign Used 🌍 ✨
+🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🖤 Black Exterior | 🚘 Practical & Fuel-Efficient | 🔥 Price: ₦13,500,000
+
+2017 Kia Rio — Foreign Used 🌍🔥
+Available is this 2017 Kia Rio, finished in a clean Black 🖤 exterior with a sleek and sporty appearance.
+
+The Kia Rio offers a good balance of style, comfort, practicality, and fuel efficiency, making it a suitable choice for both personal and everyday use.
+
+The vehicle comes with duty paid and is currently available in Abuja, Nigeria 🇳🇬.
+
+⭐ Key Features
+✅ Foreign Used 🌍
+✅ Clean Black Exterior 🖤
+✅ Duty Paid 🧾
+✅ Stylish Kia Rio Design 🚘
+✅ Sporty Alloy Wheels 🛞
+✅ Modern Headlights 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Sleek & Sporty Appearance ✨
+✅ Comfortable Interior 🛋️
+✅ Practical & Fuel-Efficient 🚗
+✅ Great Value at ₦13.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'mercedes-benz-c400-2017-white-foreign-used',
+    make: 'Mercedes-Benz',
+    model: 'C400',
+    year: 2017,
+    price: 28500000,
+    mileage: 52000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '3.0L V6 Bi-Turbo',
+    color: 'White',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/1t69Lxfn/IMG-20260811-WA0111.jpg',
+      'https://i.ibb.co/DgSPvXwC/IMG-20260811-WA0117.jpg',
+      'https://i.ibb.co/27Sy6qv3/IMG-20260811-WA0118.jpg',
+      'https://i.ibb.co/LhbxqJL4/IMG-20260811-WA0115.jpg',
+      'https://i.ibb.co/wZJV3HSf/IMG-20260811-WA0119.jpg'
+    ],
+    description: `✨ 2017 Mercedes-Benz C400 — Foreign Used 🌍 ✨
+🌍 Foreign Used | Fullest Option ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🤍 White Exterior | ⚙️ 3.0L V6 Bi-Turbo Engine | 🔥 Price: ₦28,500,000
+
+2017 Mercedes-Benz C400 — Foreign Used 🔥
+Available is this 2017 Mercedes-Benz C400, finished in a beautiful White 🤍 exterior.
+
+This C400 combines luxury, performance, comfort, and style, making it an excellent choice for anyone looking for a premium executive vehicle.
+
+It comes with desirable features including keyless entry, panoramic sunroof, and a full-option specification, giving you a refined and enjoyable driving experience.
+
+The vehicle is duty paid and currently available in Abuja, Nigeria 🇳🇬.
+
+⭐ Key Features
+✅ Foreign Used 🌍
+✅ Beautiful White Exterior 🤍
+✅ Keyless Entry 🔑
+✅ Panoramic Sunroof 🌅
+✅ Fullest Option Specification ✨
+✅ Powerful 3.0L V6 Engine ⚙️
+✅ Sporty Alloy Wheels 🛞
+✅ LED Headlights 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Sporty & Elegant Mercedes-Benz Design 🏁
+✅ Premium & Comfortable Interior 🛋️
+✅ Duty Paid 🧾
+✅ Great Value at ₦28.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'honda-civic-2014-reddish-brown-belgium',
+    make: 'Honda',
+    model: 'Civic',
+    year: 2014,
+    price: 11500000,
+    mileage: 58000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '1.8L 4-Cylinder i-VTEC',
+    color: 'Reddish Brown',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/Fk3khkmw/IMG-20260811-WA0101.jpg',
+      'https://i.ibb.co/40vJQWs/IMG-20260811-WA0103.jpg',
+      'https://i.ibb.co/b5Ltb8st/IMG-20260811-WA0109.jpg',
+      'https://i.ibb.co/wNhmfW3V/IMG-20260811-WA0108.jpg',
+      'https://i.ibb.co/qbtpvp1/IMG-20260811-WA0107.jpg'
+    ],
+    description: `✨ 2014 Honda Civic — Direct Belgium 🇧🇪 ✨
+🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🤎 Reddish Brown Exterior | 🚘 Stylish Honda Civic Design | 🔥 Price: ₦11,500,000
+
+2014 Honda Civic — Direct Belgium 🇧🇪🔥
+Available is this 2014 Honda Civic Direct Belgium, finished in a distinctive Reddish Brown 🤎 exterior with a sleek and sporty appearance.
+
+The Civic combines style, comfort, practicality, and Honda's reputation for reliability, making it a solid choice for both personal and executive use.
+
+The vehicle comes with duty paid and is available in Abuja.
+
+⭐ Key Features
+✅ Direct Belgium 🇧🇪 Import
+✅ Reddish Brown Exterior 🤎
+✅ Duty Paid 🧾
+✅ Stylish Honda Civic Design 🚘
+✅ Sporty Alloy Wheels 🛞
+✅ Modern LED-Style Rear Lighting 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Elegant & Sporty Appearance ✨
+✅ Comfortable Interior 🛋️
+✅ Great Value at ₦11.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'toyota-camry-2008-greenish-grey-clean-used',
+    make: 'Toyota',
+    model: 'Camry',
+    year: 2008,
+    price: 7500000,
+    mileage: 110000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.4L 4-Cylinder',
+    color: 'Greenish Grey',
+    condition: 'Nigerian Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/gZm93RzG/IMG-20260811-WA0092.jpg',
+      'https://i.ibb.co/7fCWbDB/IMG-20260811-WA0097.jpg',
+      'https://i.ibb.co/ybtnYqg/IMG-20260811-WA0099.jpg',
+      'https://i.ibb.co/MknVjg5T/IMG-20260811-WA0094.jpg',
+      'https://i.ibb.co/p6jK6LRK/IMG-20260811-WA0096.jpg'
+    ],
+    description: `✨ 2008 Toyota Camry ✨
+🇳🇬 Clean Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🩶🟢 Greenish Grey Exterior | 🚘 Reliable Toyota Camry | 🔥 Price: ₦7,500,000
+
+2008 Toyota Camry — Clean, Reliable & Affordable 🔥
+Available is this 2008 Toyota Camry, finished in a distinctive Greenish Grey 🩶🟢 exterior and presented in clean used condition.
+
+The Toyota Camry is a popular choice for buyers looking for a combination of comfort, reliability, spaciousness, and everyday practicality. This unit is suitable for personal, family, or business use.
+
+⭐ Key Features
+✅ Greenish Grey Exterior 🩶🟢
+✅ Clean Used Condition ✨
+✅ Reliable Toyota Camry 🚘
+✅ Stylish Alloy Wheels 🛞
+✅ Tinted Windows 🪟
+✅ Spacious & Comfortable Cabin 🛋️
+✅ Duty Paid 🧾
+✅ Practical & Easy to Maintain 🔧
+✅ Excellent Value at ₦7.5M 💰
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'bmw-3-series-2014-dark-blue-belgium',
+    make: 'BMW',
+    model: '3 Series',
+    year: 2014,
+    price: 17000000,
+    mileage: 62000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L TwinPower Turbo Inline-4',
+    color: 'Dark Blue',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/3yZrFGXN/IMG-20260811-WA0081.jpg',
+      'https://i.ibb.co/Pv6SJbLc/IMG-20260811-WA0083.jpg',
+      'https://i.ibb.co/gMG59WNV/IMG-20260811-WA0088.jpg',
+      'https://i.ibb.co/KjJp529H/IMG-20260811-WA0089.jpg',
+      'https://i.ibb.co/sdZG38bC/IMG-20260811-WA0087.jpg'
+    ],
+    description: `✨ 2014 BMW — Direct Belgium 🇧🇪 ✨
+🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🔵 Dark Blue Exterior | 🏁 Sporty Executive Design | 🔥 Price: ₦17,000,000
+
+2014 BMW — Direct Belgium 🇧🇪🔥
+Step into premium German motoring with this 2014 BMW Direct Belgium, finished in a striking Dark Blue 🔵 exterior.
+
+With its elegant BMW styling, sporty alloy wheels, and commanding road presence, this vehicle delivers the perfect blend of luxury, style, and driving appeal. The vehicle comes with duty paid and is available in Abuja.
+
+⭐ Key Features
+✅ Direct Belgium 🇧🇪 Import
+✅ Striking Dark Blue Exterior 🔵
+✅ Duty Paid 🧾
+✅ Premium BMW Styling ⭐
+✅ Sport Alloy Wheels 🛞
+✅ Modern BMW Headlights 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Sporty Executive Design 🏁
+✅ Comfortable Premium Cabin 🛋️
+✅ Clean & Attractive Appearance ✨
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'honda-accord-2014-black-nigeria-used',
+    make: 'Honda',
+    model: 'Accord',
+    year: 2014,
+    price: 10500000,
+    mileage: 82000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.4L i-VTEC Inline-4',
+    color: 'Black',
+    condition: 'Nigerian Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/s9X677fz/IMG-20260811-WA0071.jpg',
+      'https://i.ibb.co/Mx7CwGBj/IMG-20260811-WA0076.jpg',
+      'https://i.ibb.co/PsGrZdbK/IMG-20260811-WA0077.jpg',
+      'https://i.ibb.co/b5NMKRzN/IMG-20260811-WA0079.jpg',
+      'https://i.ibb.co/5XtwSF68/IMG-20260811-WA0073.jpg'
+    ],
+    description: `✨ 2014 Honda Accord ✨
+🇳🇬 Nigeria Used | Extremely Clean Condition ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🖤 Glossy Black Exterior | 🚘 Premium Executive Sedan | 🔥 Price: ₦10,500,000
+
+2014 Honda Accord — Extremely Clean & Ready to Go 🔥
+Available is this 2014 Honda Accord Nigeria Used 🇳🇬, finished in a sleek Black 🖤 exterior and presented in extremely clean condition.
+
+The Accord offers a great combination of comfort, reliability, elegant styling, and everyday practicality, making it an excellent choice for both personal and executive use.
+
+⭐ Key Features
+✅ Extremely Clean Condition ✨
+✅ Glossy Black Exterior 🖤
+✅ Premium Executive Sedan 🚘
+✅ Stylish Alloy Wheels 🛞
+✅ Modern Headlight Design 💡
+✅ Privacy-Tinted Windows 🪟
+✅ Spacious & Comfortable Interior 🛋️
+✅ Duty Paid 🧾
+✅ Nigeria Used 🇳🇬
+✅ Excellent Value for Money 🔥
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'bmw-328i-2014-white-nigeria-used',
+    make: 'BMW',
+    model: '328i',
+    year: 2014,
+    price: 13000000,
+    mileage: 78000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.0L TwinPower Turbo Inline-4',
+    color: 'White',
+    condition: 'Nigerian Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/VcqqybXQ/IMG-20260811-WA0065.jpg',
+      'https://i.ibb.co/RkS35N6P/IMG-20260811-WA0068.jpg',
+      'https://i.ibb.co/JRLXjf6x/IMG-20260811-WA0067.jpg',
+      'https://i.ibb.co/spvgPvCR/IMG-20260811-WA0069.jpg',
+      'https://i.ibb.co/zHhgDy7z/IMG-20260811-WA0066.jpg'
+    ],
+    description: `✨ 2014 BMW 328i ✨
+🇳🇬 Nigeria Used | Extremely Clean Condition ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🤍 Clean White Exterior | 🏁 Sporty BMW 3-Series Styling | 🔥 Price: ₦13,000,000
+
+2014 BMW 328i — Extremely Clean & Ready to Go 🔥
+This 2014 BMW 328i comes in a beautiful White 🤍 exterior and presents a clean, sporty, and executive look.
+
+With its distinctive BMW styling, premium appearance, and engaging driving character, the 328i is an excellent choice for anyone looking for a luxury sedan that combines elegance, performance, and everyday practicality.
+
+⭐ Key Features
+✅ Extremely Clean Condition ✨
+✅ Clean White Exterior 🤍
+✅ Sporty BMW 3-Series Styling 🏁
+✅ Sport Alloy Wheels 🛞
+✅ Privacy-Tinted Windows 🪟
+✅ Premium BMW Lighting 💡
+✅ Luxury Executive Sedan ⭐
+✅ Duty Paid 🧾
+✅ Nigeria Used 🇳🇬
+✅ Excellent Value for Money 🔥
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'hyundai-sonata-2018-white-belgium',
+    make: 'Hyundai',
+    model: 'Sonata',
+    year: 2018,
+    price: 16000000,
+    mileage: 55000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'Sedan',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '2.4L 4-Cylinder',
+    color: 'White',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/w16rC5v/IMG-20260811-WA0050.jpg',
+      'https://i.ibb.co/WpBvQY3V/IMG-20260811-WA0045.jpg',
+      'https://i.ibb.co/vtppTvh/IMG-20260811-WA0049.jpg',
+      'https://i.ibb.co/FbXztTgn/IMG-20260811-WA0048.jpg',
+      'https://i.ibb.co/BHLvzwYX/IMG-20260811-WA0047.jpg'
+    ],
+    description: `✨ 2018 Hyundai Sonata ✨
+🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🤍 Clean White Exterior | ☀️ Sunroof | 🔑 Keyless Entry | 🚘 Executive Sedan
+
+2018 Hyundai Sonata — Clean, Stylish & Ready to Go 🔥
+This 2018 Hyundai Sonata Direct Belgium 🇧🇪 comes in a beautiful White 🤍 exterior and offers a great balance of style, comfort, and practicality.
+
+Equipped with desirable features including sunroof ☀️ and keyless entry 🔑, this Sonata is an excellent choice for anyone looking for a modern executive sedan at a competitive price.
+
+⭐ Key Features
+✅ Direct Belgium 🇧🇪 Import
+✅ Clean White Exterior
+✅ Sunroof ☀️
+✅ Keyless Entry 🔑
+✅ Duty Paid 🧾
+✅ 2018 Model
+✅ Stylish Alloy Wheels
+✅ Modern LED / Projector Lighting
+✅ Sporty Exterior Design
+✅ Comfortable & Spacious Interior
+✅ Excellent Daily & Executive Sedan
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
+    id: 'lexus-rx-350-2012-silver-foreign-used',
+    make: 'Lexus',
+    model: 'RX 350',
+    year: 2012,
+    price: 23000000,
+    mileage: 72000,
+    transmission: 'Automatic',
+    fuelType: 'Petrol',
+    bodyType: 'SUV',
+    location: 'Abuja',
+    dealership: 'Verified Private Sourcing',
+    engine: '3.5L V6',
+    color: 'Silver',
+    condition: 'Foreign Used',
+    isFeatured: true,
+    status: 'Active',
+    images: [
+      'https://i.ibb.co/WN7qTx9D/IMG-20260811-WA0030.jpg',
+      'https://i.ibb.co/WvQJCqr0/IMG-20260811-WA0036.jpg',
+      'https://i.ibb.co/d1bR9Rb/IMG-20260811-WA0037.jpg',
+      'https://i.ibb.co/0jT4HDfd/IMG-20260811-WA0038.jpg',
+      'https://i.ibb.co/6RpvQKvq/IMG-20260811-WA0032.jpg'
+    ],
+    description: `✨ 2012 Lexus RX 350 ✨
+🇺🇸 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
+🩶 Elegant Silver Exterior | 🚘 Luxury SUV | 🔥 ₦23,000,000
+
+2012 Lexus RX 350 — Luxury, Comfort & Reliability 🔥
+This Foreign Used 2012 Lexus RX 350 comes in a classy Silver 🩶 exterior with the premium styling and commanding road presence the RX series is known for.
+
+A solid choice for anyone looking for a comfortable, spacious and prestigious luxury SUV for both everyday driving and long-distance trips.
+
+⭐ Key Features
+✅ Foreign Used 🇺🇸 (USA Import)
+✅ Elegant Silver Exterior
+✅ Duty Paid 🧾
+✅ Premium Lexus Luxury Styling
+✅ Alloy Wheels
+✅ Projector-Style Headlamps
+✅ Tinted Windows
+✅ Spacious & Comfortable Cabin
+✅ Smooth 3.5L V6 Engine
+✅ Located in Abuja
+✅ Ready to Drive`,
+  },
+  {
     id: 'mercedes-benz-ml350-2014-grey-belgium',
     make: 'Mercedes-Benz',
     model: 'ML350',
