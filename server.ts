@@ -84,7 +84,16 @@ function saveInquiriesStore(inquiries: any[]) {
   fs.writeFileSync(INQUIRIES_FILE, JSON.stringify(inquiries, null, 2), "utf-8");
 }
 
-// API Routes
+// API Routes & Anti-Cache Middleware
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
 app.get("/api/resolve-image", async (req, res) => {
   const targetUrl = req.query.url as string;
   if (!targetUrl) return res.status(400).json({ error: "Missing url parameter" });

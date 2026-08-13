@@ -2,7 +2,7 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v1';
+const VEHICLES_KEY = 'jite_vehicles_v2';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
 
@@ -264,10 +264,11 @@ export function getImageUrl(url: string | undefined | null): string {
 // Async fetch vehicles from server with fallback to localStorage
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
-    const res = await fetch('/api/vehicles');
+    const res = await fetch('/api/vehicles?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.removeItem('jite_vehicles_v1');
         localStorage.setItem(VEHICLES_KEY, JSON.stringify(data));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: data }));
@@ -283,6 +284,11 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 
 // Get loaded vehicles from localStorage or seed
 export function getVehicles(): Vehicle[] {
+  try {
+    localStorage.removeItem('jite_vehicles_v1');
+  } catch {
+    // ignore
+  }
   const data = localStorage.getItem(VEHICLES_KEY);
   if (!data) {
     localStorage.setItem(VEHICLES_KEY, JSON.stringify(INITIAL_VEHICLES));
@@ -316,7 +322,7 @@ export function saveVehicles(vehicles: Vehicle[]): void {
 // Fetch leads from server
 export async function fetchLeads(): Promise<Lead[]> {
   try {
-    const res = await fetch('/api/leads');
+    const res = await fetch('/api/leads?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -380,7 +386,7 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
 // Fetch inquiries from server
 export async function fetchInquiries(): Promise<Inquiry[]> {
   try {
-    const res = await fetch('/api/inquiries');
+    const res = await fetch('/api/inquiries?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {

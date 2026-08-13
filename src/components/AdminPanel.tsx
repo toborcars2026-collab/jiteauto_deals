@@ -246,6 +246,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const handleResetSeeds = () => {
     if (confirm('This will wipe all custom additions and reset the catalog back to the original curated vehicles. Proceed?')) {
       localStorage.removeItem('jite_vehicles_v1');
+      localStorage.removeItem('jite_vehicles_v2');
       fetch('/api/vehicles/reset', { method: 'POST' }).finally(() => {
         window.location.reload();
       });
