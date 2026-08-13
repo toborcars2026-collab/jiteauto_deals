@@ -1,2655 +1,1838 @@
-import { Vehicle } from './types';
+import { Vehicle } from "./types";
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
-    id: 'toyota-land-cruiser-prado-v6-2012-2023-upgrade-black',
-    make: 'Toyota',
-    model: 'Land Cruiser Prado',
-    year: 2012,
-    price: 26500000,
-    mileage: 75000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '4.0L V6',
-    color: 'Black',
-    condition: 'Clean Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/nqghkFzY/IMG-20260811-WA0166.jpg'
-    ],
-    description: `✨ Toyota Land Cruiser Prado V6 ✨
-🚘 2012 Model | Upgraded to 2023 Look
-🖤 Super Clean | Black Exterior | 📍 Abuja
-Consolidated Retail Price: ₦26,500,000
-
-Enjoy the legendary durability, comfort, and commanding road presence of the Toyota Land Cruiser Prado V6, featuring a 2023 exterior upgrade. This premium SUV combines a powerful 4.0L V6 engine with a spacious cabin and excellent road capability.
-
-⭐ Key Features
-✅ 2023 Exterior Body Upgrade 🚘
-✅ 4.0L V6 Engine & Automatic Transmission ⚡
-✅ Premium Leather Interior 🛋️
-✅ Keyless Entry & Push Start 🔑
-✅ Touchscreen Infotainment System, Bluetooth & Reverse Camera 📺
-✅ Parking Sensors & Cruise Control 🎯
-✅ Automatic Climate Control ❄️
-✅ Alloy Wheels & Roof Rails 🛞
-✅ LED Headlamps & Daytime Running Lights 💡
-✅ Power Windows & Mirrors 🪟
-✅ Multiple Airbags & Stability Control 🛡️
-✅ Spacious & Super Clean Interior & Exterior ✨
-✅ Excellent Engine & Transmission
-✅ Located in Abuja 📍
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-c300-2016-black-foreign-used',
-    make: 'Mercedes-Benz',
-    model: 'C300',
-    year: 2016,
-    price: 19500000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L 4-Cylinder Turbo',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/Q4qnX22/IMG-20260811-WA0161.jpg',
-      'https://i.ibb.co/5hf72QW0/IMG-20260728-WA0030.jpg',
-      'https://i.ibb.co/RkZT1LBq/IMG-20260728-WA0032.jpg',
-      'https://i.ibb.co/8gJH58xT/IMG-20260811-WA0163.jpg',
-      'https://i.ibb.co/gLzBfWRv/IMG-20260811-WA0165.jpg'
-    ],
-    description: `✨ 2016 Mercedes-Benz C300 — Foreign Used 🌍 ✨
-🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🖤 Black Exterior | ⭐ Premium Mercedes-Benz Design | 🔥 Price: ₦19,500,000
-
-2016 Mercedes-Benz C300 — Foreign Used 🌍🔥
-Available is this 2016 Mercedes-Benz C300 Foreign Used, finished in an elegant Black 🖤 exterior with sophisticated executive styling.
-
-The C300 offers a great combination of luxury, performance, comfort, and executive appeal, delivering a smooth and sophisticated driving experience.
-
-The vehicle comes with duty paid and is currently available in Abuja, Nigeria 🇳🇬.
-
-⭐ Key Features
-✅ Foreign Used 🌍
-✅ Black Exterior 🖤
-✅ Duty Paid 🧾
-✅ Premium Mercedes-Benz Design ⭐
-✅ Stylish LED-Style Headlights 💡
-✅ Premium Alloy Wheels 🛞
-✅ Privacy-Tinted Windows 🪟
-✅ Elegant Executive Appearance ✨
-✅ Comfortable & Refined Interior 🛋️
-✅ Smooth & Sophisticated Driving Experience 🚘
-✅ Great Value at ₦19.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'honda-accord-2016-black-foreign-used',
-    make: 'Honda',
-    model: 'Accord',
-    year: 2016,
-    price: 18500000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.4L 4-Cylinder i-VTEC',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/tp5GZ5BS/IMG-20260811-WA0154.jpg',
-      'https://i.ibb.co/Xx5t0cqb/IMG-20260811-WA0157.jpg',
-      'https://i.ibb.co/S4b6TKxh/IMG-20260811-WA0156.jpg',
-      'https://i.ibb.co/CpxD5Gtf/IMG-20260811-WA0155.jpg',
-      'https://i.ibb.co/GQ1TzHZC/IMG-20260811-WA0159.jpg'
-    ],
-    description: `✨ 2016 Honda Accord — Foreign Used 🌍 ✨
-🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🖤 Black Exterior | 🚘 Sleek Honda Accord Design | 🔥 Price: ₦18,500,000
-
-2016 Honda Accord — Foreign Used 🌍🔥
-Available is this 2016 Honda Accord Foreign Used, finished in a sleek Black 🖤 exterior with a clean and executive appearance.
-
-The Accord offers a strong combination of style, comfort, practicality, and reliability, making it an excellent choice for both personal and executive use.
-
-The vehicle comes with duty paid and is available in Abuja.
-
-⭐ Key Features
-✅ Foreign Used 🌍
-✅ Sleek Black Exterior 🖤
-✅ Duty Paid 🧾
-✅ Sleek Honda Accord Design 🚘
-✅ Alloy Wheels 🛞
-✅ Modern LED-Style Rear Lighting 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Premium & Executive Appearance ✨
-✅ Spacious & Comfortable Interior 🛋️
-✅ Practical & Reliable Sedan ⛽
-✅ Great Value at ₦18.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-c300-2015-black-nigeria-used',
-    make: 'Mercedes-Benz',
-    model: 'C300',
-    year: 2015,
-    price: 15800000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L 4-Cylinder Turbo',
-    color: 'Black',
-    condition: 'Nigerian Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/n8QQdvCk/IMG-20260811-WA0139.jpg',
-      'https://i.ibb.co/b5Xcqdyd/IMG-20260811-WA0149.jpg',
-      'https://i.ibb.co/W9fPmXp/IMG-20260811-WA0144.jpg',
-      'https://i.ibb.co/JRJkvphV/IMG-20260811-WA0142.jpg',
-      'https://i.ibb.co/99tBncmX/IMG-20260811-WA0147.jpg',
-      'https://i.ibb.co/3y0FLhvc/IMG-20260811-WA0148.jpg'
-    ],
-    description: `✨ 2015 Mercedes-Benz C300 — Extremely Clean Nigerian Used 🔥 ✨
-🇳🇬 Nigerian Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🖤 Black Exterior | 🚘 Elegant C-Class Design | 🔥 Price: ₦15,800,000
-
-2015 Mercedes-Benz C300 — Extremely Clean Nigerian Used 🔥
-Available is this 2015 Mercedes-Benz C300, finished in a sleek Black 🖤 exterior with the sophisticated styling expected from the Mercedes-Benz C-Class.
-
-The C300 offers a great combination of luxury, performance, comfort, and executive appeal, making it an excellent choice for both personal and professional use.
-
-The vehicle comes with duty paid 🧾 and is currently available in Abuja, Nigeria 🇳🇬.
-
-⭐ Key Features
-✅ Extremely Clean Nigerian Used 🇳🇬
-✅ Sleek Black Exterior 🖤
-✅ Duty Paid 🧾
-✅ Elegant Mercedes-Benz C-Class Design 🚘
-✅ Sporty Alloy Wheels 🛞
-✅ LED-Style Lighting 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Premium & Executive Appearance ✨
-✅ Comfortable Interior 🛋️
-✅ Sporty Driving Experience 🏁
-✅ Great Value at ₦15.8M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'toyota-camry-se-2016-red-belgium',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2016,
-    price: 16000000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.5L 4-Cylinder',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/Q30c18Qg/IMG-20260808-WA0015.jpg',
-      'https://i.ibb.co/xqrRbscs/IMG-20260811-WA0134.jpg',
-      'https://i.ibb.co/Kczc7g1F/IMG-20260811-WA0135.jpg',
-      'https://i.ibb.co/R4pSs4Jc/IMG-20260811-WA0136.jpg',
-      'https://i.ibb.co/23853WNt/IMG-20260811-WA0137.jpg',
-      'https://i.ibb.co/VWzvYDbd/IMG-20260808-WA0016.jpg'
-    ],
-    description: `✨ 2016 Toyota Camry SE — Direct Belgium 🇧🇪 ✨
-🦅 Foreign Used | Direct Belgium 🇧🇪 | Original Duty 2026 🧾 | Location: Abuja 🇳🇬
-❤️ Red Exterior | 🔥 Price: ₦16,000,000
-
-2016 Toyota Camry SE — Foreign Used 🇧🇪🔥
-Just arrived is this 2016 Toyota Camry SE, imported from Belgium 🇧🇪 and finished in a beautiful Red ❤️ exterior.
-
-The Camry SE combines sporty styling, comfort, practicality, and Toyota's reputation for reliability, making it an excellent choice for both personal and executive use.
-
-The vehicle comes with original duty for 2026 🧾 and is currently available in Abuja, Nigeria 🇳🇬.
-
-⭐ Key Features
-✅ Foreign Used 🦅
-✅ Direct Belgium 🇧🇪 Import
-✅ Striking Red Exterior ❤️
-✅ Original Duty 2026 Paid 🧾
-✅ Camry SE Sporty Design 🚘
-✅ Alloy Wheels 🛞
-✅ Modern LED-Style Lighting 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Sleek & Sporty Appearance ✨
-✅ Comfortable Interior 🛋️
-✅ Just Arrived 🔥
-✅ Great Value at ₦16M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'kia-rio-2017-black-foreign-used',
-    make: 'Kia',
-    model: 'Rio',
-    year: 2017,
-    price: 13500000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '1.6L 4-Cylinder',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/cSwP1pB1/IMG-20260811-WA0121.jpg',
-      'https://i.ibb.co/397FH3X5/IMG-20260811-WA0127.jpg',
-      'https://i.ibb.co/VWP4Rwnm/IMG-20260811-WA0125.jpg',
-      'https://i.ibb.co/60PDYyxt/IMG-20260811-WA0128.jpg',
-      'https://i.ibb.co/cKTJZc0D/IMG-20260811-WA0129.jpg'
-    ],
-    description: `✨ 2017 Kia Rio — Foreign Used 🌍 ✨
-🌍 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🖤 Black Exterior | 🚘 Practical & Fuel-Efficient | 🔥 Price: ₦13,500,000
-
-2017 Kia Rio — Foreign Used 🌍🔥
-Available is this 2017 Kia Rio, finished in a clean Black 🖤 exterior with a sleek and sporty appearance.
-
-The Kia Rio offers a good balance of style, comfort, practicality, and fuel efficiency, making it a suitable choice for both personal and everyday use.
-
-The vehicle comes with duty paid and is currently available in Abuja, Nigeria 🇳🇬.
-
-⭐ Key Features
-✅ Foreign Used 🌍
-✅ Clean Black Exterior 🖤
-✅ Duty Paid 🧾
-✅ Stylish Kia Rio Design 🚘
-✅ Sporty Alloy Wheels 🛞
-✅ Modern Headlights 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Sleek & Sporty Appearance ✨
-✅ Comfortable Interior 🛋️
-✅ Practical & Fuel-Efficient 🚗
-✅ Great Value at ₦13.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-c400-2017-white-foreign-used',
-    make: 'Mercedes-Benz',
-    model: 'C400',
-    year: 2017,
-    price: 28500000,
-    mileage: 52000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '3.0L V6 Bi-Turbo',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/1t69Lxfn/IMG-20260811-WA0111.jpg',
-      'https://i.ibb.co/DgSPvXwC/IMG-20260811-WA0117.jpg',
-      'https://i.ibb.co/27Sy6qv3/IMG-20260811-WA0118.jpg',
-      'https://i.ibb.co/LhbxqJL4/IMG-20260811-WA0115.jpg',
-      'https://i.ibb.co/wZJV3HSf/IMG-20260811-WA0119.jpg'
-    ],
-    description: `✨ 2017 Mercedes-Benz C400 — Foreign Used 🌍 ✨
-🌍 Foreign Used | Fullest Option ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🤍 White Exterior | ⚙️ 3.0L V6 Bi-Turbo Engine | 🔥 Price: ₦28,500,000
-
-2017 Mercedes-Benz C400 — Foreign Used 🔥
-Available is this 2017 Mercedes-Benz C400, finished in a beautiful White 🤍 exterior.
-
-This C400 combines luxury, performance, comfort, and style, making it an excellent choice for anyone looking for a premium executive vehicle.
-
-It comes with desirable features including keyless entry, panoramic sunroof, and a full-option specification, giving you a refined and enjoyable driving experience.
-
-The vehicle is duty paid and currently available in Abuja, Nigeria 🇳🇬.
-
-⭐ Key Features
-✅ Foreign Used 🌍
-✅ Beautiful White Exterior 🤍
-✅ Keyless Entry 🔑
-✅ Panoramic Sunroof 🌅
-✅ Fullest Option Specification ✨
-✅ Powerful 3.0L V6 Engine ⚙️
-✅ Sporty Alloy Wheels 🛞
-✅ LED Headlights 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Sporty & Elegant Mercedes-Benz Design 🏁
-✅ Premium & Comfortable Interior 🛋️
-✅ Duty Paid 🧾
-✅ Great Value at ₦28.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'honda-civic-2014-reddish-brown-belgium',
-    make: 'Honda',
-    model: 'Civic',
-    year: 2014,
-    price: 11500000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '1.8L 4-Cylinder i-VTEC',
-    color: 'Reddish Brown',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/Fk3khkmw/IMG-20260811-WA0101.jpg',
-      'https://i.ibb.co/40vJQWs/IMG-20260811-WA0103.jpg',
-      'https://i.ibb.co/b5Ltb8st/IMG-20260811-WA0109.jpg',
-      'https://i.ibb.co/wNhmfW3V/IMG-20260811-WA0108.jpg',
-      'https://i.ibb.co/qbtpvp1/IMG-20260811-WA0107.jpg'
-    ],
-    description: `✨ 2014 Honda Civic — Direct Belgium 🇧🇪 ✨
-🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🤎 Reddish Brown Exterior | 🚘 Stylish Honda Civic Design | 🔥 Price: ₦11,500,000
-
-2014 Honda Civic — Direct Belgium 🇧🇪🔥
-Available is this 2014 Honda Civic Direct Belgium, finished in a distinctive Reddish Brown 🤎 exterior with a sleek and sporty appearance.
-
-The Civic combines style, comfort, practicality, and Honda's reputation for reliability, making it a solid choice for both personal and executive use.
-
-The vehicle comes with duty paid and is available in Abuja.
-
-⭐ Key Features
-✅ Direct Belgium 🇧🇪 Import
-✅ Reddish Brown Exterior 🤎
-✅ Duty Paid 🧾
-✅ Stylish Honda Civic Design 🚘
-✅ Sporty Alloy Wheels 🛞
-✅ Modern LED-Style Rear Lighting 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Elegant & Sporty Appearance ✨
-✅ Comfortable Interior 🛋️
-✅ Great Value at ₦11.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'toyota-camry-2008-greenish-grey-clean-used',
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2008,
-    price: 7500000,
-    mileage: 110000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.4L 4-Cylinder',
-    color: 'Greenish Grey',
-    condition: 'Nigerian Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/gZm93RzG/IMG-20260811-WA0092.jpg',
-      'https://i.ibb.co/7fCWbDB/IMG-20260811-WA0097.jpg',
-      'https://i.ibb.co/ybtnYqg/IMG-20260811-WA0099.jpg',
-      'https://i.ibb.co/MknVjg5T/IMG-20260811-WA0094.jpg',
-      'https://i.ibb.co/p6jK6LRK/IMG-20260811-WA0096.jpg'
-    ],
-    description: `✨ 2008 Toyota Camry ✨
-🇳🇬 Clean Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🩶🟢 Greenish Grey Exterior | 🚘 Reliable Toyota Camry | 🔥 Price: ₦7,500,000
-
-2008 Toyota Camry — Clean, Reliable & Affordable 🔥
-Available is this 2008 Toyota Camry, finished in a distinctive Greenish Grey 🩶🟢 exterior and presented in clean used condition.
-
-The Toyota Camry is a popular choice for buyers looking for a combination of comfort, reliability, spaciousness, and everyday practicality. This unit is suitable for personal, family, or business use.
-
-⭐ Key Features
-✅ Greenish Grey Exterior 🩶🟢
-✅ Clean Used Condition ✨
-✅ Reliable Toyota Camry 🚘
-✅ Stylish Alloy Wheels 🛞
-✅ Tinted Windows 🪟
-✅ Spacious & Comfortable Cabin 🛋️
-✅ Duty Paid 🧾
-✅ Practical & Easy to Maintain 🔧
-✅ Excellent Value at ₦7.5M 💰
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'bmw-3-series-2014-dark-blue-belgium',
-    make: 'BMW',
-    model: '3 Series',
-    year: 2014,
-    price: 17000000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L TwinPower Turbo Inline-4',
-    color: 'Dark Blue',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/3yZrFGXN/IMG-20260811-WA0081.jpg',
-      'https://i.ibb.co/Pv6SJbLc/IMG-20260811-WA0083.jpg',
-      'https://i.ibb.co/gMG59WNV/IMG-20260811-WA0088.jpg',
-      'https://i.ibb.co/KjJp529H/IMG-20260811-WA0089.jpg',
-      'https://i.ibb.co/sdZG38bC/IMG-20260811-WA0087.jpg'
-    ],
-    description: `✨ 2014 BMW — Direct Belgium 🇧🇪 ✨
-🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🔵 Dark Blue Exterior | 🏁 Sporty Executive Design | 🔥 Price: ₦17,000,000
-
-2014 BMW — Direct Belgium 🇧🇪🔥
-Step into premium German motoring with this 2014 BMW Direct Belgium, finished in a striking Dark Blue 🔵 exterior.
-
-With its elegant BMW styling, sporty alloy wheels, and commanding road presence, this vehicle delivers the perfect blend of luxury, style, and driving appeal. The vehicle comes with duty paid and is available in Abuja.
-
-⭐ Key Features
-✅ Direct Belgium 🇧🇪 Import
-✅ Striking Dark Blue Exterior 🔵
-✅ Duty Paid 🧾
-✅ Premium BMW Styling ⭐
-✅ Sport Alloy Wheels 🛞
-✅ Modern BMW Headlights 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Sporty Executive Design 🏁
-✅ Comfortable Premium Cabin 🛋️
-✅ Clean & Attractive Appearance ✨
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'honda-accord-2014-black-nigeria-used',
-    make: 'Honda',
-    model: 'Accord',
-    year: 2014,
-    price: 10500000,
-    mileage: 82000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.4L i-VTEC Inline-4',
-    color: 'Black',
-    condition: 'Nigerian Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/s9X677fz/IMG-20260811-WA0071.jpg',
-      'https://i.ibb.co/Mx7CwGBj/IMG-20260811-WA0076.jpg',
-      'https://i.ibb.co/PsGrZdbK/IMG-20260811-WA0077.jpg',
-      'https://i.ibb.co/b5NMKRzN/IMG-20260811-WA0079.jpg',
-      'https://i.ibb.co/5XtwSF68/IMG-20260811-WA0073.jpg'
-    ],
-    description: `✨ 2014 Honda Accord ✨
-🇳🇬 Nigeria Used | Extremely Clean Condition ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🖤 Glossy Black Exterior | 🚘 Premium Executive Sedan | 🔥 Price: ₦10,500,000
-
-2014 Honda Accord — Extremely Clean & Ready to Go 🔥
-Available is this 2014 Honda Accord Nigeria Used 🇳🇬, finished in a sleek Black 🖤 exterior and presented in extremely clean condition.
-
-The Accord offers a great combination of comfort, reliability, elegant styling, and everyday practicality, making it an excellent choice for both personal and executive use.
-
-⭐ Key Features
-✅ Extremely Clean Condition ✨
-✅ Glossy Black Exterior 🖤
-✅ Premium Executive Sedan 🚘
-✅ Stylish Alloy Wheels 🛞
-✅ Modern Headlight Design 💡
-✅ Privacy-Tinted Windows 🪟
-✅ Spacious & Comfortable Interior 🛋️
-✅ Duty Paid 🧾
-✅ Nigeria Used 🇳🇬
-✅ Excellent Value for Money 🔥
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'bmw-328i-2014-white-nigeria-used',
-    make: 'BMW',
-    model: '328i',
-    year: 2014,
-    price: 13000000,
-    mileage: 78000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L TwinPower Turbo Inline-4',
-    color: 'White',
-    condition: 'Nigerian Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/VcqqybXQ/IMG-20260811-WA0065.jpg',
-      'https://i.ibb.co/RkS35N6P/IMG-20260811-WA0068.jpg',
-      'https://i.ibb.co/JRLXjf6x/IMG-20260811-WA0067.jpg',
-      'https://i.ibb.co/spvgPvCR/IMG-20260811-WA0069.jpg',
-      'https://i.ibb.co/zHhgDy7z/IMG-20260811-WA0066.jpg'
-    ],
-    description: `✨ 2014 BMW 328i ✨
-🇳🇬 Nigeria Used | Extremely Clean Condition ✨ | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🤍 Clean White Exterior | 🏁 Sporty BMW 3-Series Styling | 🔥 Price: ₦13,000,000
-
-2014 BMW 328i — Extremely Clean & Ready to Go 🔥
-This 2014 BMW 328i comes in a beautiful White 🤍 exterior and presents a clean, sporty, and executive look.
-
-With its distinctive BMW styling, premium appearance, and engaging driving character, the 328i is an excellent choice for anyone looking for a luxury sedan that combines elegance, performance, and everyday practicality.
-
-⭐ Key Features
-✅ Extremely Clean Condition ✨
-✅ Clean White Exterior 🤍
-✅ Sporty BMW 3-Series Styling 🏁
-✅ Sport Alloy Wheels 🛞
-✅ Privacy-Tinted Windows 🪟
-✅ Premium BMW Lighting 💡
-✅ Luxury Executive Sedan ⭐
-✅ Duty Paid 🧾
-✅ Nigeria Used 🇳🇬
-✅ Excellent Value for Money 🔥
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'hyundai-sonata-2018-white-belgium',
-    make: 'Hyundai',
-    model: 'Sonata',
-    year: 2018,
-    price: 16000000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.4L 4-Cylinder',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/w16rC5v/IMG-20260811-WA0050.jpg',
-      'https://i.ibb.co/WpBvQY3V/IMG-20260811-WA0045.jpg',
-      'https://i.ibb.co/vtppTvh/IMG-20260811-WA0049.jpg',
-      'https://i.ibb.co/FbXztTgn/IMG-20260811-WA0048.jpg',
-      'https://i.ibb.co/BHLvzwYX/IMG-20260811-WA0047.jpg'
-    ],
-    description: `✨ 2018 Hyundai Sonata ✨
-🇧🇪 Direct Belgium Import | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🤍 Clean White Exterior | ☀️ Sunroof | 🔑 Keyless Entry | 🚘 Executive Sedan
-
-2018 Hyundai Sonata — Clean, Stylish & Ready to Go 🔥
-This 2018 Hyundai Sonata Direct Belgium 🇧🇪 comes in a beautiful White 🤍 exterior and offers a great balance of style, comfort, and practicality.
-
-Equipped with desirable features including sunroof ☀️ and keyless entry 🔑, this Sonata is an excellent choice for anyone looking for a modern executive sedan at a competitive price.
-
-⭐ Key Features
-✅ Direct Belgium 🇧🇪 Import
-✅ Clean White Exterior
-✅ Sunroof ☀️
-✅ Keyless Entry 🔑
-✅ Duty Paid 🧾
-✅ 2018 Model
-✅ Stylish Alloy Wheels
-✅ Modern LED / Projector Lighting
-✅ Sporty Exterior Design
-✅ Comfortable & Spacious Interior
-✅ Excellent Daily & Executive Sedan
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'lexus-rx-350-2012-silver-foreign-used',
-    make: 'Lexus',
-    model: 'RX 350',
-    year: 2012,
-    price: 23000000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '3.5L V6',
-    color: 'Silver',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/WN7qTx9D/IMG-20260811-WA0030.jpg',
-      'https://i.ibb.co/WvQJCqr0/IMG-20260811-WA0036.jpg',
-      'https://i.ibb.co/d1bR9Rb/IMG-20260811-WA0037.jpg',
-      'https://i.ibb.co/0jT4HDfd/IMG-20260811-WA0038.jpg',
-      'https://i.ibb.co/6RpvQKvq/IMG-20260811-WA0032.jpg'
-    ],
-    description: `✨ 2012 Lexus RX 350 ✨
-🇺🇸 Foreign Used | Duty Paid 🧾 | Location: Abuja 🇳🇬
-🩶 Elegant Silver Exterior | 🚘 Luxury SUV | 🔥 ₦23,000,000
-
-2012 Lexus RX 350 — Luxury, Comfort & Reliability 🔥
-This Foreign Used 2012 Lexus RX 350 comes in a classy Silver 🩶 exterior with the premium styling and commanding road presence the RX series is known for.
-
-A solid choice for anyone looking for a comfortable, spacious and prestigious luxury SUV for both everyday driving and long-distance trips.
-
-⭐ Key Features
-✅ Foreign Used 🇺🇸 (USA Import)
-✅ Elegant Silver Exterior
-✅ Duty Paid 🧾
-✅ Premium Lexus Luxury Styling
-✅ Alloy Wheels
-✅ Projector-Style Headlamps
-✅ Tinted Windows
-✅ Spacious & Comfortable Cabin
-✅ Smooth 3.5L V6 Engine
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-ml350-2014-grey-belgium',
-    make: 'Mercedes-Benz',
-    model: 'ML350',
-    year: 2014,
-    price: 21500000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '3.5L V6',
-    color: 'Grey',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/QsG9kCD/IMG-20260807-WA0019.jpg',
-      'https://i.ibb.co/ZznYdM3N/IMG-20260807-WA0027.jpg',
-      'https://i.ibb.co/RGvC5dfW/IMG-20260807-WA0024.jpg',
-      'https://i.ibb.co/BH0CfhKV/IMG-20260807-WA0026.jpg',
-      'https://i.ibb.co/tTW3cyb0/IMG-20260807-WA0025.jpg'
-    ],
-    description: `✨ 2014 Mercedes-Benz ML350 ✨
-🇧🇪 Direct Belgium Import | July 2026 Duty Paid 🧾
-🩶 Classy Grey Exterior | 🔑 Keyless Entry | 🚘 Bold Luxury SUV Presence | 🚨 Urgent Sale: ₦21,500,000
-
-🚨 MONEY NEEDED URGENTLY! 🔥🔥
-Available is this 2014 Mercedes-Benz ML350 Direct Belgium 🇧🇪, finished in a classy Grey 🩶 and offering the bold, premium presence expected from the Mercedes-Benz ML-Class.
-
-The vehicle comes with keyless entry and July 2026 duty, making it an attractive option for anyone looking for a premium Mercedes SUV at a competitive price.
-
-⭐ Key Features
-✅ Direct Belgium 🇧🇪 Import
-✅ Elegant Grey Exterior
-✅ Keyless Entry
-✅ July 2026 Duty Paid
-✅ Premium Mercedes-Benz Luxury SUV
-✅ Premium Alloy Wheels
-✅ Sporty & Powerful V6 SUV Design
-✅ Urgent Sale Opportunity
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-cla-250-2014-grey',
-    make: 'Mercedes-Benz',
-    model: 'CLA 250',
-    year: 2014,
-    price: 11000000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L Turbocharged Inline-4',
-    color: 'Grey',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/F4CRCs9C/IMG-20260807-WA0010.jpg',
-      'https://i.ibb.co/Wvg5ynhP/IMG-20260807-WA0017.jpg',
-      'https://i.ibb.co/Z6WLTvbM/IMG-20260807-WA0016.jpg',
-      'https://i.ibb.co/6RKh0Xdm/IMG-20260807-WA0015.jpg',
-      'https://i.ibb.co/dspnd2G4/IMG-20260807-WA0014.jpg'
-    ],
-    description: `✨ 2014 Mercedes-Benz CLA 250 ✨
-🇩🇪 Foreign Used | Original Duty Paid 🇳🇬 | Clean Title 📄
-🩶 Classy Grey Exterior | 🏁 Sporty Coupe-Sedan Styling | 🚨 Distress Price: ₦11,000,000
-
-🚨 MONEY NEEDED! DISTRESS SALE 🔥
-Here’s an opportunity to own a 2014 Mercedes-Benz CLA 250 at an attractive distress price of just ₦11,000,000.
-
-Finished in a classy Grey 🩶, this CLA 250 combines Mercedes-Benz luxury, sporty styling, and everyday practicality. The vehicle comes with Original Duty and a Clean Title, making it an excellent option for someone looking for a stylish Mercedes at a competitive price.
-
-⭐ Key Features
-✅ Foreign Used 🇩🇪 (Germany Import)
-✅ Premium Grey Exterior
-✅ Sporty CLA Coupe-Sedan Design
-✅ Mercedes-Benz Luxury Styling
-✅ Stylish Alloy Wheels & Premium Interior
-✅ Original Duty Paid
-✅ Clean Title
-✅ Distress Price — ₦11M
-✅ Located in Abuja
-✅ Ready to Drive`,
-  },
-  {
-    id: 'toyota-c-hr-2024-black-foreign-used',
-    make: 'Toyota',
-    model: 'C-HR',
-    year: 2024,
-    price: 30000000,
-    mileage: 15000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L 4-Cylinder',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/xKH6vbnb/IMG-20260807-WA0002.jpg',
-      'https://i.ibb.co/rKYnGW01/IMG-20260807-WA0003.jpg',
-      'https://i.ibb.co/5XL5YmyS/IMG-20260807-WA0005.jpg',
-      'https://i.ibb.co/TBqYGJhD/IMG-20260807-WA0007.jpg',
-      'https://i.ibb.co/CkFmJ4L/IMG-20260805-WA0081.jpg'
-    ],
-    description: `✨ 2024 Toyota C-HR ✨
-🇩🇪 Foreign Used | Just Arrived | Original Duty Paid 🇳🇬
-🖤 Elegant Black Exterior | ☀️ Sunroof | 🔑 Keyless Entry | 🚘 Modern Crossover
-
-Clean, classy and ready to go! 🔥 This 2024 Toyota C-HR Foreign Used 🇩🇪 is a stylish and modern crossover designed for buyers who want a combination of premium looks, comfort and everyday practicality.
-
-Finished in an elegant Black 🖤, this unit comes with desirable features including a sunroof and keyless entry. It is accident-free, clean title and original duty, giving you added confidence when purchasing.
-
-⭐ Key Features
-✅ Foreign Used 🇩🇪 (Germany Import)
-✅ Sunroof
-✅ Keyless Entry
-✅ Accident Free & Clean Title
-✅ Original Duty Paid
-✅ 2024 Model
-✅ Modern Crossover / SUV Design
-✅ Premium & Stylish Appearance
-✅ Just Arrived & Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-glb250-2022-white',
-    make: 'Mercedes-Benz',
-    model: 'GLB250',
-    year: 2022,
-    price: 45000000,
-    mileage: 25000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.0L Turbocharged 4-Cylinder',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/C3JRXPLq/IMG-20260805-WA0069.jpg',
-      'https://i.ibb.co/MyyxDxHS/IMG-20260805-WA0071.jpg',
-      'https://i.ibb.co/Lhtywnzw/IMG-20260805-WA0073.jpg',
-      'https://i.ibb.co/BK2ZNzGK/IMG-20260805-WA0075.jpg',
-      'https://i.ibb.co/sJQFgHDy/IMG-20260805-WA0077.jpg',
-      'https://i.ibb.co/gM2m6985/IMG-20260805-WA0079.jpg'
-    ],
-    description: `✨ 2022 Mercedes-Benz GLB250 ✨
-🇩🇪 Foreign Used | New Arrival | Original Duty Paid 🇳🇬
-🤍 Elegant White Exterior | 🚘 Compact Luxury SUV | ⚡ Accident Free & Clean Title
-
-Experience modern luxury, versatility, and advanced technology with this pristine 2022 Mercedes-Benz GLB250. Featuring a bold design, panoramic glass roof, 360° surround camera system, and a turbocharged engine, this compact luxury SUV offers exceptional comfort and performance.
-
-⭐ Features & Highlights
-✅ Panoramic Glass Roof
-✅ 360° Surround-View Camera
-✅ Keyless Entry & Push Button Start
-✅ Premium Mercedes-Benz Leather Interior
-✅ Digital Instrument Display & Touchscreen Infotainment
-✅ LED Lighting
-✅ Mercedes-Benz Safety & Driver-Assistance Features
-✅ Roof Rails & Alloy Wheels
-✅ 2.0L Turbocharged 4-Cylinder Engine
-✅ 8-Speed Automatic Transmission with AWD/4MATIC
-✅ Original Duty Paid`,
-  },
-  {
-    id: 'mercedes-benz-glk-350-4matic-2014-deep-blue',
-    make: 'Mercedes-Benz',
-    model: 'GLK 350 4MATIC',
-    year: 2014,
-    price: 20000000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '3.5L V6',
-    color: 'Deep Blue',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/YFbhKVcK/IMG-20260805-WA0016.jpg',
-      'https://i.ibb.co/XfxK8TyX/IMG-20260805-WA0020.jpg',
-      'https://i.ibb.co/Dg7wJk39/IMG-20260805-WA0018.jpg',
-      'https://i.ibb.co/vCFqZtzr/IMG-20260805-WA0022-1.jpg',
-      'https://i.ibb.co/nN6TT680/IMG-20260805-WA0024.jpg'
-    ],
-    description: `✨ 2014 Mercedes-Benz GLK 350 4MATIC ✨
-🇩🇪 Foreign Used | 2026 Duty Paid 🇳🇬
-🌅 Full Panoramic Roof | 🔑 Keyless Entry | ⚡ Full Option | 💙 Elegant Deep Blue Exterior
-
-Experience luxury, performance, and commanding road presence with this 2014 Mercedes-Benz GLK 350 4MATIC. This full-option luxury SUV combines Mercedes-Benz comfort with the confidence of 4MATIC all-wheel drive, a powerful V6 engine, and a premium interior.
-
-⭐ Features & Highlights
-✅ Full Panoramic Roof
-✅ Keyless Entry & Push Start Button
-✅ 4MATIC All-Wheel Drive
-✅ 3.5L V6 Engine
-✅ Premium Leather Interior & Power Seats
-✅ Reverse Camera & Parking Sensors
-✅ Bluetooth Connectivity & Touchscreen Interface
-✅ Multifunction Steering Wheel & Cruise Control
-✅ Automatic Climate Control
-✅ Alloy Wheels
-✅ Power Windows & Mirrors
-✅ LED Lighting
-✅ Multiple Airbags & Stability Control
-✅ Spacious Premium Cabin
-✅ Full Option Specification
-✅ Excellent Engine & Transmission
-✅ Ready to Drive`,
-  },
-  {
-    id: 'toyota-corolla-s-2015-silver-few-months-used',
-    make: 'Toyota',
-    model: 'Corolla S',
-    year: 2015,
-    price: 12000000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '1.8L Inline-4',
-    color: 'Silver',
-    condition: 'Few Months Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/6LVPB7w/IMG-20260805-WA0004.jpg',
-      'https://i.ibb.co/zWKYzJQ4/IMG-20260805-WA0008.jpg',
-      'https://i.ibb.co/5WQ4qB4v/IMG-20260805-WA0006.jpg',
-      'https://i.ibb.co/gxqhPjp/IMG-20260805-WA0010.jpg',
-      'https://i.ibb.co/QjkPFyBr/IMG-20260805-WA0012.jpg'
-    ],
-    description: `✨ 2015 Toyota Corolla S ✨
-🇳🇬 Few Months Used | Extremely Clean | 2026 Duty Paid
-🚘 Sporty Sedan | 🩶 Elegant Silver Exterior | 🔑 Keyless Entry
-
-Get behind the wheel of this extremely clean 2015 Toyota Corolla S, maintained in excellent condition and ready for immediate use. Combining Toyota's renowned reliability with sporty styling, excellent fuel economy, and a comfortable interior, this Corolla is an excellent choice for everyday driving.
-
-⭐ Key Features
-✅ Corolla S Sport Trim
-✅ Keyless Entry & Push Start Button
-✅ Reverse Camera
-✅ Bluetooth Connectivity & Touchscreen Multimedia System
-✅ Multifunction Steering Wheel & Cruise Control
-✅ Automatic Climate Control
-✅ Alloy Wheels & Sporty Exterior Styling
-✅ LED Daytime Running Lights
-✅ Power Windows & Power Mirrors
-✅ ABS & Multiple Airbags
-✅ Spacious Interior & Boot
-✅ Excellent Engine & Transmission
-✅ Extremely Clean Interior & Exterior
-✅ Ready to Drive`,
-  },
-  {
-    id: 'toyota-camry-xse-2020-blue-full-option',
-    make: 'Toyota',
-    model: 'Camry XSE',
-    year: 2020,
-    price: 35000000,
-    mileage: 48000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    engine: '2.5L Inline-4',
-    color: 'Blue',
-    condition: 'Foreign Used',
-    isFeatured: true,
-    status: 'Active',
-    images: [
-      'https://i.ibb.co/BHnZ5FPD/IMG-20260803-WA0012.jpg',
-      'https://i.ibb.co/1GgQbTVj/IMG-20260803-WA0014.jpg',
-      'https://i.ibb.co/7tHWj13q/IMG-20260803-WA0016.jpg',
-      'https://i.ibb.co/gLgvnJ5Y/IMG-20260803-WA0018.jpg',
-      'https://i.ibb.co/bjtFsVSr/IMG-20260803-WA0020.jpg'
-    ],
-    description: `✨ 2020 Toyota Camry XSE ✨
-🇯🇵 Foreign Used | New Arrival | 2026 Duty Paid 🇳🇬
-🔑 Keyless Entry | 🌅 Panoramic Roof | 📉 Low Mileage | 💙 Elegant Blue Exterior
-
-Experience the perfect combination of sporty styling, premium comfort, and cutting-edge technology with this 2020 Toyota Camry XSE. This low-mileage, foreign-used sedan offers an exceptional driving experience, outstanding fuel economy, and the legendary reliability Toyota is known for.
-
-⭐ Key Features
-✅ Panoramic Glass Roof
-✅ Smart Keyless Entry & Push Start Button
-✅ Reverse Camera
-✅ Bluetooth Connectivity & Touchscreen Infotainment System
-✅ Apple CarPlay & Android Auto
-✅ Premium Leather Interior
-✅ Power Driver & Passenger Seats
-✅ Dual-Zone Automatic Climate Control
-✅ Multifunction Steering Wheel & Cruise Control
-✅ Sport Alloy Wheels
-✅ LED Headlamps & Daytime Running Lights
-✅ Front & Rear Parking Sensors
-✅ Blind Spot Monitor & Lane Departure Alert
-✅ ABS, Vehicle Stability Control & Multiple Airbags
-✅ Power Windows & Power Mirrors
-✅ Factory Tinted Glass
-✅ Low Mileage
-✅ Excellent Engine & Transmission
-✅ Ready to Drive`,
-  },
-  {
-    id: 'mercedes-benz-gle400-2016-red-4matic',
-    make: 'Mercedes-Benz',
-    model: 'GLE 400',
-    year: 2016,
-    price: 36500000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    images: [
-      'https://i.ibb.co/zHhVWvV2/IMG-20260730-WA0041.jpg',
-      'https://i.ibb.co/v4XnrxZr/IMG-20260730-WA0048.jpg',
-      'https://i.ibb.co/zWZfPkcR/IMG-20260730-WA0049.jpg',
-      'https://i.ibb.co/5XxQr60q/IMG-20260730-WA0050.jpg',
-      'https://i.ibb.co/4nPkPtkh/IMG-20260730-WA0052.jpg',
-      'https://i.ibb.co/wNzrygKZ/IMG-20260730-WA0051.jpg',
-      'https://i.ibb.co/Gv4SzCrG/IMG-20260730-WA0047.jpg'
-    ],
-    description: `🚘 VEHICLE PROFILE SHEET
-2016 Mercedes-Benz GLE 400 4MATIC (Full Option)
-📍 Location: Abuja
-💰 Price: ₦36,500,000
-🎨 Color: Red
-📦 Condition: Foreign Used
-📄 Duty: Fully Paid
-
-📝 Description
-Stand out in style with this 2016 Mercedes-Benz GLE 400 4MATIC Full Option, finished in a striking Red exterior. This luxury SUV combines powerful twin-turbo performance with premium comfort, advanced technology, and world-class safety. Featuring a Full Panoramic Roof, refined leather cabin, and intelligent 4MATIC all-wheel drive, it delivers an exceptional driving experience for both city roads and long-distance journeys. Fully duty paid and ready for immediate registration.
-
-⭐ Key Features
-✅ 3.0L V6 Twin-Turbo Petrol Engine
-✅ 9G-TRONIC Automatic Transmission
-✅ 4MATIC Intelligent All-Wheel Drive
-✅ Full Panoramic Glass Sunroof
-✅ Smart Keyless Entry & Push Start
-✅ Premium Leather Interior
-✅ Electrically Adjustable Front Seats
-✅ Memory Seats
-✅ Heated Front Seats
-✅ Dual-Zone Automatic Climate Control
-✅ Power Tailgate
-✅ Reverse Camera
-✅ Front & Rear Parking Sensors
-✅ Blind Spot Assist
-✅ Lane Keeping Assist
-✅ Adaptive Cruise Control
-✅ LED Intelligent Headlights & Daytime Running Lights
-✅ Navigation System
-✅ Bluetooth & USB Connectivity
-✅ Premium Surround Sound System
-✅ Multifunction Steering Wheel
-✅ Alloy Wheels
-✅ Multiple Airbags
-✅ ABS, ESP & Traction Control`,
-    engine: '3.0L V6 Twin-Turbo Petrol Engine',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-benz-ml350-2015-white-4matic',
-    make: 'Mercedes-Benz',
-    model: 'ML350',
-    year: 2015,
-    price: 20000000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    images: [
-      'https://i.ibb.co/hxVMVf37/IMG-20260730-WA0032.jpg',
-      'https://i.ibb.co/rKLNX5XL/IMG-20260730-WA0035.jpg',
-      'https://i.ibb.co/KxDPj60g/IMG-20260730-WA0036.jpg',
-      'https://i.ibb.co/MkFvwgyr/IMG-20260730-WA0039.jpg',
-      'https://i.ibb.co/1Gkmhj7W/IMG-20260730-WA0040.jpg'
-    ],
-    description: `🚘 VEHICLE PROFILE SHEET
-2015 Mercedes-Benz ML350 4MATIC
-📍 Location: Abuja
-💰 Price: ₦20,000,000
-🎨 Color: White
-📦 Condition: Extremely Clean Nigerian Used
-📄 Duty: Fully Paid
-
-📝 Description
-Own a premium luxury SUV at an unbeatable value with this 2015 Mercedes-Benz ML350. Finished in a stunning White exterior, this SUV delivers the perfect combination of elegance, comfort, performance, and reliability. It features a refined interior, smooth V6 engine, advanced safety technologies, and exceptional ride quality, making it ideal for both city driving and long-distance trips. Fully duty paid and ready to drive.
-
-⭐ Key Features
-✅ 3.5L V6 Petrol Engine
-✅ 7-Speed Automatic Transmission
-✅ 4MATIC All-Wheel Drive
-✅ Leather Interior
-✅ Electrically Adjustable Front Seats
-✅ Memory Seats
-✅ Heated Front Seats
-✅ Panoramic Sunroof
-✅ Power Tailgate
-✅ Keyless Entry & Push Start
-✅ Dual-Zone Automatic Climate Control
-✅ Reverse Camera
-✅ Front & Rear Parking Sensors
-✅ Bluetooth Connectivity
-✅ Premium Audio System
-✅ Multifunction Steering Wheel
-✅ Cruise Control
-✅ Xenon/LED Headlamps with Daytime Running Lights
-✅ Alloy Wheels
-✅ ABS, ESP & Traction Control
-✅ Multiple Airbags`,
-    engine: '3.5L V6 Petrol Engine',
-    color: 'White',
-    condition: 'Extremely Clean Nigerian Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-2019-blue-xse',
-    make: 'Toyota',
-    model: 'Camry',
-    year: 2019,
-    price: 32000000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    images: [
-      'https://i.ibb.co/Jj0LR4zr/IMG-20260730-WA0022.jpg',
-      'https://i.ibb.co/20DDg0Tq/IMG-20260730-WA0024.jpg',
-      'https://i.ibb.co/4g2yv9Bw/IMG-20260730-WA0026.jpg',
-      'https://i.ibb.co/v6cPQTp8/IMG-20260730-WA0028.jpg',
-      'https://i.ibb.co/KcRtngpc/IMG-20260730-WA0030.jpg'
-    ],
-    description: `🚘 VEHICLE PROFILE SHEET
-2019 Toyota Camry XSE (Full Option)
-📍 Location: Abuja
-💰 Price: ₦32,000,000
-🎨 Color: Blue
-📦 Condition: Foreign Used
-📄 Duty: Fully Paid
-
-📝 Description
-Experience luxury, performance, and cutting-edge technology in this 2019 Toyota Camry XSE Full Option. Finished in a stunning Blue exterior, this premium sedan combines sporty styling with Toyota's legendary reliability. Equipped with a Heads-Up Display, Full Panoramic Roof, and Keyless Entry, it offers an exceptional driving experience with outstanding comfort and safety. Fully duty paid and ready for immediate registration.
-
-⭐ Key Features
-✅ Heads-Up Display (HUD)
-✅ Full Panoramic Glass Roof
-✅ Smart Keyless Entry & Push Start
-✅ Leather Sport Interior
-✅ Electrically Adjustable Front Seats
-✅ Seat Memory Function
-✅ Heated Front Seats
-✅ Dual-Zone Automatic Climate Control
-✅ Large Touchscreen Infotainment System
-✅ Apple CarPlay & Android Auto (where equipped)
-✅ Premium JBL Sound System (Full Option)
-✅ Reverse Camera
-✅ Front & Rear Parking Sensors
-✅ Blind Spot Monitoring
-✅ Lane Departure Alert
-✅ Adaptive Cruise Control
-✅ Pre-Collision Safety System
-✅ LED Headlights & Daytime Running Lights
-✅ Sport Alloy Wheels
-✅ Paddle Shifters
-✅ Steering Wheel Audio & Cruise Controls
-✅ Multiple Airbags
-✅ ABS, Traction Control & Vehicle Stability Control`,
-    engine: '2.5L 4-Cylinder Engine',
-    color: 'Blue',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-yaris-2014-white-le-belgium',
-    make: 'Toyota',
-    model: 'Yaris',
-    year: 2014,
-    price: 14000000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Hatchback',
-    location: 'Abuja',
-    dealership: 'Verified Private Sourcing',
-    images: [
-      'https://i.ibb.co/rfy9BB4j/IMG-20260729-WA0012.jpg',
-      'https://i.ibb.co/fVP9tm2s/IMG-20260729-WA0016.jpg',
-      'https://i.ibb.co/5W0x3ZZJ/IMG-20260729-WA0017.jpg',
-      'https://i.ibb.co/n8jvMwk0/IMG-20260729-WA0018.jpg',
-      'https://i.ibb.co/gMykm5wL/IMG-20260729-WA0022.jpg'
-    ],
-    description: "🚘 VEHICLE PROFILE SHEET\n2014 Toyota Yaris LE\n📍 Location: Abuja\n💰 Price: ₦14,000,000\n🎨 Color: White\n📦 Condition: Direct Belgium (Foreign Used) 🇧🇪\n📄 Duty: Paid\n\n📝 Description\nLooking for a reliable, fuel-efficient, and low-maintenance car? This 2014 Toyota Yaris LE is an excellent choice. Directly imported from Belgium and finished in a clean White exterior, this hatchback offers Toyota's legendary durability, impressive fuel economy, and practical design. Perfect for daily commuting, ride-hailing, or first-time car owners.\n\n⭐ Key Features\n✅ LE Trim\n✅ Fuel-Efficient 1.5L 4-Cylinder Engine\n✅ Automatic Transmission\n✅ Air Conditioning\n✅ Power Steering\n✅ Power Windows\n✅ Power Door Locks\n✅ Remote Keyless Entry\n✅ Multi-Function Steering Wheel\n✅ Bluetooth Hands-Free Connectivity\n✅ USB & AUX Audio Input\n✅ Factory Audio System\n✅ Touchscreen Display (where equipped)\n✅ Rear View Camera (where equipped)\n✅ Electric Side Mirrors\n✅ Split Folding Rear Seats\n✅ ABS Braking System\n✅ Vehicle Stability Control (VSC)\n✅ Traction Control\n✅ Multiple Airbags\n✅ Daytime Running Lights\n✅ Excellent Fuel Economy",
-    engine: '1.5L 4-Cylinder Engine',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-benz-gla250-2017-red',
-    make: 'Mercedes-Benz',
-    model: 'GLA 250',
-    year: 2017,
-    price: 27000000,
-    mileage: 48000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/SwHYr8TF/IMG-20260723-WA0035.jpg'
-    ],
-    description: "✨ 2017 Mercedes-Benz GLA 250 (Fullest Option) ✨\n🇧🇪 Direct Belgium (Foreign Used) | ✅ Original Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nThis 2017 Direct Belgium Mercedes-Benz GLA 250 Full Option is finished in a stunning Red exterior and comes loaded with premium features including Keyless Entry, Push Button Start, and a Full Panoramic Sunroof. It offers a powerful yet fuel-efficient 2.0L turbocharged engine, a luxurious interior, and the comfort and technology expected from Mercedes-Benz. Ideal for buyers seeking a stylish, reliable, and premium compact SUV at ₦27M.\n\nKey Features & Highlights:\n🌞 Full Panoramic Sunroof & 🔑 Keyless Entry (KEYLESS-GO) & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\n❄️ Dual-Zone Climate Control & 🏎️ Paddle Shifters\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n🧭 Navigation System & 📱 Bluetooth, USB & AUX Connectivity\n🚪 Power Tailgate & 💡 LED Daytime Running Lights\n🛞 Premium Alloy Wheels & 🛣️ Cruise Control",
-    engine: '2.0L Turbocharged 4-Cylinder Petrol',
-    color: 'Red',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'dodge-challenger-2018-black',
-    make: 'Dodge',
-    model: 'Challenger',
-    year: 2018,
-    price: 39000000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Coupe',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/Lzn146bw/IMG-20260728-WA0091.jpg'
-    ],
-    description: "🏁 2018 Dodge Challenger 🏁\n🇧🇪 Direct Belgium | Duty Paid | 📍 Located in Abuja\n🖤 Bold Black Exterior | 💪 Powerful Performance | 🚗 American Muscle Car\n\nVehicle Overview:\nTurn heads wherever you go with this stunning 2018 Dodge Challenger. Imported directly from Belgium and finished in an elegant Black exterior, this iconic muscle car combines aggressive styling with impressive performance and everyday comfort. Whether cruising through the city or enjoying long highway drives, the Challenger delivers a thrilling driving experience with its powerful 3.6L V6 engine, smooth 8-speed automatic transmission, and spacious interior at ₦39M.\n\nKey Features & Highlights:\n✅ Direct Belgium Import & Duty Paid\n⚡ 8-Speed Automatic Transmission & Powerful 3.6L V6 Petrol Engine\n🔑 Smart Key / Keyless Entry & Push-Button Start\n📷 Reverse Camera & Rear Parking Sensors\n❄️ Dual-Zone Automatic Climate Control & Multifunction Steering Wheel\n📱 Touchscreen Infotainment System with Bluetooth, USB & AUX\n🎵 Premium Audio System & LED Halo Headlights\n🛞 Alloy Wheels, ABS Braking, Traction & Stability Control",
-    engine: '3.6L V6 Petrol',
-    color: 'Black',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-rx350-f-sport-2017-black',
-    make: 'Lexus',
-    model: 'RX 350 F Sport',
-    year: 2017,
-    price: 36000000,
-    mileage: 52000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/dsVMH8nF/IMG-20260728-WA0090.jpg'
-    ],
-    description: "✨ 2017 Lexus RX350 F Sport ✨\n🏁 Tokunbo Grade | F Sport Package | 📍 Located in Abuja\n🖤 Black Exterior | Tan (Brown) Leather Interior | 🔧 Dry Engine, Gear & AC Intact\n\nVehicle Overview:\nExperience sporty luxury with this neatly used 2017 Lexus RX350 F Sport. Finished in a sleek Black exterior with a premium Tan leather interior, this SUV combines aggressive styling with Lexus' legendary comfort and reliability. Powered by a responsive 3.5L V6 engine and smooth 8-speed automatic transmission, it delivers outstanding performance, a refined ride, and excellent durability for both city and highway driving at ₦36M.\n\nKey Features & Highlights:\n🏁 F Sport Package & Sport Seats\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Premium Tan/Brown Leather Interior\n📷 Reverse Camera & Parking Sensors\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\n🚪 Power Tailgate & Dual-Zone Automatic Climate Control\n💡 LED Headlights & Daytime Running Lights\n⚠️ Blind Spot Monitoring, Lane Departure Alert & Adaptive Cruise Control\n🎵 Premium Audio System with Bluetooth, USB & Apple CarPlay",
-    engine: '3.5L V6 Petrol',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-rx350-2013-milky',
-    make: 'Lexus',
-    model: 'RX 350',
-    year: 2013,
-    price: 23700000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/VWpHZXfn/IMG-20260728-WA0089.jpg'
-    ],
-    description: "✨ 2013 Lexus RX350 ✨\n🇧🇪 Direct Belgium | New Entry | 2025 Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nEnjoy the perfect blend of luxury, reliability, and performance with this clean 2013 Lexus RX350. Finished in a classy Milky Pearl White exterior, this premium SUV is powered by a dependable 3.5L V6 engine paired with a smooth automatic transmission. It delivers a quiet ride, excellent comfort, and outstanding durability, making it ideal for both city driving and long-distance journeys at ₦23.7M.\n\nKey Features & Highlights:\n✅ Direct Belgium Import & 2025 Duty Paid\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Luxury Leather Interior & Power Front Seats with Driver Memory\n📷 Reverse Camera & Parking Sensors\n❄️ Dual-Zone Automatic Climate Control & Power Tailgate\n🎵 Premium Audio System with Bluetooth Connectivity & Cruise Control\n💡 LED Daytime Running Lights, Alloy Wheels & Roof Rails\n🛡️ ABS, Traction Control, Multiple Airbags & Spacious Cargo Cabin",
-    engine: '3.5L V6 Petrol',
-    color: 'Milky White',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-rx350-2023-blue',
-    make: 'Lexus',
-    model: 'RX 350',
-    year: 2023,
-    price: 70000000,
-    mileage: 18000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/DfyYmPxJ/IMG-20260728-WA0088.jpg'
-    ],
-    description: "✨ 2023 Lexus RX350 Full Option ✨\n🌍 Foreign Used | ✅ Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium luxury, cutting-edge technology, and exceptional comfort in this beautifully maintained 2023 Lexus RX350. With its bold spindle grille, elegant design, powerful turbocharged engine, and refined interior, this SUV delivers outstanding performance and a smooth, quiet ride. Ideal for those seeking reliability, prestige, and advanced safety in one package at ₦70M.\n\nKey Features & Highlights:\n✨ Full Option Package & Accident-Free\n📸 360° Camera & 🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Leather Interior & 🌞 Panoramic Sunroof\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\n📱 Large Touchscreen Infotainment with Apple CarPlay & Android Auto\n🎵 Premium Sound System & ⚡ Wireless Phone Charger\n❄️ Dual-Zone Automatic Climate Control & 💡 LED Headlights & DRLs\n⚠️ Blind Spot Monitoring, Lane Keeping Assist & Adaptive Cruise Control\n🅿️ Parking Sensors, Premium Alloy Wheels & 🚪 Power Tailgate",
-    engine: '2.4L Turbocharged 4-Cylinder Petrol',
-    color: 'Deep Blue',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'honda-civic-2007-blue',
-    make: 'Honda',
-    model: 'Civic',
-    year: 2007,
-    price: 8500000,
-    mileage: 85000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/5yqp4dy/IMG-20260728-WA0087.jpg'
-    ],
-    description: "🚘 2007 Honda Civic\n🇧🇪 Accident-Free | Direct Belgium | June 2026 Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nEnjoy reliability, comfort, and excellent fuel economy with this clean Direct Belgium Honda Civic. The vehicle features a stylish Sky Blue exterior, a smooth automatic transmission, and Honda's dependable 1.8L i-VTEC engine, making it perfect for daily commuting or long-distance travel. It offers a spacious interior, responsive handling, and low maintenance costs.\n\nKey Features:\n✅ Accident-Free & Direct Belgium\n✅ Automatic Transmission & 1.8L i-VTEC Petrol Engine\n❄️ Air Conditioning & Power Steering/Windows/Locks\n🛞 Alloy Wheels & ABS Braking System\n🛡️ Dual Front Airbags & Factory Audio System\n🪑 Foldable Rear Seats & Comfortable Interior\n⛽ Excellent Fuel Economy & June 2026 Duty Paid",
-    engine: '1.8L i-VTEC 4-Cylinder Petrol',
-    color: 'Sky Blue',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-rx350-2012-black',
-    make: 'Lexus',
-    model: 'RX 350',
-    year: 2012,
-    price: 24000000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/3mt9X6dz/IMG-20260711-WA0006.jpg',
-      'https://i.ibb.co/F4JRZN2b/IMG-20260728-WA0080.jpg',
-      'https://i.ibb.co/bjC2CyG9/IMG-20260728-WA0082.jpg',
-      'https://i.ibb.co/0RmRB0gF/IMG-20260728-WA0086.jpg',
-      'https://i.ibb.co/VWwDGk3Y/IMG-20260728-WA0084.jpg'
-    ],
-    description: "✨ 2012 Lexus RX 350 Full Option ✨\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium comfort, reliability, and timeless luxury with this 2012 Lexus RX 350 Full Option. Finished in elegant Black, this foreign-used SUV delivers a smooth V6 engine, a refined cabin, and the legendary dependability Lexus is known for. An excellent choice for daily driving or long-distance travel, available for ₦24M.\n\nKey Features & Highlights:\n🔑 Smart Keyless Entry & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable & Memory Seats\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n🌞 Panoramic Sunroof & ❄️ Dual-Zone Automatic Climate Control\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\n🧭 Factory Navigation System & 💡 HID/LED Headlights with DRLs\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\n🛣️ Cruise Control & 🪟 Factory Privacy Glass",
-    engine: '3.5L V6 Petrol',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-rx350-2016-black',
-    make: 'Lexus',
-    model: 'RX 350',
-    year: 2016,
-    price: 29000000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/Y7tgvVhP/IMG-20260728-WA0069.jpg',
-      'https://i.ibb.co/3999h7qP/IMG-20260728-WA0071.jpg',
-      'https://i.ibb.co/CKshTxks/IMG-20260728-WA0074.jpg',
-      'https://i.ibb.co/wrQczs1s/IMG-20260728-WA0075.jpg',
-      'https://i.ibb.co/214V6Cn6/IMG-20260728-WA0077.jpg'
-    ],
-    description: "✨ 2016 Lexus RX 350 ✨\n🇳🇬 Abuja Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience luxury, comfort, and Lexus reliability with this 2016 Lexus RX 350. Finished in elegant Black, this exceptionally clean Abuja-used SUV offers a smooth ride, premium interior, advanced safety features, and the durability Lexus is known for. An excellent choice for anyone seeking a refined luxury SUV at ₦29M.\n\nKey Features & Highlights:\n🔑 Smart Keyless Entry & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n❄️ Dual-Zone Automatic Climate Control\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\n🌞 Panoramic Sunroof & 💡 LED Headlights & DRLs\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\n🛣️ Cruise Control & 🪟 Factory Tinted Glass",
-    engine: '3.5L V6 Petrol',
-    color: 'Black',
-    condition: 'Extremely Clean',
-    isFeatured: true
-  },
-  {
-    id: 'bmw-x5-m-sport-2021-white',
-    make: 'BMW',
-    model: 'X5 M Sport',
-    year: 2021,
-    price: 100000000,
-    mileage: 28000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/5mnbw7M/IMG-20260715-WA0056.jpg',
-      'https://i.ibb.co/CpCDDLdk/IMG-20260715-WA0066.jpg',
-      'https://i.ibb.co/m57GGTnR/IMG-20260715-WA0063.jpg',
-      'https://i.ibb.co/sdrFLzbk/IMG-20260715-WA0062.jpg',
-      'https://i.ibb.co/zWqfZDTF/IMG-20260715-WA0069.jpg',
-      'https://i.ibb.co/C30qMbWV/IMG-20260715-WA0060.jpg'
-    ],
-    description: "✨ 2021 BMW X5 M Sport ✨\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience first-class luxury, thrilling performance, and cutting-edge technology with this 2021 BMW X5 M Sport. Designed for drivers who demand comfort, prestige, and dynamic handling, this SUV delivers a refined driving experience with premium features and an aggressive M Sport appearance. A perfect blend of luxury and performance, offered at ₦100M.\n\nKey Features & Highlights:\n🔑 Comfort Access Keyless Entry & 🔘 Push Button Start\n📷 360° Surround View Camera & 🅿️ Front & Rear Parking Sensors\n🌞 Panoramic Glass Sunroof & 🪑 Premium Leather Interior\n💺 Heated & Memory Seats & ❄️ 4-Zone Automatic Climate Control\n📱 Apple CarPlay & Android Auto & 🧭 Navigation System\n🎵 Harman Kardon Premium Sound System\n⚡ Wireless Charging & 🚪 Power Tailgate\n🛣️ Adaptive Cruise Control & ⚠️ Blind Spot Monitoring\n🚘 Lane Departure Warning & 💡 Adaptive LED Headlights\n🛞 21-Inch M Sport Alloy Wheels & 🏁 M Sport Body Kit",
-    engine: '3.0L TwinPower Turbo Inline-6',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'ford-explorer-platinum-2021-blue',
-    make: 'Ford',
-    model: 'Explorer Platinum',
-    year: 2021,
-    price: 48000000,
-    mileage: 32000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/27cXwLCb/IMG-20260728-WA0063.jpg'
-    ],
-    description: "✨ 2021 Ford Explorer Full Option ✨\n🇧🇪 Direct Belgium | ✅ 2026 Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium luxury, advanced technology, and exceptional performance with this 2021 Direct Belgium Ford Explorer Full Option. Designed for comfort, safety, and family adventures, it combines a bold exterior, refined interior, and powerful performance with all the modern features you expect in a flagship SUV. A superb choice for anyone seeking luxury and reliability at ₦48M.\n\nKey Features & Specifications:\n🔑 Keyless Entry, 🔘 Push Button Start & 🚘 Remote Start\n📷 360° Camera & 🅿️ Front & Rear Parking Sensors\n🪑 Premium Leather Seats, 💺 Heated & Ventilated Front Seats\n🌞 Panoramic Sunroof & 🧭 Navigation System\n📱 Apple CarPlay & Android Auto | 🎵 Premium B&O Sound System\n⚡ Wireless Charging & ❄️ Tri-Zone Climate Control\n🚗 Adaptive Cruise Control, ⚠️ Blind Spot Monitoring & 🛣️ Lane Keep Assist\n💡 Full LED Headlights & DRLs | 🛞 Premium Alloy Wheels | 🧳 Power Tailgate | 👨‍👩‍👧‍👦 7-Seater Luxury SUV",
-    engine: '3.0L EcoBoost V6 / 2.3L EcoBoost',
-    color: 'Blue',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'ford-explorer-limited-2015-red',
-    make: 'Ford',
-    model: 'Explorer Limited',
-    year: 2015,
-    price: 13000000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/0yh8B7Qf/IMG-20260728-WA0040.jpg'
-    ],
-    description: "✨ 2015 Ford Explorer Limited ✨\n🇺🇸 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience comfort, power, and versatility with this 2015 Ford Explorer Limited. It offers a refined interior, smooth automatic transmission, 3.5L V6 engine with 4WD/AWD capability, excellent road presence, and ample space for family or business use. This 7-seater SUV is exceptionally clean inside and out, offering outstanding luxury value.\n\nKey Features & Highlights:\n🔑 Keyless Entry & 🔘 Push Start\n🛋️ Premium Leather Interior & 🧳 Spacious 7-Seater Cabin\n📷 Reverse Camera & 🅿️ Parking Sensors\n🌡️ Dual-Zone Climate Control & 🎵 Premium Audio System\n🛞 Alloy Wheels & 💡 LED Daytime Running Lights\n🛣️ Cruise Control, 🪟 Tinted Glass & 3.5L V6 Engine",
-    engine: '3.5L V6 Petrol',
-    color: 'Red',
-    condition: 'Extremely Clean',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-rav4-2012-black',
-    make: 'Toyota',
-    model: 'RAV4',
-    year: 2012,
-    price: 15000000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/vCqpr68F/IMG-20260728-WA0038.jpg'
-    ],
-    description: "✨ 2012 Toyota RAV4 Last Batch (XA30 Facelift) ✨\n💎 Condition: Foreign Used | 🖤 Sleek Black Exterior | 📄 Customs Duty Paid\n\nVehicle Overview:\nExperience the perfect blend of reliability, comfort, and practicality with this foreign-used 2012 Toyota RAV4 Last Batch. Finished in a sleek black exterior, this SUV is exceptionally clean inside and out, making it an excellent choice for daily commuting, family trips, or business use. Renowned for its durability, fuel efficiency, and low maintenance costs.\n\nKey Features & Specifications:\n⚙️ Efficient 2.5L 4-Cylinder Petrol Engine & Smooth Automatic Transmission\n❄️ Air Conditioning & Climate Control\n🔑 Remote Keyless Entry & Power Windows/Door Locks\n🎵 Audio System with AUX, USB & Bluetooth Connectivity\n🛞 Alloy Wheels, Fog Lights, Roof Rails & Rear Window Wiper\n🪑 Split Folding Rear Seats (60:40) & Spacious Cargo Area\n🛡️ Multiple Airbags, ABS & Traction Control",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-benz-e300-2017-black',
-    make: 'Mercedes-Benz',
-    model: 'E300',
-    year: 2017,
-    price: 26000000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/gqVm8Vk/IMG-20260728-WA0028.jpg',
-      'https://i.ibb.co/xSRC0fdx/IMG-20260728-WA0030.jpg',
-      'https://i.ibb.co/SLyYjtd/IMG-20260728-WA0032.jpg',
-      'https://i.ibb.co/67bXyBCX/IMG-20260728-WA0034.jpg',
-      'https://i.ibb.co/v6HKh71B/IMG-20260728-WA0036.jpg'
-    ],
-    description: "✨ 2017 Mercedes-Benz E300 (4-door Luxury Sedan) ✨\n💎 Condition: Extremely Clean Used (as advertised) | 📄 Customs Duty Paid 📜 | 🖤 Obsidian Black Exterior\n\nVehicle Overview:\nThe 2017 Mercedes-Benz E300 represents the benchmark of executive luxury sedans. Powered by a responsive 2.0L Turbocharged Inline-4 engine paired with a 9-Speed Automatic 9G-TRONIC transmission delivering 241 hp, this unit is extremely clean, well-maintained, and fully duty paid.\n\nKey Performance & Luxury Features:\n⚙️ 2.0L Turbocharged Inline-4 (241 hp / 273 lb-ft Torque)\n🕹️ 9-Speed Automatic Transmission (9G-TRONIC)\n💡 LED Intelligent Headlamps & Daytime Running Lights\n🔑 Keyless Start & Smart Access\n🛋️ Premium Leather Interior with Power Front Seats & Memory\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n📱 Large High-Resolution Infotainment Display with Bluetooth\n📷 Reverse Camera with Front & Rear Parking Sensors\n🛞 Executive Alloy Wheels\n🛡️ Collision Prevention Assist, Attention Assist, ESP, Traction Control & Multiple Airbags",
-    engine: '2.0L Turbocharged Inline-4 (241 hp)',
-    color: 'Black',
-    condition: 'Extremely Clean',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-hilux-2024-white',
-    make: 'Toyota',
-    model: 'Hilux',
-    year: 2024,
-    price: 59000000,
-    mileage: 5000,
-    transmission: 'Automatic',
-    fuelType: 'Diesel',
-    bodyType: 'Truck',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/TNDxQB3/IMG-20260728-WA0026.jpg',
-      'https://i.ibb.co/DfP9xWTp/IMG-20260728-WA0020.jpg',
-      'https://i.ibb.co/nsZm53b8/IMG-20260728-WA0024.jpg',
-      'https://i.ibb.co/m5Hdg2S1/IMG-20260728-WA0022.jpg',
-      'https://i.ibb.co/v4Lh1pfV/IMG-20260728-WA0014.jpg'
-    ],
-    description: "✨ 2024 Toyota Hilux (Registered, Like New) ✨\n🌍 Registered, Bought Brand New in 2024 | 📄 Duty Paid 📜 | 💎 Like New Condition\n\nVehicle Overview:\nThe 2024 Toyota Hilux is one of the most dependable pickup trucks on the market, renowned for its rugged durability, exceptional performance, and outstanding reliability. This unit was purchased brand new last year, is Nigerian registered, and remains in like-new condition with genuine duty paid. It is ideal for both commercial operations and personal use.\n\nKey Features:\n⚙️ 2.8L Turbo Diesel Engine\n🏎️ Automatic Transmission & 4WD Capability\n🔑 Smart Key / Keyless Entry & Push-Button Start\n📱 Touchscreen Infotainment System with Apple CarPlay & Android Auto\n📶 Bluetooth Connectivity\n📷 Reverse Camera & Rear Parking Sensors\n🏎️ Multifunction Steering Wheel & Cruise Control\n❄️ Automatic Climate Control\n💡 LED Headlights, Daytime Running Lights & Fog Lights\n🛞 Alloy Wheels, Side Steps, Bed Cover (Tonneau Cover) & Sports Bar\n⚡ Power Windows & Mirrors\n🛡️ Multiple Airbags, ABS, Vehicle Stability Control (VSC) & Traction Control",
-    engine: '2.8L Turbo Diesel',
-    color: 'White',
-    condition: 'Like New',
-    isFeatured: true
-  },
-  {
-    id: 'honda-crv-limited-edition-2021-white',
-    make: 'Honda',
-    model: 'CR-V Limited Edition',
-    year: 2021,
-    price: 25000000,
-    mileage: 22000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/6c9x4xK9/IMG-20260728-WA0011.jpg',
-      'https://i.ibb.co/M5fgMvt4/IMG-20260728-WA0012.jpg',
-      'https://i.ibb.co/qMsZnCFP/IMG-20260728-WA0010.jpg',
-      'https://i.ibb.co/XZQqJ3NY/IMG-20260728-WA0016.jpg',
-      'https://i.ibb.co/mFh4cKD9/IMG-20260728-WA0018.jpg'
-    ],
-    description: "✨ 2021 Honda CR-V Limited Edition (Slightly Used, Unregistered) ✨\n🌍 Slightly Used, Unregistered | 📄 Original Papers Available 📜 | 💎 Excellent Condition\n\nVehicle Overview:\nThe 2021 Honda CR-V Limited Edition is a premium compact SUV that blends modern styling, exceptional comfort, advanced safety, and fuel-efficient performance. This unregistered Nigerian unit is in excellent condition and comes with sought-after features including keyless entry and a panoramic sunroof, making it an ideal SUV for families and professionals alike.\n\nKey Features:\n⚙️ 1.5L Turbocharged Petrol Engine\n🏎️ Automatic Transmission (CVT) & Front-Wheel Drive (FWD)\n🌟 Limited Edition Trim\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🌅 Panoramic Sunroof\n💡 LED Headlights, Daytime Running Lights & LED Fog Lights\n🛞 Alloy Wheels\n📷 Reverse Camera & Front & Rear Parking Sensors\n📱 Touchscreen Infotainment System with Apple CarPlay, Android Auto & Bluetooth\n⚡ USB Charging Ports & Power Tailgate\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n🅿️ Electric Parking Brake with Auto Hold\n🪑 Premium Interior Finish\n🛡️ Multiple Airbags, ABS, Vehicle Stability Assist (VSA) & Traction Control",
-    engine: '1.5L Turbocharged Petrol',
-    color: 'White',
-    condition: 'Slightly Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-tacoma-2017-full-option',
-    make: 'Toyota',
-    model: 'Tacoma Full Option',
-    year: 2017,
-    price: 43500000,
-    mileage: 48000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Truck',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/qMcQ5ckY/IMG-20260728-WA0003.jpg'
-    ],
-    description: "✨ 2017 Toyota Tacoma (Direct Belgium) – Full Option ✨\n🌍 Direct Belgium | 📄 Valid Duty (Expires April 2026) 📜 | 💎 Accident-Free\n\nVehicle Overview:\nThe 2017 Toyota Tacoma is a rugged midsize pickup built for both everyday driving and demanding off-road adventures. This accident-free, Direct Belgium unit comes in full-option specification with a powerful engine, premium features, and a well-maintained exterior and interior. With duty valid until April 2026, it's ready for immediate use.\n\nKey Features:\n⚙️ 3.5L V6 Petrol Engine\n🏎️ 6-Speed Automatic Transmission\n🛣️ 4WD (Four-Wheel Drive)\n🌟 Full Option Package\n🏎️ TRD-Style Front Grille & Hood Scoop\n💡 LED Daytime Running Lights & Fog Lights\n🛞 Alloy Wheels with All-Terrain Tires & Side Steps\n📱 Touchscreen Infotainment System with Bluetooth, Apple CarPlay & Android Auto\n📷 Reverse Camera & Push-Button Start / Smart Key Entry\n🏎️ Cruise Control & Dual-Zone Automatic Climate Control\n🪑 Leather/Fabric Premium Interior & Multifunction Steering Wheel\n🛡️ Multiple Airbags, ABS, Traction Control, Vehicle Stability Control, Hill Start Assist & Trailer Sway Control",
-    engine: '3.5L V6 Petrol',
-    color: 'Orange',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-se-2015-silver',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2015,
-    price: 14300000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/tMr2rYx4/IMG-20260723-WA0028.jpg'
-    ],
-    description: "✨ 2015 Toyota Camry SE ✨\n🌍 Mint Foreign Used | 📄 Genuine Duty Paid 📜 | 🏎️ Sport Trim\n\nThe 2015 Toyota Camry SE offers a perfect combination of sporty styling, reliability, fuel efficiency, and comfort. This foreign-used unit is in mint condition with a clean interior, factory reverse camera, and an untampered engine and transmission, making it an excellent choice for personal or family use.\n\nKey Features:\n⚙️ 2.5L 4-Cylinder DOHC Engine\n🏎️ Automatic Transmission & Front-Wheel Drive (FWD)\n📷 Factory Reverse Camera & Sport (SE) Body Kit\n🛞 Alloy Wheels & Fabric Sport Seats\n🎡 Multifunction Steering Wheel & Cruise Control\n🎵 Bluetooth, USB & AUX Audio Input\n❄️ Air Conditioning & Keyless Entry\n⚡ Power Windows & Mirrors & Fog Lights\n🛡️ ABS Braking System, VSC & Driver/Passenger Airbags\n\nCondition Report:\n✅ Mint Foreign Used\n✅ Clean and well-kept interior\n✅ Untampered engine & smooth automatic transmission\n✅ Excellent suspension & neat exterior paintwork\n✅ Genuine duty paid & ready to drive",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Silver',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-benz-cla-250-2014',
-    make: 'Mercedes-Benz',
-    model: 'CLA 250',
-    year: 2014,
-    price: 19000000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/cS42nbXX/9ab7afef35ae48c88563da945ef8ad76.jpg'
-    ],
-    description: "✨ 2014 Mercedes-Benz CLA 250 ✨\n🌍 Foreign Used | 📄 Custom Duty Paid | 🌟 Excellent Luxury Condition\n\nThe 2014 Mercedes-Benz CLA 250 is a stylish luxury compact sedan that combines sporty performance with premium comfort and advanced technology. Featuring a sleek coupe-inspired design, turbocharged power, and a refined interior, this foreign-used unit offers an excellent blend of elegance and driving excitement.\n\nKey Features:\n⚙️ 2.0L Turbocharged Inline-4 Engine\n🏎️ 7-Speed Dual-Clutch Automatic Transmission (7G-DCT)\n🔑 Push-Button Start & Keyless Entry\n🪑 Leather Upholstery with Memory Power Front Seats\n❄️ Dual-Zone Automatic Climate Control\n🎡 Multifunction Leather Steering Wheel with Paddle Shifters\n🎵 Premium Audio System with Bluetooth, USB & AUX Input\n📷 Reverse Camera with Front & Rear Parking Sensors\n🏎️ Cruise Control & Automatic Headlights with LED DRLs\n🛞 Alloy Wheels & Power Windows/Mirrors",
-    engine: '2.0L Turbocharged Inline-4',
-    color: 'Grey',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mini-cooper-countryman-s-2019',
-    make: 'MINI',
-    model: 'Cooper Countryman S',
-    year: 2019,
-    price: 28000000,
-    mileage: 38000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/1Y5qvg2j/IMG-20260702-WA0012.jpg'
-    ],
-    description: "✨ 2019 MINI Cooper Countryman S ✨\n🇧🇪 Direct Belgium Import | 📄 Duty Paid | 💎 Mint Condition (Full Option)\n\nThe 2019 MINI Cooper Countryman S is a premium compact SUV that delivers sporty performance, luxury comfort, and distinctive British styling. This Direct Belgium import comes in full-option specification and is in mint condition, making it an excellent choice for buyers seeking a unique luxury crossover with modern technology and premium features.\n\nKey Features:\n⚙️ 2.0L TwinPower Turbo 4-Cylinder Engine\n🏎️ Automatic Transmission\n🔑 Push-Button Start & Keyless Entry\n🪑 Full Leather Interior with Power Front Seats\n☀️ Panoramic Sunroof\n❄️ Dual-Zone Automatic Climate Control\n🎵 MINI Connected Infotainment System with Large Display\n📱 Apple CarPlay, Bluetooth, USB & AUX Ports\n🎧 Premium Sound System\n📷 Reverse Camera with Front & Rear Parking Sensors\n💡 LED Headlights & Daytime Running Lights\n🛞 Alloy Wheels",
-    engine: '2.0L TwinPower Turbo 4-Cylinder',
-    color: 'Silver',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-xse-2019',
-    make: 'Toyota',
-    model: 'Camry XSE',
-    year: 2019,
-    price: 28000000,
-    mileage: 42000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/qLk6pzSs/IMG-20260727-WA0062.jpg',
-      'https://i.ibb.co/Gvpx7hCJ/IMG-20260727-WA0068.jpg',
-      'https://i.ibb.co/LM4j63y/IMG-20260727-WA0070.jpg',
-      'https://i.ibb.co/cc0DMd89/IMG-20260727-WA0069.jpg',
-      'https://i.ibb.co/G4GGB0FD/IMG-20260727-WA0067.jpg'
-    ],
-    description: "✨ 2019 Toyota Camry XSE ✨\n🌍 Foreign Used | 📄 Custom Duty Paid | 🔑 Keyless Entry\n\nThe 2019 Toyota Camry XSE is a premium sport sedan that combines bold styling, advanced technology, and outstanding reliability. With its aggressive exterior, luxurious interior, and smooth performance, this foreign-used unit is an excellent choice for buyers seeking comfort, style, and long-term dependability.\n\nKey Features:\n⚙️ 2.5L Dynamic Force 4-Cylinder Engine\n🏎️ 8-Speed Automatic Transmission & XSE Sport Trim\n🔑 Keyless Entry with Push-Button Start & Smart Key System\n🪑 Leather-Trimmed Sport Seats with Power Driver & Front Passenger Seats\n❄️ Dual-Zone Automatic Climate Control\n🎡 Multifunction Steering Wheel & Paddle Shifters\n🎵 Touchscreen Infotainment System with Apple CarPlay, Bluetooth & USB\n📷 Reverse Camera & Blind Spot Monitor\n🛣️ Adaptive Cruise Control & Lane Departure Alert\n🛡️ ABS, Traction Control, Vehicle Stability Control & Multiple Airbags",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-se-2013-silver-ng',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2013,
-    price: 10900000,
-    mileage: 75000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/PvGh48GK/IMG-20260727-WA0040.jpg',
-      'https://i.ibb.co/0p2hgj8f/IMG-20260727-WA0074.jpg',
-      'https://i.ibb.co/B2NWNR2L/IMG-20260727-WA0077.jpg',
-      'https://i.ibb.co/bg52qTdz/IMG-20260727-WA0078.jpg'
-    ],
-    description: "✨ 2013 Toyota Camry SE ✨\n🇳🇬 Nigerian Used | 📄 Custom Duty Paid | 🌟 Extremely Clean\n\nThe 2013 Toyota Camry SE blends sporty styling, comfort, and Toyota's renowned reliability. This Nigerian-used unit is exceptionally clean, making it an excellent choice for buyers seeking a dependable midsize sedan with premium driving comfort at an affordable price.\n\nKey Features:\n⚙️ 2.5L 4-Cylinder DOHC Engine\n🏎️ Sport (SE) Trim & Sport-Tuned Suspension\n🪑 Fabric Sport Seats\n🎡 Multifunction Steering Wheel with Cruise Control\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX Connectivity\n📷 Reverse Camera\n❄️ Dual-Zone Automatic Climate Control\n🔑 Keyless Entry\n🛞 Alloy Wheels & Fog Lights\n⚡ Power Windows & Mirrors\n🛡️ ABS, Vehicle Stability Control (VSC) & Multiple Airbags",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Silver',
-    condition: 'Nigerian Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-le-2007',
-    make: 'Toyota',
-    model: 'Camry LE',
-    year: 2007,
-    price: 7000000,
-    mileage: 95000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/h1YjmC00/IMG-20260727-WA0051.jpg',
-      'https://i.ibb.co/TMSPbjGm/IMG-20260727-WA0054.jpg',
-      'https://i.ibb.co/Rk2Q06R0/IMG-20260727-WA0056.jpg',
-      'https://i.ibb.co/RkFcVDWJ/IMG-20260727-WA0057.jpg',
-      'https://i.ibb.co/3YVPNdQ6/IMG-20260727-WA0059.jpg'
-    ],
-    description: "✨ 2007 Toyota Camry LE ✨\n📄 Duty Paid | 🌟 Extremely Clean\n\nThe 2007 Toyota Camry LE is a reliable and fuel-efficient midsize sedan renowned for its durability, comfort, and low maintenance costs. It's an excellent choice for daily commuting, ride-hailing, family use, or first-time car buyers seeking dependable transportation.\n\nKey Features:\n⚙️ Automatic Transmission\n⛽ 2.4L 4-Cylinder Engine (Fuel Efficient)\n🪑 Fabric Interior\n❄️ Air Conditioning\n🚗 Power Steering\n🪟 Power Windows & Door Locks\n🎡 Multifunction Steering Wheel\n🎵 AM/FM/CD Audio System\n🏎️ Cruise Control\n🛞 Alloy Wheel Covers\n🧳 Spacious Cabin & Large Boot\n🛡️ Dual Front Airbags, ABS & Remote Central Locking\n\nPerformance:\n• Smooth and dependable engine\n• Comfortable suspension for city and highway driving\n• Excellent fuel economy\n• Affordable maintenance with widely available spare parts",
-    engine: '2.4L 4-Cylinder Petrol',
-    color: 'Silver',
-    condition: 'Extremely Clean',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-se-2016-white',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2016,
-    price: 15700000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/YBr1zHsR/IMG-20260727-WA0041.jpg',
-      'https://i.ibb.co/zT74g4rs/IMG-20260727-WA0044.jpg',
-      'https://i.ibb.co/zhndkzkv/IMG-20260727-WA0049.jpg',
-      'https://i.ibb.co/7xhHCHZC/IMG-20260727-WA0046.jpg',
-      'https://i.ibb.co/mCnrBMkQ/IMG-20260727-WA0047.jpg'
-    ],
-    description: "✨ 2016 Toyota Camry SE ✨\n🌍 Foreign Used | 📄 Duty Paid | 🤍 Elegant White Exterior\nExperience comfort, reliability, and sporty styling with this 2016 Toyota Camry SE. Designed for everyday driving and long-distance comfort, this sedan offers excellent fuel economy, responsive performance, and Toyota's renowned durability.\n\nKey Features:\n🔑 Keyless Entry\n⚙️ Automatic Transmission\n⛽ Fuel-Efficient Petrol Engine\n🪑 Premium Cloth Interior\n❄️ Chilled Air Conditioning\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX\n📷 Reverse Camera\n🛞 Factory Alloy Wheels\n🛣️ Smooth Suspension & Comfortable Ride\n🧳 Spacious Boot\n🛡️ ABS, Airbags & Vehicle Stability Control",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-camry-se-2013-red',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2013,
-    price: 11500000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/bMQ3Jj4P/IMG-20260727-WA0030.jpg',
-      'https://i.ibb.co/0ygddzTD/IMG-20260727-WA0033.jpg',
-      'https://i.ibb.co/qM1wHf4v/IMG-20260727-WA0037.jpg',
-      'https://i.ibb.co/QFN5Dp1k/IMG-20260727-WA0036.jpg'
-    ],
-    description: "✨ 2013 Toyota Camry SE ✨\n📄 Duty Paid | ☀️ Sunroof | ❤️ Sporty Red Exterior\nEnjoy comfort, style, and Toyota's legendary reliability with this 2013 Toyota Camry SE. This sporty sedan offers a smooth ride, responsive performance, a spacious cabin, and excellent fuel efficiency—making it ideal for both daily commuting and long-distance travel.\n\nKey Features:\n☀️ Factory Sunroof\n🔑 Keyless Entry\n⚙️ Automatic Transmission\n⛽ Petrol Engine\n🪑 Premium Cloth Interior\n❄️ Chilled Air Conditioning\n🎵 AM/FM Audio System with Bluetooth/USB\n🛞 Alloy Wheels\n🛣️ Smooth Suspension & Comfortable Ride\n🧳 Spacious Boot\n🛡️ ABS, Airbags & Stability Control",
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Red',
-    condition: 'Extremely Clean',
-    isFeatured: true
-  },
-  {
-    id: 'hyundai-elantra-se-2020-white',
-    make: 'Hyundai',
-    model: 'Elantra SE',
-    year: 2020,
-    price: 14700000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/CRLGhK4/IMG-20260706-WA0029.jpg',
-      'https://i.ibb.co/zWrTxg3j/IMG-20260706-WA0031.jpg',
-      'https://i.ibb.co/rKDcc6R5/IMG-20260706-WA0033.jpg',
-      'https://i.ibb.co/GQBVnXss/IMG-20260706-WA0035.jpg',
-      'https://i.ibb.co/NgwdLsTY/IMG-20260706-WA0037.jpg'
-    ],
-    description: '✨ 2020 Hyundai Elantra SE ✨\n🇳🇬 Nigerian Used | 📄 Duty Paid | 🤍 Clean White Exterior\nEnjoy a stylish, comfortable, and fuel-efficient driving experience with this clean 2020 Hyundai Elantra SE. This modern sedan offers sleek styling, a spacious cabin, smooth performance, and excellent everyday practicality.\n🚘 Clean exterior\n🪑 Comfortable and spacious interior\n⚙️ Automatic transmission\n⛽ Petrol engine\n🛣️ Smooth and reliable performance\n🔑 Excellent for city and long-distance driving',
-    engine: '2.0L 4-Cylinder Petrol',
-    color: 'White',
-    condition: 'Nigerian Used',
-    isFeatured: true
-  },
-  {
-    id: 'toyota-venza-2010-red',
-    make: 'Toyota',
-    model: 'Venza',
-    year: 2010,
-    price: 17800000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/W4xR5n5F/IMG-20260706-WA0039.jpg',
-      'https://i.ibb.co/vSY5HQJ/IMG-20260706-WA0041.jpg',
-      'https://i.ibb.co/DPz4pZLN/IMG-20260706-WA0043.jpg',
-      'https://i.ibb.co/2p7bCFT/IMG-20260706-WA0045.jpg',
-      'https://i.ibb.co/vxsHHCd9/IMG-20260708-WA0030.jpg'
-    ],
-    description: '✨ 2010 Toyota Venza ✨\n🇺🇸 Foreign Used | 📄 Duty Paid | ❤️ Beautiful Red Exterior\nExperience comfort, reliability, and practicality in this clean Toyota Venza crossover SUV. It offers a spacious cabin, smooth driving experience, stylish design, and the dependable performance Toyota is known for.\n🚘 Clean exterior\n🛞 Comfortable and spacious interior\n⚙️ Automatic transmission\n⛽ Petrol engine\n🛣️ Excellent for city and long-distance driving\n🔑 Reliable Toyota performance',
-    engine: '2.7L 4-Cylinder Petrol',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-ml350-2015',
-    make: 'Mercedes-Benz',
-    model: 'ML350 4MATIC',
-    year: 2015,
-    price: 29000000,
-    mileage: 82000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/PGYDnWbz/IMG-20260715-WA0074.jpg?id=7tzk5pTN',
-      'https://i.ibb.co/TB8X4FGb/IMG-20260715-WA0076.jpg',
-      'https://i.ibb.co/PGYDnWbz/IMG-20260715-WA0074.jpg?id=7tzk5pTN'
-    ],
-    description: '✨ 2015 Mercedes-Benz ML350 ✨\n🇧🇪 Clean Used | 2026 Duty Paid 🇬🇭\n🔑 Keyless Entry | 🚘 Luxury SUV | 🤍 Elegant Pearl White Exterior\nExperience luxury, comfort, and performance in this beautiful Mercedes-Benz ML350. A stylish and spacious SUV with a premium look, excellent road presence, and the comfort you expect from Mercedes-Benz.',
-    engine: '3.5L V6',
-    color: 'pearl white',
-    condition: 'Clean Used',
-    isFeatured: true
-  },
-  {
-    id: 'mercedes-e350-2010',
-    make: 'Mercedes-Benz',
-    model: 'E350',
-    year: 2010,
-    price: 9000000,
-    mileage: 85000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/FkJp7PT9/IMG-20260720-WA0019.jpg?id=MypdNX0b',
-      'https://i.ibb.co/C362cXG2/IMG-20260716-WA0021.jpg',
-      'https://i.ibb.co/kVbLptWR/IMG-20260716-WA0036.jpg',
-      'https://i.ibb.co/ymLwFgS2/IMG-20260716-WA0038.jpg'
-    ],
-    description: '✨ 2010 Mercedes-Benz E350 ✨\n🇩🇪 Clean Used | Duty Paid 🇩🇪\n💎 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\nExperience luxury, comfort, and performance in this clean Mercedes-Benz E350. Featuring a refined leather interior, wood-trim dashboard and steering wheel, panoramic sunroof, premium alloy wheels, and the comfort and road presence expected from Mercedes-Benz.',
-    engine: '3.5L V6',
-    color: 'White',
-    condition: 'Clean Used',
-    isFeatured: true
-  },
-  {
-    id: 'honda-accord-2026',
-    make: 'Honda',
-    model: 'Accord',
-    year: 2026,
-    price: 50000000,
-    mileage: 5000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/Y7yYc8Py/IMG-20260713-WA0054.jpg?id=SXdWt05d',
-      'https://i.ibb.co/Y7mpNZvT/IMG-20260713-WA0056.jpg',
-      'https://i.ibb.co/ZRfSc4Tf/IMG-20260713-WA0062.jpg',
-      'https://i.ibb.co/k2RCcvvm/IMG-20260713-WA0060.jpg',
-      'https://i.ibb.co/xK5JL063/IMG-20260713-WA0058.jpg'
-    ],
-    description: '✨ 2026 Honda Accord ✨\n🇧🇪 Foreign Used | Original Duty Paid 🇧🇪\n🚘 Just Arrived | 🩶 Elegant Silver Exterior | ⚡ Modern Honda Accord\nExperience modern styling, comfort, and advanced technology in this beautiful 2026 Honda Accord. With its sleek exterior design, refined interior, digital instrument cluster, touchscreen infotainment system, automatic transmission, spacious cabin, and excellent road presence, this Accord is a perfect choice for anyone looking for a fresh, modern sedan.',
-    engine: '1.5L Turbo',
-    color: 'Silver',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-is250-2015',
-    make: 'Lexus',
-    model: 'IS250 F Sport',
-    year: 2015,
-    price: 15500000,
-    mileage: 82000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/K4znhbc/IMG-20260611-WA0043.jpg?id=HwpZ4BL',
-      'https://i.ibb.co/BHS9B7Nm/IMG-20260611-WA0050.jpg',
-      'https://i.ibb.co/tw9ns3kt/IMG-20260611-WA0048.jpg',
-      'https://i.ibb.co/d0XzKGJr/IMG-20260611-WA0049.jpg',
-      'https://i.ibb.co/SX8QzFG5/IMG-20260611-WA0051.jpg'
-    ],
-    description: '✨ 2015 Lexus IS250 F Sport ✨\n🇳🇬 Abuja Used | Duty Paid 🇳🇬\n🏁 F Sport Package | 🩶 Elegant Silver Exterior | 🖤 Premium Black Leather Interior\nExperience luxury, performance, and sporty styling in this clean 2015 Lexus IS250 F Sport. Featuring a powerful 2.5L V6 engine, sporty F Sport design, premium leather interior, sunroof, stylish alloy wheels, and excellent road presence, this Lexus delivers the perfect balance of comfort and performance.',
-    engine: '2.5L V6',
-    color: 'Silver',
-    condition: 'Nigerian Used',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-es350-2011',
-    make: 'Lexus',
-    model: 'ES350',
-    year: 2011,
-    price: 11500000,
-    mileage: 75000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/d0XD8zGN/IMG-20260722-WA0007.jpg',
-      'https://i.ibb.co/hx9S0gWw/IMG-20260722-WA0009.jpg',
-      'https://i.ibb.co/fz6r5Vfb/IMG-20260722-WA0011.jpg',
-      'https://i.ibb.co/NgpwqDKT/IMG-20260722-WA0013.jpg',
-      'https://i.ibb.co/ymPHSvFZ/IMG-20260722-WA0016.jpg'
-    ],
-    description: '✨ 2011 Lexus ES350 ✨\n🇧🇪 Extremely Clean Used | 🇳🇬 2026 Duty Paid\n🔑 Keyless Entry | 💺 Luxury Leather Interior | ❄️ Dual-Zone Climate Control\nExperience premium comfort, reliability, and smooth performance in this exceptionally clean 2011 Lexus ES350. Powered by a refined 3.5L V6 engine paired with an automatic transmission, this luxury sedan delivers a quiet ride, excellent fuel efficiency for its class, and legendary Lexus dependability.',
-    engine: '3.5L V6',
-    color: 'Dark Grey (Metallic)',
-    condition: 'Direct Belgium',
-    isFeatured: true
-  },
-  {
-    id: 'hyundai-santa-fe-2014',
-    make: 'Hyundai',
-    model: 'Santa Fe',
-    year: 2014,
-    price: 16000000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Nigeria',
-    dealership: 'Silver Star Sourcing',
-    images: [
-      'https://i.ibb.co/MyCc05hW/IMG-20260721-WA0032.jpg',
-      'https://i.ibb.co/d4BZZ3Rs/IMG-20260721-WA0034.jpg',
-      'https://i.ibb.co/qYYgS83N/IMG-20260721-WA0036.jpg',
-      'https://i.ibb.co/DgpJtZRW/IMG-20260721-WA0040.jpg',
-      'https://i.ibb.co/zW5pFRR7/IMG-20260721-WA0039.jpg'
-    ],
-    description: '✨ 2014 Hyundai Santa Fe ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚙 Luxury SUV | 💎 Elegant Silver Exterior\nExperience comfort, reliability, and performance with this well-maintained 2014 Hyundai Santa Fe. It offers a spacious 7-seater cabin, smooth automatic transmission, excellent fuel efficiency, premium interior, alloy wheels, fog lamps, multifunction steering controls, air conditioning, and ample cargo space—making it an ideal SUV for both family and business use.',
-    engine: '3.3L V6',
-    color: 'Silver',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'hyundai-azera-2023',
-    make: 'Hyundai',
-    model: 'Azera (Full Option)',
-    year: 2023,
-    price: 93000000,
-    mileage: 18000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Nigeria',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/s96rzXqZ/IMG-20260721-WA0058.jpg',
-      'https://i.ibb.co/HDNBxQ5T/IMG-20260721-WA0055.jpg',
-      'https://i.ibb.co/3m1Bjp31/IMG-20260721-WA0054.jpg',
-      'https://i.ibb.co/MyDmWVP8/IMG-20260721-WA0060.jpg',
-      'https://i.ibb.co/NdcNCBwx/IMG-20260721-WA0056.jpg'
-    ],
-    description: '✨ 2023 Hyundai Azera (Full Option) ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🌅 Full Panoramic Roof | 💎 Premium Grey Exterior\nExperience first-class luxury, advanced technology, and exceptional comfort with this stunning 2023 Hyundai Azera Full Option. Equipped with a powerful yet fuel-efficient engine, premium leather interior, panoramic sunroof, push-to-start ignition, smart keyless entry, large infotainment display, reverse camera, front & rear parking sensors, wireless charging, premium alloy wheels, LED headlights, dual-zone climate control, and advanced driver-assistance features.',
-    engine: '2.5L Smartstream',
-    color: 'Grey',
-    condition: 'Foreign Used',
-    isFeatured: true
-  },
-  {
-    id: 'lexus-is350-2014',
-    make: 'Lexus',
-    model: 'IS350 F Sport',
-    year: 2014,
-    price: 20000000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Nigeria',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/DgrkkpSL/IMG-20260611-WA0075-1.jpg',
-      'https://i.ibb.co/W4sQ7zVP/IMG-20260611-WA0082.jpg',
-      'https://i.ibb.co/xq4GrCQL/IMG-20260611-WA0081.jpg',
-      'https://i.ibb.co/TqktbKGr/IMG-20260611-WA0085.jpg',
-      'https://i.ibb.co/pvrFHp2c/IMG-20260611-WA0083.jpg',
-      'https://i.ibb.co/TBsJVjY0/IMG-20260611-WA0084.jpg'
-    ],
-    description: '✨ 2014 Lexus IS350 F Sport ✨\n🇧🇪 Accident Free | Direct Belgium | Original Custom Duty 🇳🇬\n🔑 Keyless Entry | 🔥 AMG Sound System | 💎 Elegant Deep Blue Exterior\nExperience luxury, power, and sporty performance with this accident-free 2014 Lexus IS350 F Sport. Powered by a responsive 3.5L V6 engine paired with a smooth automatic transmission, this premium sports sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, premium AMG sound system, reverse camera, parking sensors, LED daytime running lights, alloy wheels, dual-zone climate control, multifunction steering wheel, cruise control, and exceptional driving comfort. A perfect choice for anyone seeking performance, reliability, and executive class.',
-    engine: '3.5L V6 Petrol',
-    color: 'Deep Blue',
-    condition: 'Direct Belgium',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-corolla-2004',
-    make: 'Toyota',
-    model: 'Corolla',
-    year: 2004,
-    price: 5000000,
-    mileage: 120000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Nigeria',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/8gnd2pSn/IMG-20260722-WA0020.jpg',
-      'https://i.ibb.co/fd4gnQ5y/IMG-20260722-WA0022.jpg',
-      'https://i.ibb.co/rRn3fSnX/IMG-20260722-WA0024.jpg',
-      'https://i.ibb.co/3mMvFPMz/IMG-20260722-WA0005.jpg',
-      'https://i.ibb.co/b53c0SX6/IMG-20260722-WA0026.jpg'
-    ],
-    description: '✨ 2004 Toyota Corolla ✨\n🇳🇬 Nigeria Used | Duty Paid\n🔑 Reliable Sedan | ⛽ Fuel Efficient | 🖤 Classic Black Exterior\nOwn one of Toyota\'s most dependable sedans with this well-maintained 2004 Toyota Corolla. Renowned for its durability, fuel economy, and low maintenance costs, this sedan features a smooth automatic transmission, comfortable fabric interior, air conditioning, power windows, power steering, central locking, factory audio system, spacious cabin, and a generous boot space. An excellent choice for daily commuting, ride-hailing, or personal use.',
-    engine: '1.8L 4-Cylinder Petrol',
-    color: 'Black',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-camry-se-2013',
-    make: 'Toyota',
-    model: 'Camry SE',
-    year: 2013,
-    price: 15000000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Nigeria',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/CKRmpKHL/IMG-20260630-WA0117.jpg',
-      'https://i.ibb.co/8wNH6k0/IMG-20260630-WA0119.jpg',
-      'https://i.ibb.co/xS4fcb5C/IMG-20260630-WA0121.jpg',
-      'https://i.ibb.co/1GrPJS5Q/IMG-20260630-WA0124.jpg',
-      'https://i.ibb.co/mVmnY14D/IMG-20260630-WA0126.jpg',
-      'https://i.ibb.co/rGBttmMg/IMG-20260630-WA0128.jpg'
-    ],
-    description: '✨ 2013 Toyota Camry SE ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🏁 Sport Edition (SE) | ❤️ Premium Red Exterior\nEnjoy the perfect blend of sporty styling, comfort, and Toyota reliability with this clean 2013 Toyota Camry SE. Powered by a fuel-efficient 2.5L 4-cylinder engine and paired with a smooth automatic transmission, this sedan features a premium fabric interior, smart keyless entry, push-to-start ignition, reverse camera, Bluetooth connectivity, multifunction steering wheel, alloy wheels, cruise control, dual-zone climate control, sport-tuned suspension, LED daytime running lights, and a spacious cabin. An excellent choice for daily driving with impressive performance and low maintenance costs.',
-    engine: '2.5L 4-Cylinder Petrol',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'mercedes-c300-2013',
-    make: 'Mercedes-Benz',
-    model: 'C300 4MATIC',
-    year: 2013,
-    price: 11000000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/07J9ctH/IMG-20260721-WA0006.jpg',
-      'https://i.ibb.co/mFXGmNjd/IMG-20260721-WA0012.jpg',
-      'https://i.ibb.co/cSSYQpDk/IMG-20260721-WA0013.jpg',
-      'https://i.ibb.co/0ypVrhpS/IMG-20260721-WA0014.jpg',
-      'https://i.ibb.co/350Jt7xK/IMG-20260721-WA0004.jpg'
-    ],
-    description: '✨ 2013 Mercedes-Benz C300 4MATIC ✨\n🇳🇬 Clean Nigeria Used | Duty Paid\n🔑 Keyless Entry | ⭐ 4MATIC AWD | 💙 Elegant Navy Blue Exterior\nExperience luxury, comfort, and confident performance with this well-maintained 2013 Mercedes-Benz C300 4MATIC. Powered by a 3.5L V6 engine and paired with a smooth automatic transmission, this premium sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, reverse camera, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, premium alloy wheels, LED daytime running lights, Bluetooth connectivity, and Mercedes-Benz\'s renowned 4MATIC all-wheel-drive system for enhanced stability and control.',
-    engine: '3.5L V6 Petrol',
-    color: 'Navy Blue',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'mercedes-gle400-2016',
-    make: 'Mercedes-Benz',
-    model: 'GLE 400 4MATIC',
-    year: 2016,
-    price: 36000000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/k2pbVC5N/IMG-20260723-WA0014.jpg',
-      'https://i.ibb.co/SDsdP5tg/IMG-20260723-WA0021.jpg',
-      'https://i.ibb.co/Cppmh1cc/IMG-20260723-WA0020.jpg',
-      'https://i.ibb.co/0Vy9gdJs/IMG-20260723-WA0019.jpg',
-      'https://i.ibb.co/4RRZTxMC/IMG-20260723-WA0022.jpg'
-    ],
-    description: '✨ 2016 Mercedes-Benz GLE 400 4MATIC ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 📹 360° Camera | ⭐ 4MATIC AWD | ❤️ Premium Red Exterior\nExperience exceptional luxury, performance, and innovation with this stunning 2016 Mercedes-Benz GLE 400 4MATIC. Powered by a 3.0L Twin-Turbo V6 engine and paired with a smooth automatic transmission, this premium SUV delivers refined power and outstanding comfort. It features 360° surround-view camera, smart keyless entry, push-to-start ignition, premium leather interior, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, LED headlights, premium alloy wheels, Bluetooth connectivity, power tailgate, and Mercedes-Benz\'s intelligent 4MATIC all-wheel-drive system for superior handling in all driving conditions.',
-    engine: '3.0L Twin-Turbo V6 Petrol',
-    color: 'Red',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'lexus-es350-2014',
-    make: 'Lexus',
-    model: 'ES350',
-    year: 2014,
-    price: 18500000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/Q3LkfJmp/IMG-20260713-WA0064.jpg',
-      'https://i.ibb.co/tPpntdhn/IMG-20260713-WA0066.jpg',
-      'https://i.ibb.co/YFvcRs8r/IMG-20260713-WA0068.jpg',
-      'https://i.ibb.co/pryzWvKj/IMG-20260713-WA0070.jpg',
-      'https://i.ibb.co/PvqJt47b/IMG-20260713-WA0072.jpg'
-    ],
-    description: '✨ 2014 Lexus ES350 ✨\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\n🔑 Keyless Entry | 🛋️ Premium Leather Interior | 🌡️ Dual-Zone Climate Control\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 💡 LED Daytime Running Lights\n🪑 Power Seats | 🎵 Premium Audio System | 🛞 Alloy Wheels\nExperience luxury, comfort, and legendary Lexus reliability in this elegant 2014 ES350. Powered by a smooth 3.5L V6 engine with automatic transmission, it delivers excellent performance, exceptional ride comfort, low maintenance costs, and outstanding fuel efficiency. A perfect executive sedan for both city driving and long-distance travel.',
-    engine: '3.5L V6',
-    color: 'Pearl White',
-    condition: 'Direct Belgium',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-rav4-xle-2022',
-    make: 'Toyota',
-    model: 'RAV4 XLE AWD',
-    year: 2022,
-    price: 24500000,
-    mileage: 32000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/B5DHscJ1/IMG-20260721-WA0024.jpg',
-      'https://i.ibb.co/0ypVrhpS/IMG-20260721-WA0014.jpg',
-      'https://i.ibb.co/yF3vTJ8r/IMG-20260721-WA0029.jpg',
-      'https://i.ibb.co/twTjws2M/IMG-20260721-WA0028.jpg',
-      'https://i.ibb.co/xSJ1kSLw/IMG-20260721-WA0030.jpg',
-      'https://i.ibb.co/7tZLX1GB/IMG-20260721-WA0009.jpg'
-    ],
-    description: '✨ 2022 Toyota RAV4 XLE AWD ✨\n🌍 Foreign Used | 🇳🇬 Duty Paid\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛡️ Toyota Safety Sense\n📱 Apple CarPlay & Android Auto | 📷 Reverse Camera | 🌡️ Dual-Zone Climate Control\n🪑 Premium Fabric Seats | 🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 Alloy Wheels\nExperience outstanding reliability, comfort, and versatility in this beautiful 2022 Toyota RAV4 XLE AWD. Powered by a fuel-efficient 2.5L engine with automatic transmission, it delivers excellent performance, modern technology, impressive safety features, and the legendary durability Toyota is known for. An ideal SUV for city driving, family use, and long-distance travel.',
-    engine: '2.5L 4-Cylinder',
-    color: 'Silver',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-highlander-limited-2018',
-    make: 'Toyota',
-    model: 'Highlander Limited AWD',
-    year: 2018,
-    price: 28000000,
-    mileage: 48000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/MK5RscW/IMG-20260721-WA0016.jpg',
-      'https://i.ibb.co/yms87wR1/IMG-20260721-WA0020.jpg',
-      'https://i.ibb.co/jSV2fQ6/IMG-20260721-WA0023.jpg',
-      'https://i.ibb.co/RTTdFFQb/IMG-20260721-WA0021.jpg',
-      'https://i.ibb.co/21fz4sXX/IMG-20260721-WA0005.jpg'
-    ],
-    description: '✨ 2018 Toyota Highlander Limited AWD ✨\n🇳🇬 Extremely Clean Abuja Used | 🇳🇬 Duty Paid\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛋️ Premium Leather Interior\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\n🌡️ Tri-Zone Automatic Climate Control | 🪑 Heated & Ventilated Power Seats\n🎵 JBL Premium Audio System | 💡 LED Headlights | 🛞 Alloy Wheels | 🅿️ Front & Rear Parking Sensors\nExperience luxury, space, and Toyota\'s legendary reliability in this exceptionally clean 2018 Toyota Highlander Limited AWD. Powered by a refined 3.5L V6 engine with automatic transmission, it delivers strong performance, a smooth ride, advanced safety features, and outstanding comfort for both family and executive use. A premium SUV built for city driving, highway cruising, and long-distance travel.',
-    engine: '3.5L V6',
-    color: 'Pearl White',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'lexus-gs350-fsport-2015',
-    make: 'Lexus',
-    model: 'GS350 F SPORT',
-    year: 2015,
-    price: 16500000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/TDV2yQP3/IMG-20260630-WA0130-1.jpg',
-      'https://i.ibb.co/zHxfMm0L/IMG-20260630-WA0132-1.jpg',
-      'https://i.ibb.co/jv4tcxYF/IMG-20260630-WA0135-1.jpg',
-      'https://i.ibb.co/5X53MJYB/IMG-20260630-WA0137-1.jpg',
-      'https://i.ibb.co/23jpPDQS/IMG-20260630-WA0139-1.jpg'
-    ],
-    description: '✨ 2015 Lexus GS350 F SPORT ✨\n🇳🇬 Slightly Used | 🇳🇬 Original Duty Paid\n🔑 Smart Keyless Entry | 🌞 Sunroof | 🛋️ Premium Leather Interior\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\n🪑 Power Memory Seats | 🌡️ Dual-Zone Automatic Climate Control\n🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 F SPORT Alloy Wheels\nExperience premium luxury, sporty performance, and legendary Lexus reliability in this stunning 2015 Lexus GS350 F SPORT. Powered by a responsive 3.5L V6 engine with automatic transmission, it offers exceptional driving dynamics, refined comfort, advanced technology, and low maintenance costs. An ideal executive sedan for drivers who appreciate both performance and elegance.',
-    engine: '3.5L V6',
-    color: 'Silver',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'mercedes-e300-2017',
-    make: 'Mercedes-Benz',
-    model: 'E300',
-    year: 2017,
-    price: 21500000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/N2ssTJ4C/IMG-20260721-WA0042.jpg',
-      'https://i.ibb.co/ynNxn1mx/IMG-20260721-WA0044.jpg',
-      'https://i.ibb.co/S7QqvHKz/IMG-20260721-WA0046.jpg',
-      'https://i.ibb.co/spw8MV1v/IMG-20260721-WA0048.jpg',
-      'https://i.ibb.co/7JPXK02n/IMG-20260721-WA0050.jpg'
-    ],
-    description: '✨ 2017 Mercedes-Benz E300 ✨\n🇧🇪 Extremely Clean Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant Silver Metallic Exterior\nExperience luxury, comfort, and advanced German engineering with this stunning 2017 Mercedes-Benz E300. It offers a refined driving experience, premium interior, smooth 9-speed automatic transmission, and excellent fuel efficiency. Perfect for anyone seeking style, reliability, and executive-class comfort.',
-    engine: '2.0L Turbocharged Inline-4',
-    color: 'Silver Metallic',
-    condition: 'Direct Belgium',
-    isFeatured: false
-  },
-  {
-    id: 'mercedes-c300-2013-white',
-    make: 'Mercedes-Benz',
-    model: 'C300',
-    year: 2013,
-    price: 14500000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/S7vhrtxf/IMG-20260716-WA0039.jpg',
-      'https://i.ibb.co/vC8pLGhL/IMG-20260723-WA0050.jpg',
-      'https://i.ibb.co/3mJc8W0D/IMG-20260723-WA0049.jpg',
-      'https://i.ibb.co/xKt7wFgB/IMG-20260716-WA0042.jpg',
-      'https://i.ibb.co/LdzT376r/IMG-20260723-WA0051.jpg',
-      'https://i.ibb.co/qMLvBmrv/IMG-20260716-WA0045.jpg'
-    ],
-    description: '✨ 2013 Mercedes-Benz C300 ✨\n🇺🇸 Foreign Used | 🇳🇬 Duty Paid\n🖤 Black Engine | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\nExperience luxury, comfort, and performance in this beautiful 2013 Mercedes-Benz C300. A stylish and well-equipped luxury sedan with a premium look, smooth automatic transmission, powerful 3.5L V6 petrol engine, and the comfort you expect from Mercedes-Benz.',
-    engine: '3.5L V6',
-    color: 'White',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-sienna-2012',
-    make: 'Toyota',
-    model: 'Sienna',
-    year: 2012,
-    price: 11000000,
-    mileage: 78000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Minivan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/cc28rJSw/IMG-20260713-WA0083.jpg',
-      'https://i.ibb.co/X0t5TPJ/IMG-20260713-WA0085.jpg',
-      'https://i.ibb.co/WNs8FTxp/IMG-20260713-WA0087.jpg',
-      'https://i.ibb.co/4gSFXZvg/IMG-20260713-WA0082.jpg',
-      'https://i.ibb.co/6Rsj91c7/IMG-20260713-WA0080.jpg'
-    ],
-    description: '✨ 2012 Toyota Sienna ✨\n🇳🇬 Abuja Used | 📄 Duty Paid\n🩶 Elegant Silver Exterior | 🚐 Spacious Family Minivan\nExperience comfort, reliability, and practicality in this extremely clean 2012 Toyota Sienna. A spacious and comfortable family vehicle with a powerful 3.5L V6 petrol engine, smooth automatic transmission, and excellent road presence.',
-    engine: '3.5L V6',
-    color: 'Silver',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-highlander-2011-wine',
-    make: 'Toyota',
-    model: 'Highlander',
-    year: 2011,
-    price: 13000000,
-    mileage: 85000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/75drH12/IMG-20260724-WA0045.jpg',
-      'https://i.ibb.co/vCq41ms1/IMG-20260724-WA0041.jpg',
-      'https://i.ibb.co/Jw2C5Jwh/IMG-20260724-WA0043.jpg',
-      'https://i.ibb.co/zWMBrtV7/IMG-20260724-WA0046.jpg',
-      'https://i.ibb.co/99bzKxz4/IMG-20260724-WA0048.jpg',
-      'https://i.ibb.co/QFhsPtG6/IMG-20260724-WA0049.jpg'
-    ],
-    description: '✨ 2011 Toyota Highlander ✨\n🇳🇬 Duty Paid | ⭐ Full Option\n🔑 Keyless Entry | 🌞 Sunroof | 🍷 Elegant Wine Exterior\nExperience comfort, reliability, and premium utility in this extremely clean 2011 Toyota Highlander. A stylish and spacious SUV with a powerful 3.5L V6 petrol engine, smooth automatic transmission, keyless entry, sunroof, and excellent road presence.',
-    engine: '3.5L V6',
-    color: 'Wine/Burgundy',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'hyundai-sonata-2015-grey',
-    make: 'Hyundai',
-    model: 'Sonata',
-    year: 2015,
-    price: 13800000,
-    mileage: 65000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/MD8P10rH/IMG-20260630-WA0142.jpg',
-      'https://i.ibb.co/hFMVyx2S/IMG-20260630-WA0144.jpg',
-      'https://i.ibb.co/5gkrFhXv/IMG-20260630-WA0146.jpg',
-      'https://i.ibb.co/Hfcbtfhh/IMG-20260630-WA0148.jpg',
-      'https://i.ibb.co/RGLtGzzf/IMG-20260630-WA0150.jpg'
-    ],
-    description: '✨ 2015 Hyundai Sonata ✨\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\n🩶 Elegant Grey Exterior | 🚘 Luxury Sedan\nExperience style, comfort, and smooth performance in this 2015 Hyundai Sonata, directly imported from Belgium and fully duty paid. A stylish and spacious sedan with a smooth automatic transmission, efficient petrol engine, premium interior comfort, and excellent road presence.',
-    engine: '2.4L 4-Cylinder',
-    color: 'Grey',
-    condition: 'Direct Belgium',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-sienna-2003-silver',
-    make: 'Toyota',
-    model: 'Sienna',
-    year: 2003,
-    price: 4500000,
-    mileage: 120000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Minivan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/s96tpdHF/IMG-20260725-WA0003.jpg',
-      'https://i.ibb.co/Z1zjZ9k1/IMG-20260725-WA0008.jpg',
-      'https://i.ibb.co/1JJSb2HY/IMG-20260725-WA0010.jpg',
-      'https://i.ibb.co/bM5GKLGv/IMG-20260725-WA0011.jpg',
-      'https://i.ibb.co/TXcP108/IMG-20260725-WA0009.jpg'
-    ],
-    description: '✨ 2003 Toyota Sienna ✨\n🇳🇬 Duty Paid | 🩶 Elegant Silver Exterior\n🚐 Spacious Family Minivan | ⚙️ Reliable V6 Performance\nExperience comfort, practicality, and reliability in this clean used 2003 Toyota Sienna. A spacious family minivan powered by a reliable 3.0L V6 petrol engine, with automatic transmission and excellent practicality for everyday use and family trips.',
-    engine: '3.0L V6',
-    color: 'Silver',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'lexus-es350-2016-black',
-    make: 'Lexus',
-    model: 'ES 350',
-    year: 2016,
-    price: 26000000,
-    mileage: 58000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/6JcvjM6V/IMG-20260725-WA0013.jpg',
-      'https://i.ibb.co/B5QZh8gJ/IMG-20260725-WA0017.jpg',
-      'https://i.ibb.co/P7D3S3C/IMG-20260725-WA0016.jpg',
-      'https://i.ibb.co/4nTydxQs/IMG-20260725-WA0019.jpg'
-    ],
-    description: '✨ 2016 Lexus ES 350 ✨\n🇯🇵 Foreign Used | Tincan Cleared 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🖤 Elegant Black Exterior\nExperience luxury, comfort, and legendary Lexus reliability with this stunning 2016 Lexus ES 350. Powered by a refined 3.5L V6 engine, this executive sedan delivers smooth performance, premium comfort, and outstanding durability, making it the perfect choice for both city driving and long-distance travel.',
-    engine: '3.5L V6',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'lexus-is250-2015-white',
-    make: 'Lexus',
-    model: 'IS 250 AWD',
-    year: 2015,
-    price: 16500000,
-    mileage: 62000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/y9sqPLY/IMG-20260703-WA0024.jpg',
-      'https://i.ibb.co/mCWDLYGt/IMG-20260703-WA0022.jpg',
-      'https://i.ibb.co/9mnK8Y4f/IMG-20260703-WA0020.jpg',
-      'https://i.ibb.co/rKJNdhzk/IMG-20260725-WA0021.jpg',
-      'https://i.ibb.co/FL5Ttvck/IMG-20260703-WA0019.jpg'
-    ],
-    description: '✨ 2015 Lexus IS 250 AWD ✨\n🇳🇬 Abuja Used | Just Like Tokunbo | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sports Sedan | 🤍 Elegant Pearl White Exterior\n\nFeatures:\n• All-Wheel Drive (AWD)\n• Smart Keyless Entry & Push Start\n• Premium Leather Interior\n• Reverse Camera & Bluetooth Connectivity\n• Dual-Zone Climate Control & Power Front Seats\n• Alloy Wheels & LED Daytime Running Lights\n• Parking Sensors, ABS & Multiple Airbags',
-    engine: '2.5L V6',
-    color: 'Pearl White',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'hyundai-i30-gt-2015-black',
-    make: 'Hyundai',
-    model: 'i30 GT',
-    year: 2015,
-    price: 15000000,
-    mileage: 55000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Hatchback',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/n8BDCZn6/IMG-20260703-WA0021.jpg',
-      'https://i.ibb.co/Q7HxRrpp/IMG-20260725-WA0026.jpg',
-      'https://i.ibb.co/gZkzdBhy/IMG-20260725-WA0028.jpg',
-      'https://i.ibb.co/ZbS9Pqp/IMG-20260725-WA0029.jpg',
-      'https://i.ibb.co/vvMWVqQ7/IMG-20260725-WA0027.jpg'
-    ],
-    description: '✨ 2015 Hyundai i30 GT ✨\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚗 Hatchback | 🖤 Elegant Black Exterior\n\nExperience sporty performance, practicality, and excellent fuel efficiency with this 2015 Hyundai i30 GT. This well-maintained hatchback offers a comfortable cabin, smooth automatic transmission, 2.0L Inline-4 engine, and modern features making it ideal for daily commuting and long-distance travel.\n\nFeatures:\n• Keyless Entry & Push Start Button\n• Bluetooth Connectivity & Reverse Camera\n• Premium Interior & Multifunction Steering Wheel\n• Cruise Control & Automatic Climate Control\n• Alloy Wheels & LED Daytime Running Lights\n• Front Fog Lamps, ABS, ESC & Multiple Airbags',
-    engine: '2.0L Inline-4',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-sienna-2009-blue',
-    make: 'Toyota',
-    model: 'Sienna XLE Limited',
-    year: 2009,
-    price: 12500000,
-    mileage: 72000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Minivan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/XfyP7xyK/IMG-20260725-WA0031.jpg',
-      'https://i.ibb.co/Vcz0Y1QV/IMG-20260725-WA0035.jpg',
-      'https://i.ibb.co/CptJb0bp/IMG-20260725-WA0038.jpg',
-      'https://i.ibb.co/4g2yQwSw/IMG-20260725-WA0039.jpg',
-      'https://i.ibb.co/Y4q6fvXq/IMG-20260725-WA0034.jpg'
-    ],
-    description: '✨ 2009 Toyota Sienna XLE Limited ✨\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚐 Premium Minivan | 💙 Elegant Blue Exterior\n\nExperience unmatched comfort, reliability, and spaciousness with this 2009 Toyota Sienna XLE Limited. Designed for families and long-distance travel, this premium minivan offers a smooth ride, powerful 3.5L V6 engine, and Toyota\'s legendary durability.\n\nFeatures:\n• XLE Limited Trim\n• Smart Keyless Entry & Push Start Button\n• Premium Leather Interior & Power Sliding Doors\n• Power Tailgate & Reverse Camera\n• Tri-Zone Automatic Climate Control\n• Power Front Seats, Cruise Control & Alloy Wheels\n• Roof Rails, ABS, Vehicle Stability Control & Multiple Airbags',
-    engine: '3.5L V6',
-    color: 'Blue',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-corolla-2015-white',
-    make: 'Toyota',
-    model: 'Corolla LE',
-    year: 2015,
-    price: 14500000,
-    mileage: 68000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/mCsfcP3n/IMG-20260725-WA0041.jpg',
-      'https://i.ibb.co/QFY2Bd8L/IMG-20260725-WA0043.jpg',
-      'https://i.ibb.co/q3R9z3w3/IMG-20260725-WA0047.jpg',
-      'https://i.ibb.co/YTT457jr/IMG-20260725-WA0049.jpg',
-      'https://i.ibb.co/PvqKqsPt/IMG-20260725-WA0045.jpg'
-    ],
-    description: '✨ 2015 Toyota Corolla LE ✨\n🇧🇪 Foreign Used | Original 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚗 Sedan | 🤍 Elegant Pearl White Exterior\n\nExperience comfort, reliability, and exceptional fuel economy with this 2015 Toyota Corolla LE. This foreign-used sedan has original 2026 duty paid and is in excellent condition. Renowned for its durability, low maintenance costs, and smooth driving experience, it\'s an ideal choice for both personal and commercial use.\n\nFeatures:\n• Keyless Entry & Push Start Button\n• Reverse Camera & Bluetooth Connectivity\n• Touchscreen Multimedia System & Premium Fabric Interior\n• Multifunction Steering Wheel & Cruise Control\n• Automatic Climate Control & Alloy Wheels\n• LED Daytime Running Lights, Power Windows & Power Mirrors\n• ABS, Vehicle Stability Control & Multiple Airbags',
-    engine: '1.8L Inline-4',
-    color: 'Pearl White',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'honda-accord-2016-grey',
-    make: 'Honda',
-    model: 'Accord',
-    year: 2016,
-    price: 13500000,
-    mileage: 60000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/d0n8bcng/IMG-20260725-WA0078.jpg',
-      'https://i.ibb.co/9mk7r1KF/IMG-20260725-WA0077.jpg',
-      'https://i.ibb.co/HfhhyBcL/IMG-20260725-WA0091.jpg',
-      'https://i.ibb.co/bgMdLmpg/IMG-20260725-WA0087.jpg',
-      'https://i.ibb.co/d0YVRmKB/IMG-20260725-WA0071.jpg',
-      'https://i.ibb.co/prKHXqKL/IMG-20260725-WA0072.jpg'
-    ],
-    description: '✨ 2016 Honda Accord ✨\n🇳🇬 Abuja Used | Duty Paid 📄\n🔑 Keyless Entry | 📱 Double Screen | 🌞 Sunroof | 🩶 Elegant Dark Grey Exterior\n\nExperience style, comfort, and performance in this extremely clean 2016 Honda Accord. A premium and spacious sedan featuring keyless entry, double-screen infotainment system, sunroof, smooth automatic transmission, 2.4L 4-Cylinder engine, and excellent road presence.',
-    engine: '2.4L 4-Cylinder',
-    color: 'Dark Grey',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'lexus-nx300-2020-grey',
-    make: 'Lexus',
-    model: 'NX 300',
-    year: 2020,
-    price: 35500000,
-    mileage: 45000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/PZB7fXWr/IMG-20260725-WA0107.jpg',
-      'https://i.ibb.co/4nZz9pm3/IMG-20260725-WA0109.jpg',
-      'https://i.ibb.co/39M2Qb70/IMG-20260725-WA0102.jpg',
-      'https://i.ibb.co/fVTQ9b7J/IMG-20260725-WA0108.jpg'
-    ],
-    description: '✨ 2020 Lexus NX300 ✨\n🇳🇬 Abuja Used | Clean Used | Duty Paid 📄\n🩶 Elegant Grey Exterior | 🚘 Luxury SUV\n\nExperience luxury, comfort, and performance in this clean 2020 Lexus NX300. A stylish and premium SUV featuring a powerful 2.0L turbocharged petrol engine, smooth automatic transmission, modern styling, excellent road presence, and the comfort and refinement expected from Lexus.',
-    engine: '2.0L Turbo 4-Cylinder',
-    color: 'Grey',
-    condition: 'Nigerian Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-camry-2022-black',
-    make: 'Toyota',
-    model: 'Camry XSE',
-    year: 2022,
-    price: 43500000,
-    mileage: 38000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/pB9rW5qn/IMG-20260725-WA0051.jpg',
-      'https://i.ibb.co/2rktpbh/IMG-20260725-WA0053.jpg',
-      'https://i.ibb.co/m584Nm2m/IMG-20260725-WA0059.jpg',
-      'https://i.ibb.co/LXV08cQM/IMG-20260725-WA0058.jpg',
-      'https://i.ibb.co/s9tnsHnd/IMG-20260725-WA0056.jpg'
-    ],
-    description: '✨ 2022 Toyota Camry XSE ✨\n🇧🇪 Direct Belgium Import | Foreign Used | Original Duty Paid (July 18, 2026) 📄\n⭐ Full Option | 🌞 Panoramic Roof | 🔑 Keyless Entry | 📉 Low Mileage | 🖤 Elegant Black Exterior\n\nExperience premium comfort, style, and performance in this 2022 Toyota Camry XSE, directly imported from Belgium. This full-option luxury sedan features a panoramic roof, keyless entry, low mileage, sporty XSE styling, 2.5L 4-Cylinder engine, and excellent road presence.',
-    engine: '2.5L 4-Cylinder',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'toyota-4runner-2015-black',
-    make: 'Toyota',
-    model: '4Runner',
-    year: 2015,
-    price: 40800000,
-    mileage: 52000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'SUV',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/JRybQDBL/IMG-20260724-WA0029-2.jpg',
-      'https://i.ibb.co/B27TjDQx/IMG-20260724-WA0031-1.jpg',
-      'https://i.ibb.co/YFX6RnjB/IMG-20260724-WA0033-1.jpg',
-      'https://i.ibb.co/pr2CV6PR/IMG-20260724-WA0035-1.jpg',
-      'https://i.ibb.co/TD2CyYRb/IMG-20260724-WA0037-1.jpg'
-    ],
-    description: '✨ 2015 Toyota 4Runner ✨\n🌍 Foreign Used | 📄 Duty Fully Paid 🇳🇬\n🖤 Elegant Black Exterior | 🚘 Rugged Luxury SUV | ⚡ Powerful V6 Performance\n\nExperience rugged capability, comfort, and reliability in this 2015 Toyota 4Runner. A powerful and spacious SUV featuring a 4.0L V6 petrol engine, smooth automatic transmission, excellent ground clearance, strong road presence, and the durability Toyota 4Runner is known for.',
-    engine: '4.0L V6',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: false
-  },
-  {
-    id: 'honda-accord-2023-black',
-    make: 'Honda',
-    model: 'Accord',
-    year: 2023,
-    price: 43600000,
-    mileage: 32000,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    bodyType: 'Sedan',
-    location: 'Abuja',
-    dealership: 'Coscharis Certified Sourcing',
-    images: [
-      'https://i.ibb.co/3m7VRZYk/IMG-20260716-WA0029.jpg',
-      'https://i.ibb.co/C3TxS9LW/IMG-20260716-WA0019.jpg',
-      'https://i.ibb.co/vG8KmtT/IMG-20260716-WA0020.jpg',
-      'https://i.ibb.co/tpvbqm7t/IMG-20260716-WA0031.jpg',
-      'https://i.ibb.co/ZzdTbSXh/IMG-20260716-WA0033.jpg'
-    ],
-    description: '✨ 2023 Honda Accord ✨\n🌍 Foreign Used | 📄 Duty Paid 🇳🇬\n🖤 Elegant Black Exterior | 🚘 Modern Luxury Sedan\n\nExperience modern luxury, comfort, and performance in this 2023 Honda Accord. A stylish and spacious sedan with a smooth automatic transmission, efficient turbocharged petrol engine, refined interior, modern design, and excellent road presence.',
-    engine: '1.5L Turbo 4-Cylinder',
-    color: 'Black',
-    condition: 'Foreign Used',
-    isFeatured: false
+    "id": "honda-accord-2016-black-foreign-used",
+    "make": "Honda",
+    "model": "Accord",
+    "year": 2016,
+    "price": 18500000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.4L 4-Cylinder i-VTEC",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/tp5GZ5BS/IMG-20260811-WA0154.jpg",
+      "https://i.ibb.co/Xx5t0cqb/IMG-20260811-WA0157.jpg",
+      "https://i.ibb.co/S4b6TKxh/IMG-20260811-WA0156.jpg",
+      "https://i.ibb.co/CpxD5Gtf/IMG-20260811-WA0155.jpg",
+      "https://i.ibb.co/GQ1TzHZC/IMG-20260811-WA0159.jpg"
+    ],
+    "description": "\\u2728 2016 Honda Accord \\u2014 Foreign Used \\u{1F30D} \\u2728\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F9FE} | Location: Abuja \\u{1F1F3}\\u{1F1EC}\n\\u{1F5A4} Black Exterior | \\u{1F698} Sleek Honda Accord Design | \\u{1F525} Price: \\u20A618,500,000\n\n2016 Honda Accord \\u2014 Foreign Used \\u{1F30D}\\u{1F525}\nAvailable is this 2016 Honda Accord Foreign Used, finished in a sleek Black \\u{1F5A4} exterior with a clean and executive appearance.\n\nThe Accord offers a strong combination of style, comfort, practicality, and reliability, making it an excellent choice for both personal and executive use.\n\nThe vehicle comes with duty paid and is available in Abuja.\n\n\\u2B50 Key Features\n\\u2705 Foreign Used \\u{1F30D}\n\\u2705 Sleek Black Exterior \\u{1F5A4}\n\\u2705 Duty Paid \\u{1F9FE}\n\\u2705 Sleek Honda Accord Design \\u{1F698}\n\\u2705 Alloy Wheels \\u{1F6DE}\n\\u2705 Modern LED-Style Rear Lighting \\u{1F4A1}\n\\u2705 Privacy-Tinted Windows \\u{1FA9F}\n\\u2705 Premium & Executive Appearance \\u2728\n\\u2705 Spacious & Comfortable Interior \\u{1F6CB}\\uFE0F\n\\u2705 Practical & Reliable Sedan \\u26FD\n\\u2705 Great Value at \\u20A618.5M \\u{1F4B0}\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "kia-rio-2017-black-foreign-used",
+    "make": "Kia",
+    "model": "Rio",
+    "year": 2017,
+    "price": 13500000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "1.6L 4-Cylinder",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/cSwP1pB1/IMG-20260811-WA0121.jpg",
+      "https://i.ibb.co/397FH3X5/IMG-20260811-WA0127.jpg",
+      "https://i.ibb.co/VWP4Rwnm/IMG-20260811-WA0125.jpg",
+      "https://i.ibb.co/60PDYyxt/IMG-20260811-WA0128.jpg",
+      "https://i.ibb.co/cKTJZc0D/IMG-20260811-WA0129.jpg"
+    ],
+    "description": "\\u2728 2017 Kia Rio \\u2014 Foreign Used \\u{1F30D} \\u2728\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F9FE} | Location: Abuja \\u{1F1F3}\\u{1F1EC}\n\\u{1F5A4} Black Exterior | \\u{1F698} Practical & Fuel-Efficient | \\u{1F525} Price: \\u20A613,500,000\n\n2017 Kia Rio \\u2014 Foreign Used \\u{1F30D}\\u{1F525}\nAvailable is this 2017 Kia Rio, finished in a clean Black \\u{1F5A4} exterior with a sleek and sporty appearance.\n\nThe Kia Rio offers a good balance of style, comfort, practicality, and fuel efficiency, making it a suitable choice for both personal and everyday use.\n\nThe vehicle comes with duty paid and is currently available in Abuja, Nigeria \\u{1F1F3}\\u{1F1EC}.\n\n\\u2B50 Key Features\n\\u2705 Foreign Used \\u{1F30D}\n\\u2705 Clean Black Exterior \\u{1F5A4}\n\\u2705 Duty Paid \\u{1F9FE}\n\\u2705 Stylish Kia Rio Design \\u{1F698}\n\\u2705 Sporty Alloy Wheels \\u{1F6DE}\n\\u2705 Modern Headlights \\u{1F4A1}\n\\u2705 Privacy-Tinted Windows \\u{1FA9F}\n\\u2705 Sleek & Sporty Appearance \\u2728\n\\u2705 Comfortable Interior \\u{1F6CB}\\uFE0F\n\\u2705 Practical & Fuel-Efficient \\u{1F697}\n\\u2705 Great Value at \\u20A613.5M \\u{1F4B0}\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "bmw-328i-2014-white-nigeria-used",
+    "make": "BMW",
+    "model": "328i",
+    "year": 2014,
+    "price": 13000000,
+    "mileage": 78000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.0L TwinPower Turbo Inline-4",
+    "color": "White",
+    "condition": "Nigerian Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/VcqqybXQ/IMG-20260811-WA0065.jpg",
+      "https://i.ibb.co/RkS35N6P/IMG-20260811-WA0068.jpg",
+      "https://i.ibb.co/JRLXjf6x/IMG-20260811-WA0067.jpg",
+      "https://i.ibb.co/spvgPvCR/IMG-20260811-WA0069.jpg",
+      "https://i.ibb.co/zHhgDy7z/IMG-20260811-WA0066.jpg"
+    ],
+    "description": "\\u2728 2014 BMW 328i \\u2728\n\\u{1F1F3}\\u{1F1EC} Nigeria Used | Extremely Clean Condition \\u2728 | Duty Paid \\u{1F9FE} | Location: Abuja \\u{1F1F3}\\u{1F1EC}\n\\u{1F90D} Clean White Exterior | \\u{1F3C1} Sporty BMW 3-Series Styling | \\u{1F525} Price: \\u20A613,000,000\n\n2014 BMW 328i \\u2014 Extremely Clean & Ready to Go \\u{1F525}\nThis 2014 BMW 328i comes in a beautiful White \\u{1F90D} exterior and presents a clean, sporty, and executive look.\n\nWith its distinctive BMW styling, premium appearance, and engaging driving character, the 328i is an excellent choice for anyone looking for a luxury sedan that combines elegance, performance, and everyday practicality.\n\n\\u2B50 Key Features\n\\u2705 Extremely Clean Condition \\u2728\n\\u2705 Clean White Exterior \\u{1F90D}\n\\u2705 Sporty BMW 3-Series Styling \\u{1F3C1}\n\\u2705 Sport Alloy Wheels \\u{1F6DE}\n\\u2705 Privacy-Tinted Windows \\u{1FA9F}\n\\u2705 Premium BMW Lighting \\u{1F4A1}\n\\u2705 Luxury Executive Sedan \\u2B50\n\\u2705 Duty Paid \\u{1F9FE}\n\\u2705 Nigeria Used \\u{1F1F3}\\u{1F1EC}\n\\u2705 Excellent Value for Money \\u{1F525}\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "hyundai-sonata-2018-white-belgium",
+    "make": "Hyundai",
+    "model": "Sonata",
+    "year": 2018,
+    "price": 16000000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.4L 4-Cylinder",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/w16rC5v/IMG-20260811-WA0050.jpg",
+      "https://i.ibb.co/WpBvQY3V/IMG-20260811-WA0045.jpg",
+      "https://i.ibb.co/vtppTvh/IMG-20260811-WA0049.jpg",
+      "https://i.ibb.co/FbXztTgn/IMG-20260811-WA0048.jpg",
+      "https://i.ibb.co/BHLvzwYX/IMG-20260811-WA0047.jpg"
+    ],
+    "description": "\\u2728 2018 Hyundai Sonata \\u2728\n\\u{1F1E7}\\u{1F1EA} Direct Belgium Import | Duty Paid \\u{1F9FE} | Location: Abuja \\u{1F1F3}\\u{1F1EC}\n\\u{1F90D} Clean White Exterior | \\u2600\\uFE0F Sunroof | \\u{1F511} Keyless Entry | \\u{1F698} Executive Sedan\n\n2018 Hyundai Sonata \\u2014 Clean, Stylish & Ready to Go \\u{1F525}\nThis 2018 Hyundai Sonata Direct Belgium \\u{1F1E7}\\u{1F1EA} comes in a beautiful White \\u{1F90D} exterior and offers a great balance of style, comfort, and practicality.\n\nEquipped with desirable features including sunroof \\u2600\\uFE0F and keyless entry \\u{1F511}, this Sonata is an excellent choice for anyone looking for a modern executive sedan at a competitive price.\n\n\\u2B50 Key Features\n\\u2705 Direct Belgium \\u{1F1E7}\\u{1F1EA} Import\n\\u2705 Clean White Exterior\n\\u2705 Sunroof \\u2600\\uFE0F\n\\u2705 Keyless Entry \\u{1F511}\n\\u2705 Duty Paid \\u{1F9FE}\n\\u2705 2018 Model\n\\u2705 Stylish Alloy Wheels\n\\u2705 Modern LED / Projector Lighting\n\\u2705 Sporty Exterior Design\n\\u2705 Comfortable & Spacious Interior\n\\u2705 Excellent Daily & Executive Sedan\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "mercedes-benz-ml350-2014-grey-belgium",
+    "make": "Mercedes-Benz",
+    "model": "ML350",
+    "year": 2014,
+    "price": 21500000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "3.5L V6",
+    "color": "Grey",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/QsG9kCD/IMG-20260807-WA0019.jpg",
+      "https://i.ibb.co/ZznYdM3N/IMG-20260807-WA0027.jpg",
+      "https://i.ibb.co/RGvC5dfW/IMG-20260807-WA0024.jpg",
+      "https://i.ibb.co/BH0CfhKV/IMG-20260807-WA0026.jpg",
+      "https://i.ibb.co/tTW3cyb0/IMG-20260807-WA0025.jpg"
+    ],
+    "description": "\\u2728 2014 Mercedes-Benz ML350 \\u2728\n\\u{1F1E7}\\u{1F1EA} Direct Belgium Import | July 2026 Duty Paid \\u{1F9FE}\n\\u{1FA76} Classy Grey Exterior | \\u{1F511} Keyless Entry | \\u{1F698} Bold Luxury SUV Presence | \\u{1F6A8} Urgent Sale: \\u20A621,500,000\n\n\\u{1F6A8} MONEY NEEDED URGENTLY! \\u{1F525}\\u{1F525}\nAvailable is this 2014 Mercedes-Benz ML350 Direct Belgium \\u{1F1E7}\\u{1F1EA}, finished in a classy Grey \\u{1FA76} and offering the bold, premium presence expected from the Mercedes-Benz ML-Class.\n\nThe vehicle comes with keyless entry and July 2026 duty, making it an attractive option for anyone looking for a premium Mercedes SUV at a competitive price.\n\n\\u2B50 Key Features\n\\u2705 Direct Belgium \\u{1F1E7}\\u{1F1EA} Import\n\\u2705 Elegant Grey Exterior\n\\u2705 Keyless Entry\n\\u2705 July 2026 Duty Paid\n\\u2705 Premium Mercedes-Benz Luxury SUV\n\\u2705 Premium Alloy Wheels\n\\u2705 Sporty & Powerful V6 SUV Design\n\\u2705 Urgent Sale Opportunity\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "mercedes-benz-cla-250-2014-grey",
+    "make": "Mercedes-Benz",
+    "model": "CLA 250",
+    "year": 2014,
+    "price": 11000000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.0L Turbocharged Inline-4",
+    "color": "Grey",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/F4CRCs9C/IMG-20260807-WA0010.jpg",
+      "https://i.ibb.co/Wvg5ynhP/IMG-20260807-WA0017.jpg",
+      "https://i.ibb.co/Z6WLTvbM/IMG-20260807-WA0016.jpg",
+      "https://i.ibb.co/6RKh0Xdm/IMG-20260807-WA0015.jpg",
+      "https://i.ibb.co/dspnd2G4/IMG-20260807-WA0014.jpg"
+    ],
+    "description": "\\u2728 2014 Mercedes-Benz CLA 250 \\u2728\n\\u{1F1E9}\\u{1F1EA} Foreign Used | Original Duty Paid \\u{1F1F3}\\u{1F1EC} | Clean Title \\u{1F4C4}\n\\u{1FA76} Classy Grey Exterior | \\u{1F3C1} Sporty Coupe-Sedan Styling | \\u{1F6A8} Distress Price: \\u20A611,000,000\n\n\\u{1F6A8} MONEY NEEDED! DISTRESS SALE \\u{1F525}\nHere\\u2019s an opportunity to own a 2014 Mercedes-Benz CLA 250 at an attractive distress price of just \\u20A611,000,000.\n\nFinished in a classy Grey \\u{1FA76}, this CLA 250 combines Mercedes-Benz luxury, sporty styling, and everyday practicality. The vehicle comes with Original Duty and a Clean Title, making it an excellent option for someone looking for a stylish Mercedes at a competitive price.\n\n\\u2B50 Key Features\n\\u2705 Foreign Used \\u{1F1E9}\\u{1F1EA} (Germany Import)\n\\u2705 Premium Grey Exterior\n\\u2705 Sporty CLA Coupe-Sedan Design\n\\u2705 Mercedes-Benz Luxury Styling\n\\u2705 Stylish Alloy Wheels & Premium Interior\n\\u2705 Original Duty Paid\n\\u2705 Clean Title\n\\u2705 Distress Price \\u2014 \\u20A611M\n\\u2705 Located in Abuja\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "toyota-c-hr-2024-black-foreign-used",
+    "make": "Toyota",
+    "model": "C-HR",
+    "year": 2024,
+    "price": 30000000,
+    "mileage": 15000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.0L 4-Cylinder",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/xKH6vbnb/IMG-20260807-WA0002.jpg",
+      "https://i.ibb.co/rKYnGW01/IMG-20260807-WA0003.jpg",
+      "https://i.ibb.co/5XL5YmyS/IMG-20260807-WA0005.jpg",
+      "https://i.ibb.co/TBqYGJhD/IMG-20260807-WA0007.jpg",
+      "https://i.ibb.co/CkFmJ4L/IMG-20260805-WA0081.jpg"
+    ],
+    "description": "\\u2728 2024 Toyota C-HR \\u2728\n\\u{1F1E9}\\u{1F1EA} Foreign Used | Just Arrived | Original Duty Paid \\u{1F1F3}\\u{1F1EC}\n\\u{1F5A4} Elegant Black Exterior | \\u2600\\uFE0F Sunroof | \\u{1F511} Keyless Entry | \\u{1F698} Modern Crossover\n\nClean, classy and ready to go! \\u{1F525} This 2024 Toyota C-HR Foreign Used \\u{1F1E9}\\u{1F1EA} is a stylish and modern crossover designed for buyers who want a combination of premium looks, comfort and everyday practicality.\n\nFinished in an elegant Black \\u{1F5A4}, this unit comes with desirable features including a sunroof and keyless entry. It is accident-free, clean title and original duty, giving you added confidence when purchasing.\n\n\\u2B50 Key Features\n\\u2705 Foreign Used \\u{1F1E9}\\u{1F1EA} (Germany Import)\n\\u2705 Sunroof\n\\u2705 Keyless Entry\n\\u2705 Accident Free & Clean Title\n\\u2705 Original Duty Paid\n\\u2705 2024 Model\n\\u2705 Modern Crossover / SUV Design\n\\u2705 Premium & Stylish Appearance\n\\u2705 Just Arrived & Ready to Drive"
+  },
+  {
+    "id": "mercedes-benz-glb250-2022-white",
+    "make": "Mercedes-Benz",
+    "model": "GLB250",
+    "year": 2022,
+    "price": 45000000,
+    "mileage": 25000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.0L Turbocharged 4-Cylinder",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/C3JRXPLq/IMG-20260805-WA0069.jpg",
+      "https://i.ibb.co/MyyxDxHS/IMG-20260805-WA0071.jpg",
+      "https://i.ibb.co/Lhtywnzw/IMG-20260805-WA0073.jpg",
+      "https://i.ibb.co/BK2ZNzGK/IMG-20260805-WA0075.jpg",
+      "https://i.ibb.co/sJQFgHDy/IMG-20260805-WA0077.jpg",
+      "https://i.ibb.co/gM2m6985/IMG-20260805-WA0079.jpg"
+    ],
+    "description": "\\u2728 2022 Mercedes-Benz GLB250 \\u2728\n\\u{1F1E9}\\u{1F1EA} Foreign Used | New Arrival | Original Duty Paid \\u{1F1F3}\\u{1F1EC}\n\\u{1F90D} Elegant White Exterior | \\u{1F698} Compact Luxury SUV | \\u26A1 Accident Free & Clean Title\n\nExperience modern luxury, versatility, and advanced technology with this pristine 2022 Mercedes-Benz GLB250. Featuring a bold design, panoramic glass roof, 360\\xB0 surround camera system, and a turbocharged engine, this compact luxury SUV offers exceptional comfort and performance.\n\n\\u2B50 Features & Highlights\n\\u2705 Panoramic Glass Roof\n\\u2705 360\\xB0 Surround-View Camera\n\\u2705 Keyless Entry & Push Button Start\n\\u2705 Premium Mercedes-Benz Leather Interior\n\\u2705 Digital Instrument Display & Touchscreen Infotainment\n\\u2705 LED Lighting\n\\u2705 Mercedes-Benz Safety & Driver-Assistance Features\n\\u2705 Roof Rails & Alloy Wheels\n\\u2705 2.0L Turbocharged 4-Cylinder Engine\n\\u2705 8-Speed Automatic Transmission with AWD/4MATIC\n\\u2705 Original Duty Paid"
+  },
+  {
+    "id": "mercedes-benz-glk-350-4matic-2014-deep-blue",
+    "make": "Mercedes-Benz",
+    "model": "GLK 350 4MATIC",
+    "year": 2014,
+    "price": 20000000,
+    "mileage": 58000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "3.5L V6",
+    "color": "Deep Blue",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/YFbhKVcK/IMG-20260805-WA0016.jpg",
+      "https://i.ibb.co/XfxK8TyX/IMG-20260805-WA0020.jpg",
+      "https://i.ibb.co/Dg7wJk39/IMG-20260805-WA0018.jpg",
+      "https://i.ibb.co/vCFqZtzr/IMG-20260805-WA0022-1.jpg",
+      "https://i.ibb.co/nN6TT680/IMG-20260805-WA0024.jpg"
+    ],
+    "description": "\\u2728 2014 Mercedes-Benz GLK 350 4MATIC \\u2728\n\\u{1F1E9}\\u{1F1EA} Foreign Used | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\n\\u{1F305} Full Panoramic Roof | \\u{1F511} Keyless Entry | \\u26A1 Full Option | \\u{1F499} Elegant Deep Blue Exterior\n\nExperience luxury, performance, and commanding road presence with this 2014 Mercedes-Benz GLK 350 4MATIC. This full-option luxury SUV combines Mercedes-Benz comfort with the confidence of 4MATIC all-wheel drive, a powerful V6 engine, and a premium interior.\n\n\\u2B50 Features & Highlights\n\\u2705 Full Panoramic Roof\n\\u2705 Keyless Entry & Push Start Button\n\\u2705 4MATIC All-Wheel Drive\n\\u2705 3.5L V6 Engine\n\\u2705 Premium Leather Interior & Power Seats\n\\u2705 Reverse Camera & Parking Sensors\n\\u2705 Bluetooth Connectivity & Touchscreen Interface\n\\u2705 Multifunction Steering Wheel & Cruise Control\n\\u2705 Automatic Climate Control\n\\u2705 Alloy Wheels\n\\u2705 Power Windows & Mirrors\n\\u2705 LED Lighting\n\\u2705 Multiple Airbags & Stability Control\n\\u2705 Spacious Premium Cabin\n\\u2705 Full Option Specification\n\\u2705 Excellent Engine & Transmission\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "toyota-corolla-s-2015-silver-few-months-used",
+    "make": "Toyota",
+    "model": "Corolla S",
+    "year": 2015,
+    "price": 12000000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "1.8L Inline-4",
+    "color": "Silver",
+    "condition": "Few Months Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/6LVPB7w/IMG-20260805-WA0004.jpg",
+      "https://i.ibb.co/zWKYzJQ4/IMG-20260805-WA0008.jpg",
+      "https://i.ibb.co/5WQ4qB4v/IMG-20260805-WA0006.jpg",
+      "https://i.ibb.co/gxqhPjp/IMG-20260805-WA0010.jpg",
+      "https://i.ibb.co/QjkPFyBr/IMG-20260805-WA0012.jpg"
+    ],
+    "description": "\\u2728 2015 Toyota Corolla S \\u2728\n\\u{1F1F3}\\u{1F1EC} Few Months Used | Extremely Clean | 2026 Duty Paid\n\\u{1F698} Sporty Sedan | \\u{1FA76} Elegant Silver Exterior | \\u{1F511} Keyless Entry\n\nGet behind the wheel of this extremely clean 2015 Toyota Corolla S, maintained in excellent condition and ready for immediate use. Combining Toyota's renowned reliability with sporty styling, excellent fuel economy, and a comfortable interior, this Corolla is an excellent choice for everyday driving.\n\n\\u2B50 Key Features\n\\u2705 Corolla S Sport Trim\n\\u2705 Keyless Entry & Push Start Button\n\\u2705 Reverse Camera\n\\u2705 Bluetooth Connectivity & Touchscreen Multimedia System\n\\u2705 Multifunction Steering Wheel & Cruise Control\n\\u2705 Automatic Climate Control\n\\u2705 Alloy Wheels & Sporty Exterior Styling\n\\u2705 LED Daytime Running Lights\n\\u2705 Power Windows & Power Mirrors\n\\u2705 ABS & Multiple Airbags\n\\u2705 Spacious Interior & Boot\n\\u2705 Excellent Engine & Transmission\n\\u2705 Extremely Clean Interior & Exterior\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "toyota-camry-xse-2020-blue-full-option",
+    "make": "Toyota",
+    "model": "Camry XSE",
+    "year": 2020,
+    "price": 35000000,
+    "mileage": 48000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "2.5L Inline-4",
+    "color": "Blue",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/BHnZ5FPD/IMG-20260803-WA0012.jpg",
+      "https://i.ibb.co/1GgQbTVj/IMG-20260803-WA0014.jpg",
+      "https://i.ibb.co/7tHWj13q/IMG-20260803-WA0016.jpg",
+      "https://i.ibb.co/gLgvnJ5Y/IMG-20260803-WA0018.jpg",
+      "https://i.ibb.co/bjtFsVSr/IMG-20260803-WA0020.jpg"
+    ],
+    "description": "\\u2728 2020 Toyota Camry XSE \\u2728\n\\u{1F1EF}\\u{1F1F5} Foreign Used | New Arrival | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\n\\u{1F511} Keyless Entry | \\u{1F305} Panoramic Roof | \\u{1F4C9} Low Mileage | \\u{1F499} Elegant Blue Exterior\n\nExperience the perfect combination of sporty styling, premium comfort, and cutting-edge technology with this 2020 Toyota Camry XSE. This low-mileage, foreign-used sedan offers an exceptional driving experience, outstanding fuel economy, and the legendary reliability Toyota is known for.\n\n\\u2B50 Key Features\n\\u2705 Panoramic Glass Roof\n\\u2705 Smart Keyless Entry & Push Start Button\n\\u2705 Reverse Camera\n\\u2705 Bluetooth Connectivity & Touchscreen Infotainment System\n\\u2705 Apple CarPlay & Android Auto\n\\u2705 Premium Leather Interior\n\\u2705 Power Driver & Passenger Seats\n\\u2705 Dual-Zone Automatic Climate Control\n\\u2705 Multifunction Steering Wheel & Cruise Control\n\\u2705 Sport Alloy Wheels\n\\u2705 LED Headlamps & Daytime Running Lights\n\\u2705 Front & Rear Parking Sensors\n\\u2705 Blind Spot Monitor & Lane Departure Alert\n\\u2705 ABS, Vehicle Stability Control & Multiple Airbags\n\\u2705 Power Windows & Power Mirrors\n\\u2705 Factory Tinted Glass\n\\u2705 Low Mileage\n\\u2705 Excellent Engine & Transmission\n\\u2705 Ready to Drive"
+  },
+  {
+    "id": "mercedes-benz-gle400-2016-red-4matic",
+    "make": "Mercedes-Benz",
+    "model": "GLE 400",
+    "year": 2016,
+    "price": 36500000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "images": [
+      "https://i.ibb.co/zHhVWvV2/IMG-20260730-WA0041.jpg",
+      "https://i.ibb.co/v4XnrxZr/IMG-20260730-WA0048.jpg",
+      "https://i.ibb.co/zWZfPkcR/IMG-20260730-WA0049.jpg",
+      "https://i.ibb.co/5XxQr60q/IMG-20260730-WA0050.jpg",
+      "https://i.ibb.co/4nPkPtkh/IMG-20260730-WA0052.jpg",
+      "https://i.ibb.co/wNzrygKZ/IMG-20260730-WA0051.jpg",
+      "https://i.ibb.co/Gv4SzCrG/IMG-20260730-WA0047.jpg"
+    ],
+    "description": "\\u{1F698} VEHICLE PROFILE SHEET\n2016 Mercedes-Benz GLE 400 4MATIC (Full Option)\n\\u{1F4CD} Location: Abuja\n\\u{1F4B0} Price: \\u20A636,500,000\n\\u{1F3A8} Color: Red\n\\u{1F4E6} Condition: Foreign Used\n\\u{1F4C4} Duty: Fully Paid\n\n\\u{1F4DD} Description\nStand out in style with this 2016 Mercedes-Benz GLE 400 4MATIC Full Option, finished in a striking Red exterior. This luxury SUV combines powerful twin-turbo performance with premium comfort, advanced technology, and world-class safety. Featuring a Full Panoramic Roof, refined leather cabin, and intelligent 4MATIC all-wheel drive, it delivers an exceptional driving experience for both city roads and long-distance journeys. Fully duty paid and ready for immediate registration.\n\n\\u2B50 Key Features\n\\u2705 3.0L V6 Twin-Turbo Petrol Engine\n\\u2705 9G-TRONIC Automatic Transmission\n\\u2705 4MATIC Intelligent All-Wheel Drive\n\\u2705 Full Panoramic Glass Sunroof\n\\u2705 Smart Keyless Entry & Push Start\n\\u2705 Premium Leather Interior\n\\u2705 Electrically Adjustable Front Seats\n\\u2705 Memory Seats\n\\u2705 Heated Front Seats\n\\u2705 Dual-Zone Automatic Climate Control\n\\u2705 Power Tailgate\n\\u2705 Reverse Camera\n\\u2705 Front & Rear Parking Sensors\n\\u2705 Blind Spot Assist\n\\u2705 Lane Keeping Assist\n\\u2705 Adaptive Cruise Control\n\\u2705 LED Intelligent Headlights & Daytime Running Lights\n\\u2705 Navigation System\n\\u2705 Bluetooth & USB Connectivity\n\\u2705 Premium Surround Sound System\n\\u2705 Multifunction Steering Wheel\n\\u2705 Alloy Wheels\n\\u2705 Multiple Airbags\n\\u2705 ABS, ESP & Traction Control",
+    "engine": "3.0L V6 Twin-Turbo Petrol Engine",
+    "color": "Red",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-benz-ml350-2015-white-4matic",
+    "make": "Mercedes-Benz",
+    "model": "ML350",
+    "year": 2015,
+    "price": 20000000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "images": [
+      "https://i.ibb.co/hxVMVf37/IMG-20260730-WA0032.jpg",
+      "https://i.ibb.co/rKLNX5XL/IMG-20260730-WA0035.jpg",
+      "https://i.ibb.co/KxDPj60g/IMG-20260730-WA0036.jpg",
+      "https://i.ibb.co/MkFvwgyr/IMG-20260730-WA0039.jpg",
+      "https://i.ibb.co/1Gkmhj7W/IMG-20260730-WA0040.jpg"
+    ],
+    "description": "\\u{1F698} VEHICLE PROFILE SHEET\n2015 Mercedes-Benz ML350 4MATIC\n\\u{1F4CD} Location: Abuja\n\\u{1F4B0} Price: \\u20A620,000,000\n\\u{1F3A8} Color: White\n\\u{1F4E6} Condition: Extremely Clean Nigerian Used\n\\u{1F4C4} Duty: Fully Paid\n\n\\u{1F4DD} Description\nOwn a premium luxury SUV at an unbeatable value with this 2015 Mercedes-Benz ML350. Finished in a stunning White exterior, this SUV delivers the perfect combination of elegance, comfort, performance, and reliability. It features a refined interior, smooth V6 engine, advanced safety technologies, and exceptional ride quality, making it ideal for both city driving and long-distance trips. Fully duty paid and ready to drive.\n\n\\u2B50 Key Features\n\\u2705 3.5L V6 Petrol Engine\n\\u2705 7-Speed Automatic Transmission\n\\u2705 4MATIC All-Wheel Drive\n\\u2705 Leather Interior\n\\u2705 Electrically Adjustable Front Seats\n\\u2705 Memory Seats\n\\u2705 Heated Front Seats\n\\u2705 Panoramic Sunroof\n\\u2705 Power Tailgate\n\\u2705 Keyless Entry & Push Start\n\\u2705 Dual-Zone Automatic Climate Control\n\\u2705 Reverse Camera\n\\u2705 Front & Rear Parking Sensors\n\\u2705 Bluetooth Connectivity\n\\u2705 Premium Audio System\n\\u2705 Multifunction Steering Wheel\n\\u2705 Cruise Control\n\\u2705 Xenon/LED Headlamps with Daytime Running Lights\n\\u2705 Alloy Wheels\n\\u2705 ABS, ESP & Traction Control\n\\u2705 Multiple Airbags",
+    "engine": "3.5L V6 Petrol Engine",
+    "color": "White",
+    "condition": "Extremely Clean Nigerian Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-2019-blue-xse",
+    "make": "Toyota",
+    "model": "Camry",
+    "year": 2019,
+    "price": 32000000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "images": [
+      "https://i.ibb.co/Jj0LR4zr/IMG-20260730-WA0022.jpg",
+      "https://i.ibb.co/20DDg0Tq/IMG-20260730-WA0024.jpg",
+      "https://i.ibb.co/4g2yv9Bw/IMG-20260730-WA0026.jpg",
+      "https://i.ibb.co/v6cPQTp8/IMG-20260730-WA0028.jpg",
+      "https://i.ibb.co/KcRtngpc/IMG-20260730-WA0030.jpg"
+    ],
+    "description": "\\u{1F698} VEHICLE PROFILE SHEET\n2019 Toyota Camry XSE (Full Option)\n\\u{1F4CD} Location: Abuja\n\\u{1F4B0} Price: \\u20A632,000,000\n\\u{1F3A8} Color: Blue\n\\u{1F4E6} Condition: Foreign Used\n\\u{1F4C4} Duty: Fully Paid\n\n\\u{1F4DD} Description\nExperience luxury, performance, and cutting-edge technology in this 2019 Toyota Camry XSE Full Option. Finished in a stunning Blue exterior, this premium sedan combines sporty styling with Toyota's legendary reliability. Equipped with a Heads-Up Display, Full Panoramic Roof, and Keyless Entry, it offers an exceptional driving experience with outstanding comfort and safety. Fully duty paid and ready for immediate registration.\n\n\\u2B50 Key Features\n\\u2705 Heads-Up Display (HUD)\n\\u2705 Full Panoramic Glass Roof\n\\u2705 Smart Keyless Entry & Push Start\n\\u2705 Leather Sport Interior\n\\u2705 Electrically Adjustable Front Seats\n\\u2705 Seat Memory Function\n\\u2705 Heated Front Seats\n\\u2705 Dual-Zone Automatic Climate Control\n\\u2705 Large Touchscreen Infotainment System\n\\u2705 Apple CarPlay & Android Auto (where equipped)\n\\u2705 Premium JBL Sound System (Full Option)\n\\u2705 Reverse Camera\n\\u2705 Front & Rear Parking Sensors\n\\u2705 Blind Spot Monitoring\n\\u2705 Lane Departure Alert\n\\u2705 Adaptive Cruise Control\n\\u2705 Pre-Collision Safety System\n\\u2705 LED Headlights & Daytime Running Lights\n\\u2705 Sport Alloy Wheels\n\\u2705 Paddle Shifters\n\\u2705 Steering Wheel Audio & Cruise Controls\n\\u2705 Multiple Airbags\n\\u2705 ABS, Traction Control & Vehicle Stability Control",
+    "engine": "2.5L 4-Cylinder Engine",
+    "color": "Blue",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-yaris-2014-white-le-belgium",
+    "make": "Toyota",
+    "model": "Yaris",
+    "year": 2014,
+    "price": 14000000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Hatchback",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "images": [
+      "https://i.ibb.co/rfy9BB4j/IMG-20260729-WA0012.jpg",
+      "https://i.ibb.co/fVP9tm2s/IMG-20260729-WA0016.jpg",
+      "https://i.ibb.co/5W0x3ZZJ/IMG-20260729-WA0017.jpg",
+      "https://i.ibb.co/n8jvMwk0/IMG-20260729-WA0018.jpg",
+      "https://i.ibb.co/gMykm5wL/IMG-20260729-WA0022.jpg"
+    ],
+    "description": "\\u{1F698} VEHICLE PROFILE SHEET\\n2014 Toyota Yaris LE\\n\\u{1F4CD} Location: Abuja\\n\\u{1F4B0} Price: \\u20A614,000,000\\n\\u{1F3A8} Color: White\\n\\u{1F4E6} Condition: Direct Belgium (Foreign Used) \\u{1F1E7}\\u{1F1EA}\\n\\u{1F4C4} Duty: Paid\\n\\n\\u{1F4DD} Description\\nLooking for a reliable, fuel-efficient, and low-maintenance car? This 2014 Toyota Yaris LE is an excellent choice. Directly imported from Belgium and finished in a clean White exterior, this hatchback offers Toyota's legendary durability, impressive fuel economy, and practical design. Perfect for daily commuting, ride-hailing, or first-time car owners.\\n\\n\\u2B50 Key Features\\n\\u2705 LE Trim\\n\\u2705 Fuel-Efficient 1.5L 4-Cylinder Engine\\n\\u2705 Automatic Transmission\\n\\u2705 Air Conditioning\\n\\u2705 Power Steering\\n\\u2705 Power Windows\\n\\u2705 Power Door Locks\\n\\u2705 Remote Keyless Entry\\n\\u2705 Multi-Function Steering Wheel\\n\\u2705 Bluetooth Hands-Free Connectivity\\n\\u2705 USB & AUX Audio Input\\n\\u2705 Factory Audio System\\n\\u2705 Touchscreen Display (where equipped)\\n\\u2705 Rear View Camera (where equipped)\\n\\u2705 Electric Side Mirrors\\n\\u2705 Split Folding Rear Seats\\n\\u2705 ABS Braking System\\n\\u2705 Vehicle Stability Control (VSC)\\n\\u2705 Traction Control\\n\\u2705 Multiple Airbags\\n\\u2705 Daytime Running Lights\\n\\u2705 Excellent Fuel Economy",
+    "engine": "1.5L 4-Cylinder Engine",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-benz-gla250-2017-red",
+    "make": "Mercedes-Benz",
+    "model": "GLA 250",
+    "year": 2017,
+    "price": 27000000,
+    "mileage": 48000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/SwHYr8TF/IMG-20260723-WA0035.jpg"
+    ],
+    "description": "\\u2728 2017 Mercedes-Benz GLA 250 (Fullest Option) \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium (Foreign Used) | \\u2705 Original Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nThis 2017 Direct Belgium Mercedes-Benz GLA 250 Full Option is finished in a stunning Red exterior and comes loaded with premium features including Keyless Entry, Push Button Start, and a Full Panoramic Sunroof. It offers a powerful yet fuel-efficient 2.0L turbocharged engine, a luxurious interior, and the comfort and technology expected from Mercedes-Benz. Ideal for buyers seeking a stylish, reliable, and premium compact SUV at \\u20A627M.\\n\\nKey Features & Highlights:\\n\\u{1F31E} Full Panoramic Sunroof & \\u{1F511} Keyless Entry (KEYLESS-GO) & \\u{1F518} Push Button Start\\n\\u{1FA91} Premium Leather Interior & \\u{1F4BA} Power Adjustable Seats\\n\\u2744\\uFE0F Dual-Zone Climate Control & \\u{1F3CE}\\uFE0F Paddle Shifters\\n\\u{1F4F7} Reverse Camera & \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\n\\u{1F9ED} Navigation System & \\u{1F4F1} Bluetooth, USB & AUX Connectivity\\n\\u{1F6AA} Power Tailgate & \\u{1F4A1} LED Daytime Running Lights\\n\\u{1F6DE} Premium Alloy Wheels & \\u{1F6E3}\\uFE0F Cruise Control",
+    "engine": "2.0L Turbocharged 4-Cylinder Petrol",
+    "color": "Red",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "dodge-challenger-2018-black",
+    "make": "Dodge",
+    "model": "Challenger",
+    "year": 2018,
+    "price": 39000000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Coupe",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/Lzn146bw/IMG-20260728-WA0091.jpg"
+    ],
+    "description": "\\u{1F3C1} 2018 Dodge Challenger \\u{1F3C1}\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium | Duty Paid | \\u{1F4CD} Located in Abuja\\n\\u{1F5A4} Bold Black Exterior | \\u{1F4AA} Powerful Performance | \\u{1F697} American Muscle Car\\n\\nVehicle Overview:\\nTurn heads wherever you go with this stunning 2018 Dodge Challenger. Imported directly from Belgium and finished in an elegant Black exterior, this iconic muscle car combines aggressive styling with impressive performance and everyday comfort. Whether cruising through the city or enjoying long highway drives, the Challenger delivers a thrilling driving experience with its powerful 3.6L V6 engine, smooth 8-speed automatic transmission, and spacious interior at \\u20A639M.\\n\\nKey Features & Highlights:\\n\\u2705 Direct Belgium Import & Duty Paid\\n\\u26A1 8-Speed Automatic Transmission & Powerful 3.6L V6 Petrol Engine\\n\\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1F4F7} Reverse Camera & Rear Parking Sensors\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control & Multifunction Steering Wheel\\n\\u{1F4F1} Touchscreen Infotainment System with Bluetooth, USB & AUX\\n\\u{1F3B5} Premium Audio System & LED Halo Headlights\\n\\u{1F6DE} Alloy Wheels, ABS Braking, Traction & Stability Control",
+    "engine": "3.6L V6 Petrol",
+    "color": "Black",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-rx350-f-sport-2017-black",
+    "make": "Lexus",
+    "model": "RX 350 F Sport",
+    "year": 2017,
+    "price": 36000000,
+    "mileage": 52000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/dsVMH8nF/IMG-20260728-WA0090.jpg"
+    ],
+    "description": "\\u2728 2017 Lexus RX350 F Sport \\u2728\\n\\u{1F3C1} Tokunbo Grade | F Sport Package | \\u{1F4CD} Located in Abuja\\n\\u{1F5A4} Black Exterior | Tan (Brown) Leather Interior | \\u{1F527} Dry Engine, Gear & AC Intact\\n\\nVehicle Overview:\\nExperience sporty luxury with this neatly used 2017 Lexus RX350 F Sport. Finished in a sleek Black exterior with a premium Tan leather interior, this SUV combines aggressive styling with Lexus' legendary comfort and reliability. Powered by a responsive 3.5L V6 engine and smooth 8-speed automatic transmission, it delivers outstanding performance, a refined ride, and excellent durability for both city and highway driving at \\u20A636M.\\n\\nKey Features & Highlights:\\n\\u{1F3C1} F Sport Package & Sport Seats\\n\\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1FA91} Premium Tan/Brown Leather Interior\\n\\u{1F4F7} Reverse Camera & Parking Sensors\\n\\u{1F4BA} Power Front Seats with Memory, Heated & Ventilated Front Seats\\n\\u{1F6AA} Power Tailgate & Dual-Zone Automatic Climate Control\\n\\u{1F4A1} LED Headlights & Daytime Running Lights\\n\\u26A0\\uFE0F Blind Spot Monitoring, Lane Departure Alert & Adaptive Cruise Control\\n\\u{1F3B5} Premium Audio System with Bluetooth, USB & Apple CarPlay",
+    "engine": "3.5L V6 Petrol",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-rx350-2013-milky",
+    "make": "Lexus",
+    "model": "RX 350",
+    "year": 2013,
+    "price": 23700000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/VWpHZXfn/IMG-20260728-WA0089.jpg"
+    ],
+    "description": "\\u2728 2013 Lexus RX350 \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium | New Entry | 2025 Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nEnjoy the perfect blend of luxury, reliability, and performance with this clean 2013 Lexus RX350. Finished in a classy Milky Pearl White exterior, this premium SUV is powered by a dependable 3.5L V6 engine paired with a smooth automatic transmission. It delivers a quiet ride, excellent comfort, and outstanding durability, making it ideal for both city driving and long-distance journeys at \\u20A623.7M.\\n\\nKey Features & Highlights:\\n\\u2705 Direct Belgium Import & 2025 Duty Paid\\n\\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1FA91} Luxury Leather Interior & Power Front Seats with Driver Memory\\n\\u{1F4F7} Reverse Camera & Parking Sensors\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control & Power Tailgate\\n\\u{1F3B5} Premium Audio System with Bluetooth Connectivity & Cruise Control\\n\\u{1F4A1} LED Daytime Running Lights, Alloy Wheels & Roof Rails\\n\\u{1F6E1}\\uFE0F ABS, Traction Control, Multiple Airbags & Spacious Cargo Cabin",
+    "engine": "3.5L V6 Petrol",
+    "color": "Milky White",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-rx350-2023-blue",
+    "make": "Lexus",
+    "model": "RX 350",
+    "year": 2023,
+    "price": 70000000,
+    "mileage": 18000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/DfyYmPxJ/IMG-20260728-WA0088.jpg"
+    ],
+    "description": "\\u2728 2023 Lexus RX350 Full Option \\u2728\\n\\u{1F30D} Foreign Used | \\u2705 Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience premium luxury, cutting-edge technology, and exceptional comfort in this beautifully maintained 2023 Lexus RX350. With its bold spindle grille, elegant design, powerful turbocharged engine, and refined interior, this SUV delivers outstanding performance and a smooth, quiet ride. Ideal for those seeking reliability, prestige, and advanced safety in one package at \\u20A670M.\\n\\nKey Features & Highlights:\\n\\u2728 Full Option Package & Accident-Free\\n\\u{1F4F8} 360\\xB0 Camera & \\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1FA91} Leather Interior & \\u{1F31E} Panoramic Sunroof\\n\\u{1F4BA} Power Front Seats with Memory, Heated & Ventilated Front Seats\\n\\u{1F4F1} Large Touchscreen Infotainment with Apple CarPlay & Android Auto\\n\\u{1F3B5} Premium Sound System & \\u26A1 Wireless Phone Charger\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control & \\u{1F4A1} LED Headlights & DRLs\\n\\u26A0\\uFE0F Blind Spot Monitoring, Lane Keeping Assist & Adaptive Cruise Control\\n\\u{1F17F}\\uFE0F Parking Sensors, Premium Alloy Wheels & \\u{1F6AA} Power Tailgate",
+    "engine": "2.4L Turbocharged 4-Cylinder Petrol",
+    "color": "Deep Blue",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "honda-civic-2007-blue",
+    "make": "Honda",
+    "model": "Civic",
+    "year": 2007,
+    "price": 8500000,
+    "mileage": 85000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/5yqp4dy/IMG-20260728-WA0087.jpg"
+    ],
+    "description": "\\u{1F698} 2007 Honda Civic\\n\\u{1F1E7}\\u{1F1EA} Accident-Free | Direct Belgium | June 2026 Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nEnjoy reliability, comfort, and excellent fuel economy with this clean Direct Belgium Honda Civic. The vehicle features a stylish Sky Blue exterior, a smooth automatic transmission, and Honda's dependable 1.8L i-VTEC engine, making it perfect for daily commuting or long-distance travel. It offers a spacious interior, responsive handling, and low maintenance costs.\\n\\nKey Features:\\n\\u2705 Accident-Free & Direct Belgium\\n\\u2705 Automatic Transmission & 1.8L i-VTEC Petrol Engine\\n\\u2744\\uFE0F Air Conditioning & Power Steering/Windows/Locks\\n\\u{1F6DE} Alloy Wheels & ABS Braking System\\n\\u{1F6E1}\\uFE0F Dual Front Airbags & Factory Audio System\\n\\u{1FA91} Foldable Rear Seats & Comfortable Interior\\n\\u26FD Excellent Fuel Economy & June 2026 Duty Paid",
+    "engine": "1.8L i-VTEC 4-Cylinder Petrol",
+    "color": "Sky Blue",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-rx350-2012-black",
+    "make": "Lexus",
+    "model": "RX 350",
+    "year": 2012,
+    "price": 24000000,
+    "mileage": 72000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/3mt9X6dz/IMG-20260711-WA0006.jpg",
+      "https://i.ibb.co/F4JRZN2b/IMG-20260728-WA0080.jpg",
+      "https://i.ibb.co/bjC2CyG9/IMG-20260728-WA0082.jpg",
+      "https://i.ibb.co/0RmRB0gF/IMG-20260728-WA0086.jpg",
+      "https://i.ibb.co/VWwDGk3Y/IMG-20260728-WA0084.jpg"
+    ],
+    "description": "\\u2728 2012 Lexus RX 350 Full Option \\u2728\\n\\u{1F30D} Foreign Used | \\u2705 Original Custom Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience premium comfort, reliability, and timeless luxury with this 2012 Lexus RX 350 Full Option. Finished in elegant Black, this foreign-used SUV delivers a smooth V6 engine, a refined cabin, and the legendary dependability Lexus is known for. An excellent choice for daily driving or long-distance travel, available for \\u20A624M.\\n\\nKey Features & Highlights:\\n\\u{1F511} Smart Keyless Entry & \\u{1F518} Push Button Start\\n\\u{1FA91} Premium Leather Interior & \\u{1F4BA} Power Adjustable & Memory Seats\\n\\u{1F4F7} Reverse Camera & \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\n\\u{1F31E} Panoramic Sunroof & \\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3B5} Premium Lexus Audio System & \\u{1F4F1} Bluetooth Connectivity\\n\\u{1F9ED} Factory Navigation System & \\u{1F4A1} HID/LED Headlights with DRLs\\n\\u{1F6DE} Premium Alloy Wheels & \\u{1F6AA} Power Tailgate\\n\\u{1F6E3}\\uFE0F Cruise Control & \\u{1FA9F} Factory Privacy Glass",
+    "engine": "3.5L V6 Petrol",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-rx350-2016-black",
+    "make": "Lexus",
+    "model": "RX 350",
+    "year": 2016,
+    "price": 29000000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/Y7tgvVhP/IMG-20260728-WA0069.jpg",
+      "https://i.ibb.co/3999h7qP/IMG-20260728-WA0071.jpg",
+      "https://i.ibb.co/CKshTxks/IMG-20260728-WA0074.jpg",
+      "https://i.ibb.co/wrQczs1s/IMG-20260728-WA0075.jpg",
+      "https://i.ibb.co/214V6Cn6/IMG-20260728-WA0077.jpg"
+    ],
+    "description": "\\u2728 2016 Lexus RX 350 \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | \\u2705 Original Custom Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience luxury, comfort, and Lexus reliability with this 2016 Lexus RX 350. Finished in elegant Black, this exceptionally clean Abuja-used SUV offers a smooth ride, premium interior, advanced safety features, and the durability Lexus is known for. An excellent choice for anyone seeking a refined luxury SUV at \\u20A629M.\\n\\nKey Features & Highlights:\\n\\u{1F511} Smart Keyless Entry & \\u{1F518} Push Button Start\\n\\u{1FA91} Premium Leather Interior & \\u{1F4BA} Power Adjustable Seats\\n\\u{1F4F7} Reverse Camera & \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3B5} Premium Lexus Audio System & \\u{1F4F1} Bluetooth Connectivity\\n\\u{1F31E} Panoramic Sunroof & \\u{1F4A1} LED Headlights & DRLs\\n\\u{1F6DE} Premium Alloy Wheels & \\u{1F6AA} Power Tailgate\\n\\u{1F6E3}\\uFE0F Cruise Control & \\u{1FA9F} Factory Tinted Glass",
+    "engine": "3.5L V6 Petrol",
+    "color": "Black",
+    "condition": "Extremely Clean",
+    "isFeatured": true
+  },
+  {
+    "id": "bmw-x5-m-sport-2021-white",
+    "make": "BMW",
+    "model": "X5 M Sport",
+    "year": 2021,
+    "price": 100000000,
+    "mileage": 28000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/5mnbw7M/IMG-20260715-WA0056.jpg",
+      "https://i.ibb.co/CpCDDLdk/IMG-20260715-WA0066.jpg",
+      "https://i.ibb.co/m57GGTnR/IMG-20260715-WA0063.jpg",
+      "https://i.ibb.co/sdrFLzbk/IMG-20260715-WA0062.jpg",
+      "https://i.ibb.co/zWqfZDTF/IMG-20260715-WA0069.jpg",
+      "https://i.ibb.co/C30qMbWV/IMG-20260715-WA0060.jpg"
+    ],
+    "description": "\\u2728 2021 BMW X5 M Sport \\u2728\\n\\u{1F30D} Foreign Used | \\u2705 Original Custom Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience first-class luxury, thrilling performance, and cutting-edge technology with this 2021 BMW X5 M Sport. Designed for drivers who demand comfort, prestige, and dynamic handling, this SUV delivers a refined driving experience with premium features and an aggressive M Sport appearance. A perfect blend of luxury and performance, offered at \\u20A6100M.\\n\\nKey Features & Highlights:\\n\\u{1F511} Comfort Access Keyless Entry & \\u{1F518} Push Button Start\\n\\u{1F4F7} 360\\xB0 Surround View Camera & \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\n\\u{1F31E} Panoramic Glass Sunroof & \\u{1FA91} Premium Leather Interior\\n\\u{1F4BA} Heated & Memory Seats & \\u2744\\uFE0F 4-Zone Automatic Climate Control\\n\\u{1F4F1} Apple CarPlay & Android Auto & \\u{1F9ED} Navigation System\\n\\u{1F3B5} Harman Kardon Premium Sound System\\n\\u26A1 Wireless Charging & \\u{1F6AA} Power Tailgate\\n\\u{1F6E3}\\uFE0F Adaptive Cruise Control & \\u26A0\\uFE0F Blind Spot Monitoring\\n\\u{1F698} Lane Departure Warning & \\u{1F4A1} Adaptive LED Headlights\\n\\u{1F6DE} 21-Inch M Sport Alloy Wheels & \\u{1F3C1} M Sport Body Kit",
+    "engine": "3.0L TwinPower Turbo Inline-6",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "ford-explorer-platinum-2021-blue",
+    "make": "Ford",
+    "model": "Explorer Platinum",
+    "year": 2021,
+    "price": 48000000,
+    "mileage": 32000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/27cXwLCb/IMG-20260728-WA0063.jpg"
+    ],
+    "description": "\\u2728 2021 Ford Explorer Full Option \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium | \\u2705 2026 Custom Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience premium luxury, advanced technology, and exceptional performance with this 2021 Direct Belgium Ford Explorer Full Option. Designed for comfort, safety, and family adventures, it combines a bold exterior, refined interior, and powerful performance with all the modern features you expect in a flagship SUV. A superb choice for anyone seeking luxury and reliability at \\u20A648M.\\n\\nKey Features & Specifications:\\n\\u{1F511} Keyless Entry, \\u{1F518} Push Button Start & \\u{1F698} Remote Start\\n\\u{1F4F7} 360\\xB0 Camera & \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\n\\u{1FA91} Premium Leather Seats, \\u{1F4BA} Heated & Ventilated Front Seats\\n\\u{1F31E} Panoramic Sunroof & \\u{1F9ED} Navigation System\\n\\u{1F4F1} Apple CarPlay & Android Auto | \\u{1F3B5} Premium B&O Sound System\\n\\u26A1 Wireless Charging & \\u2744\\uFE0F Tri-Zone Climate Control\\n\\u{1F697} Adaptive Cruise Control, \\u26A0\\uFE0F Blind Spot Monitoring & \\u{1F6E3}\\uFE0F Lane Keep Assist\\n\\u{1F4A1} Full LED Headlights & DRLs | \\u{1F6DE} Premium Alloy Wheels | \\u{1F9F3} Power Tailgate | \\u{1F468}\\u200D\\u{1F469}\\u200D\\u{1F467}\\u200D\\u{1F466} 7-Seater Luxury SUV",
+    "engine": "3.0L EcoBoost V6 / 2.3L EcoBoost",
+    "color": "Blue",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "ford-explorer-limited-2015-red",
+    "make": "Ford",
+    "model": "Explorer Limited",
+    "year": 2015,
+    "price": 13000000,
+    "mileage": 58000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/0yh8B7Qf/IMG-20260728-WA0040.jpg"
+    ],
+    "description": "\\u2728 2015 Ford Explorer Limited \\u2728\\n\\u{1F1FA}\\u{1F1F8} Foreign Used | \\u2705 Original Custom Duty Paid | \\u{1F4CD} Located in Abuja\\n\\nVehicle Overview:\\nExperience comfort, power, and versatility with this 2015 Ford Explorer Limited. It offers a refined interior, smooth automatic transmission, 3.5L V6 engine with 4WD/AWD capability, excellent road presence, and ample space for family or business use. This 7-seater SUV is exceptionally clean inside and out, offering outstanding luxury value.\\n\\nKey Features & Highlights:\\n\\u{1F511} Keyless Entry & \\u{1F518} Push Start\\n\\u{1F6CB}\\uFE0F Premium Leather Interior & \\u{1F9F3} Spacious 7-Seater Cabin\\n\\u{1F4F7} Reverse Camera & \\u{1F17F}\\uFE0F Parking Sensors\\n\\u{1F321}\\uFE0F Dual-Zone Climate Control & \\u{1F3B5} Premium Audio System\\n\\u{1F6DE} Alloy Wheels & \\u{1F4A1} LED Daytime Running Lights\\n\\u{1F6E3}\\uFE0F Cruise Control, \\u{1FA9F} Tinted Glass & 3.5L V6 Engine",
+    "engine": "3.5L V6 Petrol",
+    "color": "Red",
+    "condition": "Extremely Clean",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-rav4-2012-black",
+    "make": "Toyota",
+    "model": "RAV4",
+    "year": 2012,
+    "price": 15000000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/vCqpr68F/IMG-20260728-WA0038.jpg"
+    ],
+    "description": "\\u2728 2012 Toyota RAV4 Last Batch (XA30 Facelift) \\u2728\\n\\u{1F48E} Condition: Foreign Used | \\u{1F5A4} Sleek Black Exterior | \\u{1F4C4} Customs Duty Paid\\n\\nVehicle Overview:\\nExperience the perfect blend of reliability, comfort, and practicality with this foreign-used 2012 Toyota RAV4 Last Batch. Finished in a sleek black exterior, this SUV is exceptionally clean inside and out, making it an excellent choice for daily commuting, family trips, or business use. Renowned for its durability, fuel efficiency, and low maintenance costs.\\n\\nKey Features & Specifications:\\n\\u2699\\uFE0F Efficient 2.5L 4-Cylinder Petrol Engine & Smooth Automatic Transmission\\n\\u2744\\uFE0F Air Conditioning & Climate Control\\n\\u{1F511} Remote Keyless Entry & Power Windows/Door Locks\\n\\u{1F3B5} Audio System with AUX, USB & Bluetooth Connectivity\\n\\u{1F6DE} Alloy Wheels, Fog Lights, Roof Rails & Rear Window Wiper\\n\\u{1FA91} Split Folding Rear Seats (60:40) & Spacious Cargo Area\\n\\u{1F6E1}\\uFE0F Multiple Airbags, ABS & Traction Control",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-benz-e300-2017-black",
+    "make": "Mercedes-Benz",
+    "model": "E300",
+    "year": 2017,
+    "price": 26000000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/gqVm8Vk/IMG-20260728-WA0028.jpg",
+      "https://i.ibb.co/xSRC0fdx/IMG-20260728-WA0030.jpg",
+      "https://i.ibb.co/SLyYjtd/IMG-20260728-WA0032.jpg",
+      "https://i.ibb.co/67bXyBCX/IMG-20260728-WA0034.jpg",
+      "https://i.ibb.co/v6HKh71B/IMG-20260728-WA0036.jpg"
+    ],
+    "description": "\\u2728 2017 Mercedes-Benz E300 (4-door Luxury Sedan) \\u2728\\n\\u{1F48E} Condition: Extremely Clean Used (as advertised) | \\u{1F4C4} Customs Duty Paid \\u{1F4DC} | \\u{1F5A4} Obsidian Black Exterior\\n\\nVehicle Overview:\\nThe 2017 Mercedes-Benz E300 represents the benchmark of executive luxury sedans. Powered by a responsive 2.0L Turbocharged Inline-4 engine paired with a 9-Speed Automatic 9G-TRONIC transmission delivering 241 hp, this unit is extremely clean, well-maintained, and fully duty paid.\\n\\nKey Performance & Luxury Features:\\n\\u2699\\uFE0F 2.0L Turbocharged Inline-4 (241 hp / 273 lb-ft Torque)\\n\\u{1F579}\\uFE0F 9-Speed Automatic Transmission (9G-TRONIC)\\n\\u{1F4A1} LED Intelligent Headlamps & Daytime Running Lights\\n\\u{1F511} Keyless Start & Smart Access\\n\\u{1F6CB}\\uFE0F Premium Leather Interior with Power Front Seats & Memory\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3CE}\\uFE0F Multifunction Steering Wheel & Cruise Control\\n\\u{1F4F1} Large High-Resolution Infotainment Display with Bluetooth\\n\\u{1F4F7} Reverse Camera with Front & Rear Parking Sensors\\n\\u{1F6DE} Executive Alloy Wheels\\n\\u{1F6E1}\\uFE0F Collision Prevention Assist, Attention Assist, ESP, Traction Control & Multiple Airbags",
+    "engine": "2.0L Turbocharged Inline-4 (241 hp)",
+    "color": "Black",
+    "condition": "Extremely Clean",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-hilux-2024-white",
+    "make": "Toyota",
+    "model": "Hilux",
+    "year": 2024,
+    "price": 59000000,
+    "mileage": 5000,
+    "transmission": "Automatic",
+    "fuelType": "Diesel",
+    "bodyType": "Truck",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/TNDxQB3/IMG-20260728-WA0026.jpg",
+      "https://i.ibb.co/DfP9xWTp/IMG-20260728-WA0020.jpg",
+      "https://i.ibb.co/nsZm53b8/IMG-20260728-WA0024.jpg",
+      "https://i.ibb.co/m5Hdg2S1/IMG-20260728-WA0022.jpg",
+      "https://i.ibb.co/v4Lh1pfV/IMG-20260728-WA0014.jpg"
+    ],
+    "description": "\\u2728 2024 Toyota Hilux (Registered, Like New) \\u2728\\n\\u{1F30D} Registered, Bought Brand New in 2024 | \\u{1F4C4} Duty Paid \\u{1F4DC} | \\u{1F48E} Like New Condition\\n\\nVehicle Overview:\\nThe 2024 Toyota Hilux is one of the most dependable pickup trucks on the market, renowned for its rugged durability, exceptional performance, and outstanding reliability. This unit was purchased brand new last year, is Nigerian registered, and remains in like-new condition with genuine duty paid. It is ideal for both commercial operations and personal use.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.8L Turbo Diesel Engine\\n\\u{1F3CE}\\uFE0F Automatic Transmission & 4WD Capability\\n\\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1F4F1} Touchscreen Infotainment System with Apple CarPlay & Android Auto\\n\\u{1F4F6} Bluetooth Connectivity\\n\\u{1F4F7} Reverse Camera & Rear Parking Sensors\\n\\u{1F3CE}\\uFE0F Multifunction Steering Wheel & Cruise Control\\n\\u2744\\uFE0F Automatic Climate Control\\n\\u{1F4A1} LED Headlights, Daytime Running Lights & Fog Lights\\n\\u{1F6DE} Alloy Wheels, Side Steps, Bed Cover (Tonneau Cover) & Sports Bar\\n\\u26A1 Power Windows & Mirrors\\n\\u{1F6E1}\\uFE0F Multiple Airbags, ABS, Vehicle Stability Control (VSC) & Traction Control",
+    "engine": "2.8L Turbo Diesel",
+    "color": "White",
+    "condition": "Like New",
+    "isFeatured": true
+  },
+  {
+    "id": "honda-crv-limited-edition-2021-white",
+    "make": "Honda",
+    "model": "CR-V Limited Edition",
+    "year": 2021,
+    "price": 25000000,
+    "mileage": 22000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/6c9x4xK9/IMG-20260728-WA0011.jpg",
+      "https://i.ibb.co/M5fgMvt4/IMG-20260728-WA0012.jpg",
+      "https://i.ibb.co/qMsZnCFP/IMG-20260728-WA0010.jpg",
+      "https://i.ibb.co/XZQqJ3NY/IMG-20260728-WA0016.jpg",
+      "https://i.ibb.co/mFh4cKD9/IMG-20260728-WA0018.jpg"
+    ],
+    "description": "\\u2728 2021 Honda CR-V Limited Edition (Slightly Used, Unregistered) \\u2728\\n\\u{1F30D} Slightly Used, Unregistered | \\u{1F4C4} Original Papers Available \\u{1F4DC} | \\u{1F48E} Excellent Condition\\n\\nVehicle Overview:\\nThe 2021 Honda CR-V Limited Edition is a premium compact SUV that blends modern styling, exceptional comfort, advanced safety, and fuel-efficient performance. This unregistered Nigerian unit is in excellent condition and comes with sought-after features including keyless entry and a panoramic sunroof, making it an ideal SUV for families and professionals alike.\\n\\nKey Features:\\n\\u2699\\uFE0F 1.5L Turbocharged Petrol Engine\\n\\u{1F3CE}\\uFE0F Automatic Transmission (CVT) & Front-Wheel Drive (FWD)\\n\\u{1F31F} Limited Edition Trim\\n\\u{1F511} Smart Key / Keyless Entry & Push-Button Start\\n\\u{1F305} Panoramic Sunroof\\n\\u{1F4A1} LED Headlights, Daytime Running Lights & LED Fog Lights\\n\\u{1F6DE} Alloy Wheels\\n\\u{1F4F7} Reverse Camera & Front & Rear Parking Sensors\\n\\u{1F4F1} Touchscreen Infotainment System with Apple CarPlay, Android Auto & Bluetooth\\n\\u26A1 USB Charging Ports & Power Tailgate\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3CE}\\uFE0F Multifunction Steering Wheel & Cruise Control\\n\\u{1F17F}\\uFE0F Electric Parking Brake with Auto Hold\\n\\u{1FA91} Premium Interior Finish\\n\\u{1F6E1}\\uFE0F Multiple Airbags, ABS, Vehicle Stability Assist (VSA) & Traction Control",
+    "engine": "1.5L Turbocharged Petrol",
+    "color": "White",
+    "condition": "Slightly Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-tacoma-2017-full-option",
+    "make": "Toyota",
+    "model": "Tacoma Full Option",
+    "year": 2017,
+    "price": 43500000,
+    "mileage": 48000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Truck",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/qMcQ5ckY/IMG-20260728-WA0003.jpg"
+    ],
+    "description": "\\u2728 2017 Toyota Tacoma (Direct Belgium) \\u2013 Full Option \\u2728\\n\\u{1F30D} Direct Belgium | \\u{1F4C4} Valid Duty (Expires April 2026) \\u{1F4DC} | \\u{1F48E} Accident-Free\\n\\nVehicle Overview:\\nThe 2017 Toyota Tacoma is a rugged midsize pickup built for both everyday driving and demanding off-road adventures. This accident-free, Direct Belgium unit comes in full-option specification with a powerful engine, premium features, and a well-maintained exterior and interior. With duty valid until April 2026, it's ready for immediate use.\\n\\nKey Features:\\n\\u2699\\uFE0F 3.5L V6 Petrol Engine\\n\\u{1F3CE}\\uFE0F 6-Speed Automatic Transmission\\n\\u{1F6E3}\\uFE0F 4WD (Four-Wheel Drive)\\n\\u{1F31F} Full Option Package\\n\\u{1F3CE}\\uFE0F TRD-Style Front Grille & Hood Scoop\\n\\u{1F4A1} LED Daytime Running Lights & Fog Lights\\n\\u{1F6DE} Alloy Wheels with All-Terrain Tires & Side Steps\\n\\u{1F4F1} Touchscreen Infotainment System with Bluetooth, Apple CarPlay & Android Auto\\n\\u{1F4F7} Reverse Camera & Push-Button Start / Smart Key Entry\\n\\u{1F3CE}\\uFE0F Cruise Control & Dual-Zone Automatic Climate Control\\n\\u{1FA91} Leather/Fabric Premium Interior & Multifunction Steering Wheel\\n\\u{1F6E1}\\uFE0F Multiple Airbags, ABS, Traction Control, Vehicle Stability Control, Hill Start Assist & Trailer Sway Control",
+    "engine": "3.5L V6 Petrol",
+    "color": "Orange",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-se-2015-silver",
+    "make": "Toyota",
+    "model": "Camry SE",
+    "year": 2015,
+    "price": 14300000,
+    "mileage": 58000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/tMr2rYx4/IMG-20260723-WA0028.jpg"
+    ],
+    "description": "\\u2728 2015 Toyota Camry SE \\u2728\\n\\u{1F30D} Mint Foreign Used | \\u{1F4C4} Genuine Duty Paid \\u{1F4DC} | \\u{1F3CE}\\uFE0F Sport Trim\\n\\nThe 2015 Toyota Camry SE offers a perfect combination of sporty styling, reliability, fuel efficiency, and comfort. This foreign-used unit is in mint condition with a clean interior, factory reverse camera, and an untampered engine and transmission, making it an excellent choice for personal or family use.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.5L 4-Cylinder DOHC Engine\\n\\u{1F3CE}\\uFE0F Automatic Transmission & Front-Wheel Drive (FWD)\\n\\u{1F4F7} Factory Reverse Camera & Sport (SE) Body Kit\\n\\u{1F6DE} Alloy Wheels & Fabric Sport Seats\\n\\u{1F3A1} Multifunction Steering Wheel & Cruise Control\\n\\u{1F3B5} Bluetooth, USB & AUX Audio Input\\n\\u2744\\uFE0F Air Conditioning & Keyless Entry\\n\\u26A1 Power Windows & Mirrors & Fog Lights\\n\\u{1F6E1}\\uFE0F ABS Braking System, VSC & Driver/Passenger Airbags\\n\\nCondition Report:\\n\\u2705 Mint Foreign Used\\n\\u2705 Clean and well-kept interior\\n\\u2705 Untampered engine & smooth automatic transmission\\n\\u2705 Excellent suspension & neat exterior paintwork\\n\\u2705 Genuine duty paid & ready to drive",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-benz-cla-250-2014",
+    "make": "Mercedes-Benz",
+    "model": "CLA 250",
+    "year": 2014,
+    "price": 19000000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/cS42nbXX/9ab7afef35ae48c88563da945ef8ad76.jpg"
+    ],
+    "description": "\\u2728 2014 Mercedes-Benz CLA 250 \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F4C4} Custom Duty Paid | \\u{1F31F} Excellent Luxury Condition\\n\\nThe 2014 Mercedes-Benz CLA 250 is a stylish luxury compact sedan that combines sporty performance with premium comfort and advanced technology. Featuring a sleek coupe-inspired design, turbocharged power, and a refined interior, this foreign-used unit offers an excellent blend of elegance and driving excitement.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.0L Turbocharged Inline-4 Engine\\n\\u{1F3CE}\\uFE0F 7-Speed Dual-Clutch Automatic Transmission (7G-DCT)\\n\\u{1F511} Push-Button Start & Keyless Entry\\n\\u{1FA91} Leather Upholstery with Memory Power Front Seats\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3A1} Multifunction Leather Steering Wheel with Paddle Shifters\\n\\u{1F3B5} Premium Audio System with Bluetooth, USB & AUX Input\\n\\u{1F4F7} Reverse Camera with Front & Rear Parking Sensors\\n\\u{1F3CE}\\uFE0F Cruise Control & Automatic Headlights with LED DRLs\\n\\u{1F6DE} Alloy Wheels & Power Windows/Mirrors",
+    "engine": "2.0L Turbocharged Inline-4",
+    "color": "Grey",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mini-cooper-countryman-s-2019",
+    "make": "MINI",
+    "model": "Cooper Countryman S",
+    "year": 2019,
+    "price": 28000000,
+    "mileage": 38000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/1Y5qvg2j/IMG-20260702-WA0012.jpg"
+    ],
+    "description": "\\u2728 2019 MINI Cooper Countryman S \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium Import | \\u{1F4C4} Duty Paid | \\u{1F48E} Mint Condition (Full Option)\\n\\nThe 2019 MINI Cooper Countryman S is a premium compact SUV that delivers sporty performance, luxury comfort, and distinctive British styling. This Direct Belgium import comes in full-option specification and is in mint condition, making it an excellent choice for buyers seeking a unique luxury crossover with modern technology and premium features.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.0L TwinPower Turbo 4-Cylinder Engine\\n\\u{1F3CE}\\uFE0F Automatic Transmission\\n\\u{1F511} Push-Button Start & Keyless Entry\\n\\u{1FA91} Full Leather Interior with Power Front Seats\\n\\u2600\\uFE0F Panoramic Sunroof\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3B5} MINI Connected Infotainment System with Large Display\\n\\u{1F4F1} Apple CarPlay, Bluetooth, USB & AUX Ports\\n\\u{1F3A7} Premium Sound System\\n\\u{1F4F7} Reverse Camera with Front & Rear Parking Sensors\\n\\u{1F4A1} LED Headlights & Daytime Running Lights\\n\\u{1F6DE} Alloy Wheels",
+    "engine": "2.0L TwinPower Turbo 4-Cylinder",
+    "color": "Silver",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-xse-2019",
+    "make": "Toyota",
+    "model": "Camry XSE",
+    "year": 2019,
+    "price": 28000000,
+    "mileage": 42000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/qLk6pzSs/IMG-20260727-WA0062.jpg",
+      "https://i.ibb.co/Gvpx7hCJ/IMG-20260727-WA0068.jpg",
+      "https://i.ibb.co/LM4j63y/IMG-20260727-WA0070.jpg",
+      "https://i.ibb.co/cc0DMd89/IMG-20260727-WA0069.jpg",
+      "https://i.ibb.co/G4GGB0FD/IMG-20260727-WA0067.jpg"
+    ],
+    "description": "\\u2728 2019 Toyota Camry XSE \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F4C4} Custom Duty Paid | \\u{1F511} Keyless Entry\\n\\nThe 2019 Toyota Camry XSE is a premium sport sedan that combines bold styling, advanced technology, and outstanding reliability. With its aggressive exterior, luxurious interior, and smooth performance, this foreign-used unit is an excellent choice for buyers seeking comfort, style, and long-term dependability.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.5L Dynamic Force 4-Cylinder Engine\\n\\u{1F3CE}\\uFE0F 8-Speed Automatic Transmission & XSE Sport Trim\\n\\u{1F511} Keyless Entry with Push-Button Start & Smart Key System\\n\\u{1FA91} Leather-Trimmed Sport Seats with Power Driver & Front Passenger Seats\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3A1} Multifunction Steering Wheel & Paddle Shifters\\n\\u{1F3B5} Touchscreen Infotainment System with Apple CarPlay, Bluetooth & USB\\n\\u{1F4F7} Reverse Camera & Blind Spot Monitor\\n\\u{1F6E3}\\uFE0F Adaptive Cruise Control & Lane Departure Alert\\n\\u{1F6E1}\\uFE0F ABS, Traction Control, Vehicle Stability Control & Multiple Airbags",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Red",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-se-2013-silver-ng",
+    "make": "Toyota",
+    "model": "Camry SE",
+    "year": 2013,
+    "price": 10900000,
+    "mileage": 75000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/PvGh48GK/IMG-20260727-WA0040.jpg",
+      "https://i.ibb.co/0p2hgj8f/IMG-20260727-WA0074.jpg",
+      "https://i.ibb.co/B2NWNR2L/IMG-20260727-WA0077.jpg",
+      "https://i.ibb.co/bg52qTdz/IMG-20260727-WA0078.jpg"
+    ],
+    "description": "\\u2728 2013 Toyota Camry SE \\u2728\\n\\u{1F1F3}\\u{1F1EC} Nigerian Used | \\u{1F4C4} Custom Duty Paid | \\u{1F31F} Extremely Clean\\n\\nThe 2013 Toyota Camry SE blends sporty styling, comfort, and Toyota's renowned reliability. This Nigerian-used unit is exceptionally clean, making it an excellent choice for buyers seeking a dependable midsize sedan with premium driving comfort at an affordable price.\\n\\nKey Features:\\n\\u2699\\uFE0F 2.5L 4-Cylinder DOHC Engine\\n\\u{1F3CE}\\uFE0F Sport (SE) Trim & Sport-Tuned Suspension\\n\\u{1FA91} Fabric Sport Seats\\n\\u{1F3A1} Multifunction Steering Wheel with Cruise Control\\n\\u{1F3B5} Touchscreen Audio System with Bluetooth, USB & AUX Connectivity\\n\\u{1F4F7} Reverse Camera\\n\\u2744\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F511} Keyless Entry\\n\\u{1F6DE} Alloy Wheels & Fog Lights\\n\\u26A1 Power Windows & Mirrors\\n\\u{1F6E1}\\uFE0F ABS, Vehicle Stability Control (VSC) & Multiple Airbags",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Silver",
+    "condition": "Nigerian Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-le-2007",
+    "make": "Toyota",
+    "model": "Camry LE",
+    "year": 2007,
+    "price": 7000000,
+    "mileage": 95000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/h1YjmC00/IMG-20260727-WA0051.jpg",
+      "https://i.ibb.co/TMSPbjGm/IMG-20260727-WA0054.jpg",
+      "https://i.ibb.co/Rk2Q06R0/IMG-20260727-WA0056.jpg",
+      "https://i.ibb.co/RkFcVDWJ/IMG-20260727-WA0057.jpg",
+      "https://i.ibb.co/3YVPNdQ6/IMG-20260727-WA0059.jpg"
+    ],
+    "description": "\\u2728 2007 Toyota Camry LE \\u2728\\n\\u{1F4C4} Duty Paid | \\u{1F31F} Extremely Clean\\n\\nThe 2007 Toyota Camry LE is a reliable and fuel-efficient midsize sedan renowned for its durability, comfort, and low maintenance costs. It's an excellent choice for daily commuting, ride-hailing, family use, or first-time car buyers seeking dependable transportation.\\n\\nKey Features:\\n\\u2699\\uFE0F Automatic Transmission\\n\\u26FD 2.4L 4-Cylinder Engine (Fuel Efficient)\\n\\u{1FA91} Fabric Interior\\n\\u2744\\uFE0F Air Conditioning\\n\\u{1F697} Power Steering\\n\\u{1FA9F} Power Windows & Door Locks\\n\\u{1F3A1} Multifunction Steering Wheel\\n\\u{1F3B5} AM/FM/CD Audio System\\n\\u{1F3CE}\\uFE0F Cruise Control\\n\\u{1F6DE} Alloy Wheel Covers\\n\\u{1F9F3} Spacious Cabin & Large Boot\\n\\u{1F6E1}\\uFE0F Dual Front Airbags, ABS & Remote Central Locking\\n\\nPerformance:\\n\\u2022 Smooth and dependable engine\\n\\u2022 Comfortable suspension for city and highway driving\\n\\u2022 Excellent fuel economy\\n\\u2022 Affordable maintenance with widely available spare parts",
+    "engine": "2.4L 4-Cylinder Petrol",
+    "color": "Silver",
+    "condition": "Extremely Clean",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-se-2016-white",
+    "make": "Toyota",
+    "model": "Camry SE",
+    "year": 2016,
+    "price": 15700000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/YBr1zHsR/IMG-20260727-WA0041.jpg",
+      "https://i.ibb.co/zT74g4rs/IMG-20260727-WA0044.jpg",
+      "https://i.ibb.co/zhndkzkv/IMG-20260727-WA0049.jpg",
+      "https://i.ibb.co/7xhHCHZC/IMG-20260727-WA0046.jpg",
+      "https://i.ibb.co/mCnrBMkQ/IMG-20260727-WA0047.jpg"
+    ],
+    "description": "\\u2728 2016 Toyota Camry SE \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F4C4} Duty Paid | \\u{1F90D} Elegant White Exterior\\nExperience comfort, reliability, and sporty styling with this 2016 Toyota Camry SE. Designed for everyday driving and long-distance comfort, this sedan offers excellent fuel economy, responsive performance, and Toyota's renowned durability.\\n\\nKey Features:\\n\\u{1F511} Keyless Entry\\n\\u2699\\uFE0F Automatic Transmission\\n\\u26FD Fuel-Efficient Petrol Engine\\n\\u{1FA91} Premium Cloth Interior\\n\\u2744\\uFE0F Chilled Air Conditioning\\n\\u{1F3B5} Touchscreen Audio System with Bluetooth, USB & AUX\\n\\u{1F4F7} Reverse Camera\\n\\u{1F6DE} Factory Alloy Wheels\\n\\u{1F6E3}\\uFE0F Smooth Suspension & Comfortable Ride\\n\\u{1F9F3} Spacious Boot\\n\\u{1F6E1}\\uFE0F ABS, Airbags & Vehicle Stability Control",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-camry-se-2013-red",
+    "make": "Toyota",
+    "model": "Camry SE",
+    "year": 2013,
+    "price": 11500000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/bMQ3Jj4P/IMG-20260727-WA0030.jpg",
+      "https://i.ibb.co/0ygddzTD/IMG-20260727-WA0033.jpg",
+      "https://i.ibb.co/qM1wHf4v/IMG-20260727-WA0037.jpg",
+      "https://i.ibb.co/QFN5Dp1k/IMG-20260727-WA0036.jpg"
+    ],
+    "description": "\\u2728 2013 Toyota Camry SE \\u2728\\n\\u{1F4C4} Duty Paid | \\u2600\\uFE0F Sunroof | \\u2764\\uFE0F Sporty Red Exterior\\nEnjoy comfort, style, and Toyota's legendary reliability with this 2013 Toyota Camry SE. This sporty sedan offers a smooth ride, responsive performance, a spacious cabin, and excellent fuel efficiency\\u2014making it ideal for both daily commuting and long-distance travel.\\n\\nKey Features:\\n\\u2600\\uFE0F Factory Sunroof\\n\\u{1F511} Keyless Entry\\n\\u2699\\uFE0F Automatic Transmission\\n\\u26FD Petrol Engine\\n\\u{1FA91} Premium Cloth Interior\\n\\u2744\\uFE0F Chilled Air Conditioning\\n\\u{1F3B5} AM/FM Audio System with Bluetooth/USB\\n\\u{1F6DE} Alloy Wheels\\n\\u{1F6E3}\\uFE0F Smooth Suspension & Comfortable Ride\\n\\u{1F9F3} Spacious Boot\\n\\u{1F6E1}\\uFE0F ABS, Airbags & Stability Control",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Red",
+    "condition": "Extremely Clean",
+    "isFeatured": true
+  },
+  {
+    "id": "hyundai-elantra-se-2020-white",
+    "make": "Hyundai",
+    "model": "Elantra SE",
+    "year": 2020,
+    "price": 14700000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/CRLGhK4/IMG-20260706-WA0029.jpg",
+      "https://i.ibb.co/zWrTxg3j/IMG-20260706-WA0031.jpg",
+      "https://i.ibb.co/rKDcc6R5/IMG-20260706-WA0033.jpg",
+      "https://i.ibb.co/GQBVnXss/IMG-20260706-WA0035.jpg",
+      "https://i.ibb.co/NgwdLsTY/IMG-20260706-WA0037.jpg"
+    ],
+    "description": "\\u2728 2020 Hyundai Elantra SE \\u2728\\n\\u{1F1F3}\\u{1F1EC} Nigerian Used | \\u{1F4C4} Duty Paid | \\u{1F90D} Clean White Exterior\\nEnjoy a stylish, comfortable, and fuel-efficient driving experience with this clean 2020 Hyundai Elantra SE. This modern sedan offers sleek styling, a spacious cabin, smooth performance, and excellent everyday practicality.\\n\\u{1F698} Clean exterior\\n\\u{1FA91} Comfortable and spacious interior\\n\\u2699\\uFE0F Automatic transmission\\n\\u26FD Petrol engine\\n\\u{1F6E3}\\uFE0F Smooth and reliable performance\\n\\u{1F511} Excellent for city and long-distance driving",
+    "engine": "2.0L 4-Cylinder Petrol",
+    "color": "White",
+    "condition": "Nigerian Used",
+    "isFeatured": true
+  },
+  {
+    "id": "toyota-venza-2010-red",
+    "make": "Toyota",
+    "model": "Venza",
+    "year": 2010,
+    "price": 17800000,
+    "mileage": 72000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/W4xR5n5F/IMG-20260706-WA0039.jpg",
+      "https://i.ibb.co/vSY5HQJ/IMG-20260706-WA0041.jpg",
+      "https://i.ibb.co/DPz4pZLN/IMG-20260706-WA0043.jpg",
+      "https://i.ibb.co/2p7bCFT/IMG-20260706-WA0045.jpg",
+      "https://i.ibb.co/vxsHHCd9/IMG-20260708-WA0030.jpg"
+    ],
+    "description": "\\u2728 2010 Toyota Venza \\u2728\\n\\u{1F1FA}\\u{1F1F8} Foreign Used | \\u{1F4C4} Duty Paid | \\u2764\\uFE0F Beautiful Red Exterior\\nExperience comfort, reliability, and practicality in this clean Toyota Venza crossover SUV. It offers a spacious cabin, smooth driving experience, stylish design, and the dependable performance Toyota is known for.\\n\\u{1F698} Clean exterior\\n\\u{1F6DE} Comfortable and spacious interior\\n\\u2699\\uFE0F Automatic transmission\\n\\u26FD Petrol engine\\n\\u{1F6E3}\\uFE0F Excellent for city and long-distance driving\\n\\u{1F511} Reliable Toyota performance",
+    "engine": "2.7L 4-Cylinder Petrol",
+    "color": "Red",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-ml350-2015",
+    "make": "Mercedes-Benz",
+    "model": "ML350 4MATIC",
+    "year": 2015,
+    "price": 29000000,
+    "mileage": 82000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/PGYDnWbz/IMG-20260715-WA0074.jpg?id=7tzk5pTN",
+      "https://i.ibb.co/TB8X4FGb/IMG-20260715-WA0076.jpg",
+      "https://i.ibb.co/PGYDnWbz/IMG-20260715-WA0074.jpg?id=7tzk5pTN"
+    ],
+    "description": "\\u2728 2015 Mercedes-Benz ML350 \\u2728\\n\\u{1F1E7}\\u{1F1EA} Clean Used | 2026 Duty Paid \\u{1F1EC}\\u{1F1ED}\\n\\u{1F511} Keyless Entry | \\u{1F698} Luxury SUV | \\u{1F90D} Elegant Pearl White Exterior\\nExperience luxury, comfort, and performance in this beautiful Mercedes-Benz ML350. A stylish and spacious SUV with a premium look, excellent road presence, and the comfort you expect from Mercedes-Benz.",
+    "engine": "3.5L V6",
+    "color": "pearl white",
+    "condition": "Clean Used",
+    "isFeatured": true
+  },
+  {
+    "id": "mercedes-e350-2010",
+    "make": "Mercedes-Benz",
+    "model": "E350",
+    "year": 2010,
+    "price": 9000000,
+    "mileage": 85000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/FkJp7PT9/IMG-20260720-WA0019.jpg?id=MypdNX0b",
+      "https://i.ibb.co/C362cXG2/IMG-20260716-WA0021.jpg",
+      "https://i.ibb.co/kVbLptWR/IMG-20260716-WA0036.jpg",
+      "https://i.ibb.co/ymLwFgS2/IMG-20260716-WA0038.jpg"
+    ],
+    "description": "\\u2728 2010 Mercedes-Benz E350 \\u2728\\n\\u{1F1E9}\\u{1F1EA} Clean Used | Duty Paid \\u{1F1E9}\\u{1F1EA}\\n\\u{1F48E} Keyless Entry | \\u{1F698} Luxury Sedan | \\u{1F90D} Elegant White Exterior\\nExperience luxury, comfort, and performance in this clean Mercedes-Benz E350. Featuring a refined leather interior, wood-trim dashboard and steering wheel, panoramic sunroof, premium alloy wheels, and the comfort and road presence expected from Mercedes-Benz.",
+    "engine": "3.5L V6",
+    "color": "White",
+    "condition": "Clean Used",
+    "isFeatured": true
+  },
+  {
+    "id": "honda-accord-2026",
+    "make": "Honda",
+    "model": "Accord",
+    "year": 2026,
+    "price": 50000000,
+    "mileage": 5000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/Y7yYc8Py/IMG-20260713-WA0054.jpg?id=SXdWt05d",
+      "https://i.ibb.co/Y7mpNZvT/IMG-20260713-WA0056.jpg",
+      "https://i.ibb.co/ZRfSc4Tf/IMG-20260713-WA0062.jpg",
+      "https://i.ibb.co/k2RCcvvm/IMG-20260713-WA0060.jpg",
+      "https://i.ibb.co/xK5JL063/IMG-20260713-WA0058.jpg"
+    ],
+    "description": "\\u2728 2026 Honda Accord \\u2728\\n\\u{1F1E7}\\u{1F1EA} Foreign Used | Original Duty Paid \\u{1F1E7}\\u{1F1EA}\\n\\u{1F698} Just Arrived | \\u{1FA76} Elegant Silver Exterior | \\u26A1 Modern Honda Accord\\nExperience modern styling, comfort, and advanced technology in this beautiful 2026 Honda Accord. With its sleek exterior design, refined interior, digital instrument cluster, touchscreen infotainment system, automatic transmission, spacious cabin, and excellent road presence, this Accord is a perfect choice for anyone looking for a fresh, modern sedan.",
+    "engine": "1.5L Turbo",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-is250-2015",
+    "make": "Lexus",
+    "model": "IS250 F Sport",
+    "year": 2015,
+    "price": 15500000,
+    "mileage": 82000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/K4znhbc/IMG-20260611-WA0043.jpg?id=HwpZ4BL",
+      "https://i.ibb.co/BHS9B7Nm/IMG-20260611-WA0050.jpg",
+      "https://i.ibb.co/tw9ns3kt/IMG-20260611-WA0048.jpg",
+      "https://i.ibb.co/d0XzKGJr/IMG-20260611-WA0049.jpg",
+      "https://i.ibb.co/SX8QzFG5/IMG-20260611-WA0051.jpg"
+    ],
+    "description": "\\u2728 2015 Lexus IS250 F Sport \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F3C1} F Sport Package | \\u{1FA76} Elegant Silver Exterior | \\u{1F5A4} Premium Black Leather Interior\\nExperience luxury, performance, and sporty styling in this clean 2015 Lexus IS250 F Sport. Featuring a powerful 2.5L V6 engine, sporty F Sport design, premium leather interior, sunroof, stylish alloy wheels, and excellent road presence, this Lexus delivers the perfect balance of comfort and performance.",
+    "engine": "2.5L V6",
+    "color": "Silver",
+    "condition": "Nigerian Used",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-es350-2011",
+    "make": "Lexus",
+    "model": "ES350",
+    "year": 2011,
+    "price": 11500000,
+    "mileage": 75000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/d0XD8zGN/IMG-20260722-WA0007.jpg",
+      "https://i.ibb.co/hx9S0gWw/IMG-20260722-WA0009.jpg",
+      "https://i.ibb.co/fz6r5Vfb/IMG-20260722-WA0011.jpg",
+      "https://i.ibb.co/NgpwqDKT/IMG-20260722-WA0013.jpg",
+      "https://i.ibb.co/ymPHSvFZ/IMG-20260722-WA0016.jpg"
+    ],
+    "description": "\\u2728 2011 Lexus ES350 \\u2728\\n\\u{1F1E7}\\u{1F1EA} Extremely Clean Used | \\u{1F1F3}\\u{1F1EC} 2026 Duty Paid\\n\\u{1F511} Keyless Entry | \\u{1F4BA} Luxury Leather Interior | \\u2744\\uFE0F Dual-Zone Climate Control\\nExperience premium comfort, reliability, and smooth performance in this exceptionally clean 2011 Lexus ES350. Powered by a refined 3.5L V6 engine paired with an automatic transmission, this luxury sedan delivers a quiet ride, excellent fuel efficiency for its class, and legendary Lexus dependability.",
+    "engine": "3.5L V6",
+    "color": "Dark Grey (Metallic)",
+    "condition": "Direct Belgium",
+    "isFeatured": true
+  },
+  {
+    "id": "hyundai-santa-fe-2014",
+    "make": "Hyundai",
+    "model": "Santa Fe",
+    "year": 2014,
+    "price": 16000000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Nigeria",
+    "dealership": "Silver Star Sourcing",
+    "images": [
+      "https://i.ibb.co/MyCc05hW/IMG-20260721-WA0032.jpg",
+      "https://i.ibb.co/d4BZZ3Rs/IMG-20260721-WA0034.jpg",
+      "https://i.ibb.co/qYYgS83N/IMG-20260721-WA0036.jpg",
+      "https://i.ibb.co/DgpJtZRW/IMG-20260721-WA0040.jpg",
+      "https://i.ibb.co/zW5pFRR7/IMG-20260721-WA0039.jpg"
+    ],
+    "description": "\\u2728 2014 Hyundai Santa Fe \\u2728\\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F699} Luxury SUV | \\u{1F48E} Elegant Silver Exterior\\nExperience comfort, reliability, and performance with this well-maintained 2014 Hyundai Santa Fe. It offers a spacious 7-seater cabin, smooth automatic transmission, excellent fuel efficiency, premium interior, alloy wheels, fog lamps, multifunction steering controls, air conditioning, and ample cargo space\\u2014making it an ideal SUV for both family and business use.",
+    "engine": "3.3L V6",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "hyundai-azera-2023",
+    "make": "Hyundai",
+    "model": "Azera (Full Option)",
+    "year": 2023,
+    "price": 93000000,
+    "mileage": 18000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Nigeria",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/s96rzXqZ/IMG-20260721-WA0058.jpg",
+      "https://i.ibb.co/HDNBxQ5T/IMG-20260721-WA0055.jpg",
+      "https://i.ibb.co/3m1Bjp31/IMG-20260721-WA0054.jpg",
+      "https://i.ibb.co/MyDmWVP8/IMG-20260721-WA0060.jpg",
+      "https://i.ibb.co/NdcNCBwx/IMG-20260721-WA0056.jpg"
+    ],
+    "description": "\\u2728 2023 Hyundai Azera (Full Option) \\u2728\\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F305} Full Panoramic Roof | \\u{1F48E} Premium Grey Exterior\\nExperience first-class luxury, advanced technology, and exceptional comfort with this stunning 2023 Hyundai Azera Full Option. Equipped with a powerful yet fuel-efficient engine, premium leather interior, panoramic sunroof, push-to-start ignition, smart keyless entry, large infotainment display, reverse camera, front & rear parking sensors, wireless charging, premium alloy wheels, LED headlights, dual-zone climate control, and advanced driver-assistance features.",
+    "engine": "2.5L Smartstream",
+    "color": "Grey",
+    "condition": "Foreign Used",
+    "isFeatured": true
+  },
+  {
+    "id": "lexus-is350-2014",
+    "make": "Lexus",
+    "model": "IS350 F Sport",
+    "year": 2014,
+    "price": 20000000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Nigeria",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/DgrkkpSL/IMG-20260611-WA0075-1.jpg",
+      "https://i.ibb.co/W4sQ7zVP/IMG-20260611-WA0082.jpg",
+      "https://i.ibb.co/xq4GrCQL/IMG-20260611-WA0081.jpg",
+      "https://i.ibb.co/TqktbKGr/IMG-20260611-WA0085.jpg",
+      "https://i.ibb.co/pvrFHp2c/IMG-20260611-WA0083.jpg",
+      "https://i.ibb.co/TBsJVjY0/IMG-20260611-WA0084.jpg"
+    ],
+    "description": "\\u2728 2014 Lexus IS350 F Sport \\u2728\\n\\u{1F1E7}\\u{1F1EA} Accident Free | Direct Belgium | Original Custom Duty \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F525} AMG Sound System | \\u{1F48E} Elegant Deep Blue Exterior\\nExperience luxury, power, and sporty performance with this accident-free 2014 Lexus IS350 F Sport. Powered by a responsive 3.5L V6 engine paired with a smooth automatic transmission, this premium sports sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, premium AMG sound system, reverse camera, parking sensors, LED daytime running lights, alloy wheels, dual-zone climate control, multifunction steering wheel, cruise control, and exceptional driving comfort. A perfect choice for anyone seeking performance, reliability, and executive class.",
+    "engine": "3.5L V6 Petrol",
+    "color": "Deep Blue",
+    "condition": "Direct Belgium",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-corolla-2004",
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": 2004,
+    "price": 5000000,
+    "mileage": 120000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Nigeria",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/8gnd2pSn/IMG-20260722-WA0020.jpg",
+      "https://i.ibb.co/fd4gnQ5y/IMG-20260722-WA0022.jpg",
+      "https://i.ibb.co/rRn3fSnX/IMG-20260722-WA0024.jpg",
+      "https://i.ibb.co/3mMvFPMz/IMG-20260722-WA0005.jpg",
+      "https://i.ibb.co/b53c0SX6/IMG-20260722-WA0026.jpg"
+    ],
+    "description": "\\u2728 2004 Toyota Corolla \\u2728\\n\\u{1F1F3}\\u{1F1EC} Nigeria Used | Duty Paid\\n\\u{1F511} Reliable Sedan | \\u26FD Fuel Efficient | \\u{1F5A4} Classic Black Exterior\\nOwn one of Toyota's most dependable sedans with this well-maintained 2004 Toyota Corolla. Renowned for its durability, fuel economy, and low maintenance costs, this sedan features a smooth automatic transmission, comfortable fabric interior, air conditioning, power windows, power steering, central locking, factory audio system, spacious cabin, and a generous boot space. An excellent choice for daily commuting, ride-hailing, or personal use.",
+    "engine": "1.8L 4-Cylinder Petrol",
+    "color": "Black",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-camry-se-2013",
+    "make": "Toyota",
+    "model": "Camry SE",
+    "year": 2013,
+    "price": 15000000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Nigeria",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/CKRmpKHL/IMG-20260630-WA0117.jpg",
+      "https://i.ibb.co/8wNH6k0/IMG-20260630-WA0119.jpg",
+      "https://i.ibb.co/xS4fcb5C/IMG-20260630-WA0121.jpg",
+      "https://i.ibb.co/1GrPJS5Q/IMG-20260630-WA0124.jpg",
+      "https://i.ibb.co/mVmnY14D/IMG-20260630-WA0126.jpg",
+      "https://i.ibb.co/rGBttmMg/IMG-20260630-WA0128.jpg"
+    ],
+    "description": "\\u2728 2013 Toyota Camry SE \\u2728\\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F3C1} Sport Edition (SE) | \\u2764\\uFE0F Premium Red Exterior\\nEnjoy the perfect blend of sporty styling, comfort, and Toyota reliability with this clean 2013 Toyota Camry SE. Powered by a fuel-efficient 2.5L 4-cylinder engine and paired with a smooth automatic transmission, this sedan features a premium fabric interior, smart keyless entry, push-to-start ignition, reverse camera, Bluetooth connectivity, multifunction steering wheel, alloy wheels, cruise control, dual-zone climate control, sport-tuned suspension, LED daytime running lights, and a spacious cabin. An excellent choice for daily driving with impressive performance and low maintenance costs.",
+    "engine": "2.5L 4-Cylinder Petrol",
+    "color": "Red",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "mercedes-c300-2013",
+    "make": "Mercedes-Benz",
+    "model": "C300 4MATIC",
+    "year": 2013,
+    "price": 11000000,
+    "mileage": 72000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/07J9ctH/IMG-20260721-WA0006.jpg",
+      "https://i.ibb.co/mFXGmNjd/IMG-20260721-WA0012.jpg",
+      "https://i.ibb.co/cSSYQpDk/IMG-20260721-WA0013.jpg",
+      "https://i.ibb.co/0ypVrhpS/IMG-20260721-WA0014.jpg",
+      "https://i.ibb.co/350Jt7xK/IMG-20260721-WA0004.jpg"
+    ],
+    "description": "\\u2728 2013 Mercedes-Benz C300 4MATIC \\u2728\\n\\u{1F1F3}\\u{1F1EC} Clean Nigeria Used | Duty Paid\\n\\u{1F511} Keyless Entry | \\u2B50 4MATIC AWD | \\u{1F499} Elegant Navy Blue Exterior\\nExperience luxury, comfort, and confident performance with this well-maintained 2013 Mercedes-Benz C300 4MATIC. Powered by a 3.5L V6 engine and paired with a smooth automatic transmission, this premium sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, reverse camera, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, premium alloy wheels, LED daytime running lights, Bluetooth connectivity, and Mercedes-Benz's renowned 4MATIC all-wheel-drive system for enhanced stability and control.",
+    "engine": "3.5L V6 Petrol",
+    "color": "Navy Blue",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "mercedes-gle400-2016",
+    "make": "Mercedes-Benz",
+    "model": "GLE 400 4MATIC",
+    "year": 2016,
+    "price": 36000000,
+    "mileage": 58000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/k2pbVC5N/IMG-20260723-WA0014.jpg",
+      "https://i.ibb.co/SDsdP5tg/IMG-20260723-WA0021.jpg",
+      "https://i.ibb.co/Cppmh1cc/IMG-20260723-WA0020.jpg",
+      "https://i.ibb.co/0Vy9gdJs/IMG-20260723-WA0019.jpg",
+      "https://i.ibb.co/4RRZTxMC/IMG-20260723-WA0022.jpg"
+    ],
+    "description": "\\u2728 2016 Mercedes-Benz GLE 400 4MATIC \\u2728\\n\\u{1F30D} Foreign Used | Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F4F9} 360\\xB0 Camera | \\u2B50 4MATIC AWD | \\u2764\\uFE0F Premium Red Exterior\\nExperience exceptional luxury, performance, and innovation with this stunning 2016 Mercedes-Benz GLE 400 4MATIC. Powered by a 3.0L Twin-Turbo V6 engine and paired with a smooth automatic transmission, this premium SUV delivers refined power and outstanding comfort. It features 360\\xB0 surround-view camera, smart keyless entry, push-to-start ignition, premium leather interior, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, LED headlights, premium alloy wheels, Bluetooth connectivity, power tailgate, and Mercedes-Benz's intelligent 4MATIC all-wheel-drive system for superior handling in all driving conditions.",
+    "engine": "3.0L Twin-Turbo V6 Petrol",
+    "color": "Red",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "lexus-es350-2014",
+    "make": "Lexus",
+    "model": "ES350",
+    "year": 2014,
+    "price": 18500000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/Q3LkfJmp/IMG-20260713-WA0064.jpg",
+      "https://i.ibb.co/tPpntdhn/IMG-20260713-WA0066.jpg",
+      "https://i.ibb.co/YFvcRs8r/IMG-20260713-WA0068.jpg",
+      "https://i.ibb.co/pryzWvKj/IMG-20260713-WA0070.jpg",
+      "https://i.ibb.co/PvqJt47b/IMG-20260713-WA0072.jpg"
+    ],
+    "description": "\\u2728 2014 Lexus ES350 \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium | \\u{1F1F3}\\u{1F1EC} Duty Paid\\n\\u{1F511} Keyless Entry | \\u{1F6CB}\\uFE0F Premium Leather Interior | \\u{1F321}\\uFE0F Dual-Zone Climate Control\\n\\u{1F4F1} Bluetooth Connectivity | \\u{1F4F7} Reverse Camera | \\u{1F4A1} LED Daytime Running Lights\\n\\u{1FA91} Power Seats | \\u{1F3B5} Premium Audio System | \\u{1F6DE} Alloy Wheels\\nExperience luxury, comfort, and legendary Lexus reliability in this elegant 2014 ES350. Powered by a smooth 3.5L V6 engine with automatic transmission, it delivers excellent performance, exceptional ride comfort, low maintenance costs, and outstanding fuel efficiency. A perfect executive sedan for both city driving and long-distance travel.",
+    "engine": "3.5L V6",
+    "color": "Pearl White",
+    "condition": "Direct Belgium",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-rav4-xle-2022",
+    "make": "Toyota",
+    "model": "RAV4 XLE AWD",
+    "year": 2022,
+    "price": 24500000,
+    "mileage": 32000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/B5DHscJ1/IMG-20260721-WA0024.jpg",
+      "https://i.ibb.co/0ypVrhpS/IMG-20260721-WA0014.jpg",
+      "https://i.ibb.co/yF3vTJ8r/IMG-20260721-WA0029.jpg",
+      "https://i.ibb.co/twTjws2M/IMG-20260721-WA0028.jpg",
+      "https://i.ibb.co/xSJ1kSLw/IMG-20260721-WA0030.jpg",
+      "https://i.ibb.co/7tZLX1GB/IMG-20260721-WA0009.jpg"
+    ],
+    "description": "\\u2728 2022 Toyota RAV4 XLE AWD \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F1F3}\\u{1F1EC} Duty Paid\\n\\u{1F511} Smart Keyless Entry | \\u{1F699} All-Wheel Drive (AWD) | \\u{1F6E1}\\uFE0F Toyota Safety Sense\\n\\u{1F4F1} Apple CarPlay & Android Auto | \\u{1F4F7} Reverse Camera | \\u{1F321}\\uFE0F Dual-Zone Climate Control\\n\\u{1FA91} Premium Fabric Seats | \\u{1F3B5} Premium Audio System | \\u{1F4A1} LED Headlights & DRLs | \\u{1F6DE} Alloy Wheels\\nExperience outstanding reliability, comfort, and versatility in this beautiful 2022 Toyota RAV4 XLE AWD. Powered by a fuel-efficient 2.5L engine with automatic transmission, it delivers excellent performance, modern technology, impressive safety features, and the legendary durability Toyota is known for. An ideal SUV for city driving, family use, and long-distance travel.",
+    "engine": "2.5L 4-Cylinder",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-highlander-limited-2018",
+    "make": "Toyota",
+    "model": "Highlander Limited AWD",
+    "year": 2018,
+    "price": 28000000,
+    "mileage": 48000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/MK5RscW/IMG-20260721-WA0016.jpg",
+      "https://i.ibb.co/yms87wR1/IMG-20260721-WA0020.jpg",
+      "https://i.ibb.co/jSV2fQ6/IMG-20260721-WA0023.jpg",
+      "https://i.ibb.co/RTTdFFQb/IMG-20260721-WA0021.jpg",
+      "https://i.ibb.co/21fz4sXX/IMG-20260721-WA0005.jpg"
+    ],
+    "description": "\\u2728 2018 Toyota Highlander Limited AWD \\u2728\\n\\u{1F1F3}\\u{1F1EC} Extremely Clean Abuja Used | \\u{1F1F3}\\u{1F1EC} Duty Paid\\n\\u{1F511} Smart Keyless Entry | \\u{1F699} All-Wheel Drive (AWD) | \\u{1F6CB}\\uFE0F Premium Leather Interior\\n\\u{1F4F1} Bluetooth Connectivity | \\u{1F4F7} Reverse Camera | \\u{1F6F0}\\uFE0F Navigation System\\n\\u{1F321}\\uFE0F Tri-Zone Automatic Climate Control | \\u{1FA91} Heated & Ventilated Power Seats\\n\\u{1F3B5} JBL Premium Audio System | \\u{1F4A1} LED Headlights | \\u{1F6DE} Alloy Wheels | \\u{1F17F}\\uFE0F Front & Rear Parking Sensors\\nExperience luxury, space, and Toyota's legendary reliability in this exceptionally clean 2018 Toyota Highlander Limited AWD. Powered by a refined 3.5L V6 engine with automatic transmission, it delivers strong performance, a smooth ride, advanced safety features, and outstanding comfort for both family and executive use. A premium SUV built for city driving, highway cruising, and long-distance travel.",
+    "engine": "3.5L V6",
+    "color": "Pearl White",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "lexus-gs350-fsport-2015",
+    "make": "Lexus",
+    "model": "GS350 F SPORT",
+    "year": 2015,
+    "price": 16500000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/TDV2yQP3/IMG-20260630-WA0130-1.jpg",
+      "https://i.ibb.co/zHxfMm0L/IMG-20260630-WA0132-1.jpg",
+      "https://i.ibb.co/jv4tcxYF/IMG-20260630-WA0135-1.jpg",
+      "https://i.ibb.co/5X53MJYB/IMG-20260630-WA0137-1.jpg",
+      "https://i.ibb.co/23jpPDQS/IMG-20260630-WA0139-1.jpg"
+    ],
+    "description": "\\u2728 2015 Lexus GS350 F SPORT \\u2728\\n\\u{1F1F3}\\u{1F1EC} Slightly Used | \\u{1F1F3}\\u{1F1EC} Original Duty Paid\\n\\u{1F511} Smart Keyless Entry | \\u{1F31E} Sunroof | \\u{1F6CB}\\uFE0F Premium Leather Interior\\n\\u{1F4F1} Bluetooth Connectivity | \\u{1F4F7} Reverse Camera | \\u{1F6F0}\\uFE0F Navigation System\\n\\u{1FA91} Power Memory Seats | \\u{1F321}\\uFE0F Dual-Zone Automatic Climate Control\\n\\u{1F3B5} Premium Audio System | \\u{1F4A1} LED Headlights & DRLs | \\u{1F6DE} F SPORT Alloy Wheels\\nExperience premium luxury, sporty performance, and legendary Lexus reliability in this stunning 2015 Lexus GS350 F SPORT. Powered by a responsive 3.5L V6 engine with automatic transmission, it offers exceptional driving dynamics, refined comfort, advanced technology, and low maintenance costs. An ideal executive sedan for drivers who appreciate both performance and elegance.",
+    "engine": "3.5L V6",
+    "color": "Silver",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "mercedes-e300-2017",
+    "make": "Mercedes-Benz",
+    "model": "E300",
+    "year": 2017,
+    "price": 21500000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/N2ssTJ4C/IMG-20260721-WA0042.jpg",
+      "https://i.ibb.co/ynNxn1mx/IMG-20260721-WA0044.jpg",
+      "https://i.ibb.co/S7QqvHKz/IMG-20260721-WA0046.jpg",
+      "https://i.ibb.co/spw8MV1v/IMG-20260721-WA0048.jpg",
+      "https://i.ibb.co/7JPXK02n/IMG-20260721-WA0050.jpg"
+    ],
+    "description": "\\u2728 2017 Mercedes-Benz E300 \\u2728\\n\\u{1F1E7}\\u{1F1EA} Extremely Clean Used | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F698} Luxury Sedan | \\u{1F90D} Elegant Silver Metallic Exterior\\nExperience luxury, comfort, and advanced German engineering with this stunning 2017 Mercedes-Benz E300. It offers a refined driving experience, premium interior, smooth 9-speed automatic transmission, and excellent fuel efficiency. Perfect for anyone seeking style, reliability, and executive-class comfort.",
+    "engine": "2.0L Turbocharged Inline-4",
+    "color": "Silver Metallic",
+    "condition": "Direct Belgium",
+    "isFeatured": false
+  },
+  {
+    "id": "mercedes-c300-2013-white",
+    "make": "Mercedes-Benz",
+    "model": "C300",
+    "year": 2013,
+    "price": 14500000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/S7vhrtxf/IMG-20260716-WA0039.jpg",
+      "https://i.ibb.co/vC8pLGhL/IMG-20260723-WA0050.jpg",
+      "https://i.ibb.co/3mJc8W0D/IMG-20260723-WA0049.jpg",
+      "https://i.ibb.co/xKt7wFgB/IMG-20260716-WA0042.jpg",
+      "https://i.ibb.co/LdzT376r/IMG-20260723-WA0051.jpg",
+      "https://i.ibb.co/qMLvBmrv/IMG-20260716-WA0045.jpg"
+    ],
+    "description": "\\u2728 2013 Mercedes-Benz C300 \\u2728\\n\\u{1F1FA}\\u{1F1F8} Foreign Used | \\u{1F1F3}\\u{1F1EC} Duty Paid\\n\\u{1F5A4} Black Engine | \\u{1F698} Luxury Sedan | \\u{1F90D} Elegant White Exterior\\nExperience luxury, comfort, and performance in this beautiful 2013 Mercedes-Benz C300. A stylish and well-equipped luxury sedan with a premium look, smooth automatic transmission, powerful 3.5L V6 petrol engine, and the comfort you expect from Mercedes-Benz.",
+    "engine": "3.5L V6",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-sienna-2012",
+    "make": "Toyota",
+    "model": "Sienna",
+    "year": 2012,
+    "price": 11000000,
+    "mileage": 78000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Minivan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/cc28rJSw/IMG-20260713-WA0083.jpg",
+      "https://i.ibb.co/X0t5TPJ/IMG-20260713-WA0085.jpg",
+      "https://i.ibb.co/WNs8FTxp/IMG-20260713-WA0087.jpg",
+      "https://i.ibb.co/4gSFXZvg/IMG-20260713-WA0082.jpg",
+      "https://i.ibb.co/6Rsj91c7/IMG-20260713-WA0080.jpg"
+    ],
+    "description": "\\u2728 2012 Toyota Sienna \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | \\u{1F4C4} Duty Paid\\n\\u{1FA76} Elegant Silver Exterior | \\u{1F690} Spacious Family Minivan\\nExperience comfort, reliability, and practicality in this extremely clean 2012 Toyota Sienna. A spacious and comfortable family vehicle with a powerful 3.5L V6 petrol engine, smooth automatic transmission, and excellent road presence.",
+    "engine": "3.5L V6",
+    "color": "Silver",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-highlander-2011-wine",
+    "make": "Toyota",
+    "model": "Highlander",
+    "year": 2011,
+    "price": 13000000,
+    "mileage": 85000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/75drH12/IMG-20260724-WA0045.jpg",
+      "https://i.ibb.co/vCq41ms1/IMG-20260724-WA0041.jpg",
+      "https://i.ibb.co/Jw2C5Jwh/IMG-20260724-WA0043.jpg",
+      "https://i.ibb.co/zWMBrtV7/IMG-20260724-WA0046.jpg",
+      "https://i.ibb.co/99bzKxz4/IMG-20260724-WA0048.jpg",
+      "https://i.ibb.co/QFhsPtG6/IMG-20260724-WA0049.jpg"
+    ],
+    "description": "\\u2728 2011 Toyota Highlander \\u2728\\n\\u{1F1F3}\\u{1F1EC} Duty Paid | \\u2B50 Full Option\\n\\u{1F511} Keyless Entry | \\u{1F31E} Sunroof | \\u{1F377} Elegant Wine Exterior\\nExperience comfort, reliability, and premium utility in this extremely clean 2011 Toyota Highlander. A stylish and spacious SUV with a powerful 3.5L V6 petrol engine, smooth automatic transmission, keyless entry, sunroof, and excellent road presence.",
+    "engine": "3.5L V6",
+    "color": "Wine/Burgundy",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "hyundai-sonata-2015-grey",
+    "make": "Hyundai",
+    "model": "Sonata",
+    "year": 2015,
+    "price": 13800000,
+    "mileage": 65000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/MD8P10rH/IMG-20260630-WA0142.jpg",
+      "https://i.ibb.co/hFMVyx2S/IMG-20260630-WA0144.jpg",
+      "https://i.ibb.co/5gkrFhXv/IMG-20260630-WA0146.jpg",
+      "https://i.ibb.co/Hfcbtfhh/IMG-20260630-WA0148.jpg",
+      "https://i.ibb.co/RGLtGzzf/IMG-20260630-WA0150.jpg"
+    ],
+    "description": "\\u2728 2015 Hyundai Sonata \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium | \\u{1F1F3}\\u{1F1EC} Duty Paid\\n\\u{1FA76} Elegant Grey Exterior | \\u{1F698} Luxury Sedan\\nExperience style, comfort, and smooth performance in this 2015 Hyundai Sonata, directly imported from Belgium and fully duty paid. A stylish and spacious sedan with a smooth automatic transmission, efficient petrol engine, premium interior comfort, and excellent road presence.",
+    "engine": "2.4L 4-Cylinder",
+    "color": "Grey",
+    "condition": "Direct Belgium",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-sienna-2003-silver",
+    "make": "Toyota",
+    "model": "Sienna",
+    "year": 2003,
+    "price": 4500000,
+    "mileage": 120000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Minivan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/s96tpdHF/IMG-20260725-WA0003.jpg",
+      "https://i.ibb.co/Z1zjZ9k1/IMG-20260725-WA0008.jpg",
+      "https://i.ibb.co/1JJSb2HY/IMG-20260725-WA0010.jpg",
+      "https://i.ibb.co/bM5GKLGv/IMG-20260725-WA0011.jpg",
+      "https://i.ibb.co/TXcP108/IMG-20260725-WA0009.jpg"
+    ],
+    "description": "\\u2728 2003 Toyota Sienna \\u2728\\n\\u{1F1F3}\\u{1F1EC} Duty Paid | \\u{1FA76} Elegant Silver Exterior\\n\\u{1F690} Spacious Family Minivan | \\u2699\\uFE0F Reliable V6 Performance\\nExperience comfort, practicality, and reliability in this clean used 2003 Toyota Sienna. A spacious family minivan powered by a reliable 3.0L V6 petrol engine, with automatic transmission and excellent practicality for everyday use and family trips.",
+    "engine": "3.0L V6",
+    "color": "Silver",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "lexus-es350-2016-black",
+    "make": "Lexus",
+    "model": "ES 350",
+    "year": 2016,
+    "price": 26000000,
+    "mileage": 58000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/6JcvjM6V/IMG-20260725-WA0013.jpg",
+      "https://i.ibb.co/B5QZh8gJ/IMG-20260725-WA0017.jpg",
+      "https://i.ibb.co/P7D3S3C/IMG-20260725-WA0016.jpg",
+      "https://i.ibb.co/4nTydxQs/IMG-20260725-WA0019.jpg"
+    ],
+    "description": "\\u2728 2016 Lexus ES 350 \\u2728\\n\\u{1F1EF}\\u{1F1F5} Foreign Used | Tincan Cleared \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F698} Luxury Sedan | \\u{1F5A4} Elegant Black Exterior\\nExperience luxury, comfort, and legendary Lexus reliability with this stunning 2016 Lexus ES 350. Powered by a refined 3.5L V6 engine, this executive sedan delivers smooth performance, premium comfort, and outstanding durability, making it the perfect choice for both city driving and long-distance travel.",
+    "engine": "3.5L V6",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "lexus-is250-2015-white",
+    "make": "Lexus",
+    "model": "IS 250 AWD",
+    "year": 2015,
+    "price": 16500000,
+    "mileage": 62000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/y9sqPLY/IMG-20260703-WA0024.jpg",
+      "https://i.ibb.co/mCWDLYGt/IMG-20260703-WA0022.jpg",
+      "https://i.ibb.co/9mnK8Y4f/IMG-20260703-WA0020.jpg",
+      "https://i.ibb.co/rKJNdhzk/IMG-20260725-WA0021.jpg",
+      "https://i.ibb.co/FL5Ttvck/IMG-20260703-WA0019.jpg"
+    ],
+    "description": "\\u2728 2015 Lexus IS 250 AWD \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | Just Like Tokunbo | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry | \\u{1F698} Luxury Sports Sedan | \\u{1F90D} Elegant Pearl White Exterior\\n\\nFeatures:\\n\\u2022 All-Wheel Drive (AWD)\\n\\u2022 Smart Keyless Entry & Push Start\\n\\u2022 Premium Leather Interior\\n\\u2022 Reverse Camera & Bluetooth Connectivity\\n\\u2022 Dual-Zone Climate Control & Power Front Seats\\n\\u2022 Alloy Wheels & LED Daytime Running Lights\\n\\u2022 Parking Sensors, ABS & Multiple Airbags",
+    "engine": "2.5L V6",
+    "color": "Pearl White",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "hyundai-i30-gt-2015-black",
+    "make": "Hyundai",
+    "model": "i30 GT",
+    "year": 2015,
+    "price": 15000000,
+    "mileage": 55000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Hatchback",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/n8BDCZn6/IMG-20260703-WA0021.jpg",
+      "https://i.ibb.co/Q7HxRrpp/IMG-20260725-WA0026.jpg",
+      "https://i.ibb.co/gZkzdBhy/IMG-20260725-WA0028.jpg",
+      "https://i.ibb.co/ZbS9Pqp/IMG-20260725-WA0029.jpg",
+      "https://i.ibb.co/vvMWVqQ7/IMG-20260725-WA0027.jpg"
+    ],
+    "description": "\\u2728 2015 Hyundai i30 GT \\u2728\\n\\u{1F1E7}\\u{1F1EA} Foreign Used | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry & Push Start | \\u{1F697} Hatchback | \\u{1F5A4} Elegant Black Exterior\\n\\nExperience sporty performance, practicality, and excellent fuel efficiency with this 2015 Hyundai i30 GT. This well-maintained hatchback offers a comfortable cabin, smooth automatic transmission, 2.0L Inline-4 engine, and modern features making it ideal for daily commuting and long-distance travel.\\n\\nFeatures:\\n\\u2022 Keyless Entry & Push Start Button\\n\\u2022 Bluetooth Connectivity & Reverse Camera\\n\\u2022 Premium Interior & Multifunction Steering Wheel\\n\\u2022 Cruise Control & Automatic Climate Control\\n\\u2022 Alloy Wheels & LED Daytime Running Lights\\n\\u2022 Front Fog Lamps, ABS, ESC & Multiple Airbags",
+    "engine": "2.0L Inline-4",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-sienna-2009-blue",
+    "make": "Toyota",
+    "model": "Sienna XLE Limited",
+    "year": 2009,
+    "price": 12500000,
+    "mileage": 72000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Minivan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/XfyP7xyK/IMG-20260725-WA0031.jpg",
+      "https://i.ibb.co/Vcz0Y1QV/IMG-20260725-WA0035.jpg",
+      "https://i.ibb.co/CptJb0bp/IMG-20260725-WA0038.jpg",
+      "https://i.ibb.co/4g2yQwSw/IMG-20260725-WA0039.jpg",
+      "https://i.ibb.co/Y4q6fvXq/IMG-20260725-WA0034.jpg"
+    ],
+    "description": "\\u2728 2009 Toyota Sienna XLE Limited \\u2728\\n\\u{1F1E7}\\u{1F1EA} Foreign Used | 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry & Push Start | \\u{1F690} Premium Minivan | \\u{1F499} Elegant Blue Exterior\\n\\nExperience unmatched comfort, reliability, and spaciousness with this 2009 Toyota Sienna XLE Limited. Designed for families and long-distance travel, this premium minivan offers a smooth ride, powerful 3.5L V6 engine, and Toyota's legendary durability.\\n\\nFeatures:\\n\\u2022 XLE Limited Trim\\n\\u2022 Smart Keyless Entry & Push Start Button\\n\\u2022 Premium Leather Interior & Power Sliding Doors\\n\\u2022 Power Tailgate & Reverse Camera\\n\\u2022 Tri-Zone Automatic Climate Control\\n\\u2022 Power Front Seats, Cruise Control & Alloy Wheels\\n\\u2022 Roof Rails, ABS, Vehicle Stability Control & Multiple Airbags",
+    "engine": "3.5L V6",
+    "color": "Blue",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-corolla-2015-white",
+    "make": "Toyota",
+    "model": "Corolla LE",
+    "year": 2015,
+    "price": 14500000,
+    "mileage": 68000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/mCsfcP3n/IMG-20260725-WA0041.jpg",
+      "https://i.ibb.co/QFY2Bd8L/IMG-20260725-WA0043.jpg",
+      "https://i.ibb.co/q3R9z3w3/IMG-20260725-WA0047.jpg",
+      "https://i.ibb.co/YTT457jr/IMG-20260725-WA0049.jpg",
+      "https://i.ibb.co/PvqKqsPt/IMG-20260725-WA0045.jpg"
+    ],
+    "description": "\\u2728 2015 Toyota Corolla LE \\u2728\\n\\u{1F1E7}\\u{1F1EA} Foreign Used | Original 2026 Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F511} Keyless Entry & Push Start | \\u{1F697} Sedan | \\u{1F90D} Elegant Pearl White Exterior\\n\\nExperience comfort, reliability, and exceptional fuel economy with this 2015 Toyota Corolla LE. This foreign-used sedan has original 2026 duty paid and is in excellent condition. Renowned for its durability, low maintenance costs, and smooth driving experience, it's an ideal choice for both personal and commercial use.\\n\\nFeatures:\\n\\u2022 Keyless Entry & Push Start Button\\n\\u2022 Reverse Camera & Bluetooth Connectivity\\n\\u2022 Touchscreen Multimedia System & Premium Fabric Interior\\n\\u2022 Multifunction Steering Wheel & Cruise Control\\n\\u2022 Automatic Climate Control & Alloy Wheels\\n\\u2022 LED Daytime Running Lights, Power Windows & Power Mirrors\\n\\u2022 ABS, Vehicle Stability Control & Multiple Airbags",
+    "engine": "1.8L Inline-4",
+    "color": "Pearl White",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "honda-accord-2016-grey",
+    "make": "Honda",
+    "model": "Accord",
+    "year": 2016,
+    "price": 13500000,
+    "mileage": 60000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/d0n8bcng/IMG-20260725-WA0078.jpg",
+      "https://i.ibb.co/9mk7r1KF/IMG-20260725-WA0077.jpg",
+      "https://i.ibb.co/HfhhyBcL/IMG-20260725-WA0091.jpg",
+      "https://i.ibb.co/bgMdLmpg/IMG-20260725-WA0087.jpg",
+      "https://i.ibb.co/d0YVRmKB/IMG-20260725-WA0071.jpg",
+      "https://i.ibb.co/prKHXqKL/IMG-20260725-WA0072.jpg"
+    ],
+    "description": "\\u2728 2016 Honda Accord \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | Duty Paid \\u{1F4C4}\\n\\u{1F511} Keyless Entry | \\u{1F4F1} Double Screen | \\u{1F31E} Sunroof | \\u{1FA76} Elegant Dark Grey Exterior\\n\\nExperience style, comfort, and performance in this extremely clean 2016 Honda Accord. A premium and spacious sedan featuring keyless entry, double-screen infotainment system, sunroof, smooth automatic transmission, 2.4L 4-Cylinder engine, and excellent road presence.",
+    "engine": "2.4L 4-Cylinder",
+    "color": "Dark Grey",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "lexus-nx300-2020-grey",
+    "make": "Lexus",
+    "model": "NX 300",
+    "year": 2020,
+    "price": 35500000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/PZB7fXWr/IMG-20260725-WA0107.jpg",
+      "https://i.ibb.co/4nZz9pm3/IMG-20260725-WA0109.jpg",
+      "https://i.ibb.co/39M2Qb70/IMG-20260725-WA0102.jpg",
+      "https://i.ibb.co/fVTQ9b7J/IMG-20260725-WA0108.jpg"
+    ],
+    "description": "\\u2728 2020 Lexus NX300 \\u2728\\n\\u{1F1F3}\\u{1F1EC} Abuja Used | Clean Used | Duty Paid \\u{1F4C4}\\n\\u{1FA76} Elegant Grey Exterior | \\u{1F698} Luxury SUV\\n\\nExperience luxury, comfort, and performance in this clean 2020 Lexus NX300. A stylish and premium SUV featuring a powerful 2.0L turbocharged petrol engine, smooth automatic transmission, modern styling, excellent road presence, and the comfort and refinement expected from Lexus.",
+    "engine": "2.0L Turbo 4-Cylinder",
+    "color": "Grey",
+    "condition": "Nigerian Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-camry-2022-black",
+    "make": "Toyota",
+    "model": "Camry XSE",
+    "year": 2022,
+    "price": 43500000,
+    "mileage": 38000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/pB9rW5qn/IMG-20260725-WA0051.jpg",
+      "https://i.ibb.co/2rktpbh/IMG-20260725-WA0053.jpg",
+      "https://i.ibb.co/m584Nm2m/IMG-20260725-WA0059.jpg",
+      "https://i.ibb.co/LXV08cQM/IMG-20260725-WA0058.jpg",
+      "https://i.ibb.co/s9tnsHnd/IMG-20260725-WA0056.jpg"
+    ],
+    "description": "\\u2728 2022 Toyota Camry XSE \\u2728\\n\\u{1F1E7}\\u{1F1EA} Direct Belgium Import | Foreign Used | Original Duty Paid (July 18, 2026) \\u{1F4C4}\\n\\u2B50 Full Option | \\u{1F31E} Panoramic Roof | \\u{1F511} Keyless Entry | \\u{1F4C9} Low Mileage | \\u{1F5A4} Elegant Black Exterior\\n\\nExperience premium comfort, style, and performance in this 2022 Toyota Camry XSE, directly imported from Belgium. This full-option luxury sedan features a panoramic roof, keyless entry, low mileage, sporty XSE styling, 2.5L 4-Cylinder engine, and excellent road presence.",
+    "engine": "2.5L 4-Cylinder",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "toyota-4runner-2015-black",
+    "make": "Toyota",
+    "model": "4Runner",
+    "year": 2015,
+    "price": 40800000,
+    "mileage": 52000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/JRybQDBL/IMG-20260724-WA0029-2.jpg",
+      "https://i.ibb.co/B27TjDQx/IMG-20260724-WA0031-1.jpg",
+      "https://i.ibb.co/YFX6RnjB/IMG-20260724-WA0033-1.jpg",
+      "https://i.ibb.co/pr2CV6PR/IMG-20260724-WA0035-1.jpg",
+      "https://i.ibb.co/TD2CyYRb/IMG-20260724-WA0037-1.jpg"
+    ],
+    "description": "\\u2728 2015 Toyota 4Runner \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F4C4} Duty Fully Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F5A4} Elegant Black Exterior | \\u{1F698} Rugged Luxury SUV | \\u26A1 Powerful V6 Performance\\n\\nExperience rugged capability, comfort, and reliability in this 2015 Toyota 4Runner. A powerful and spacious SUV featuring a 4.0L V6 petrol engine, smooth automatic transmission, excellent ground clearance, strong road presence, and the durability Toyota 4Runner is known for.",
+    "engine": "4.0L V6",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": false
+  },
+  {
+    "id": "honda-accord-2023-black",
+    "make": "Honda",
+    "model": "Accord",
+    "year": 2023,
+    "price": 43600000,
+    "mileage": 32000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Coscharis Certified Sourcing",
+    "images": [
+      "https://i.ibb.co/3m7VRZYk/IMG-20260716-WA0029.jpg",
+      "https://i.ibb.co/C3TxS9LW/IMG-20260716-WA0019.jpg",
+      "https://i.ibb.co/vG8KmtT/IMG-20260716-WA0020.jpg",
+      "https://i.ibb.co/tpvbqm7t/IMG-20260716-WA0031.jpg",
+      "https://i.ibb.co/ZzdTbSXh/IMG-20260716-WA0033.jpg"
+    ],
+    "description": "\\u2728 2023 Honda Accord \\u2728\\n\\u{1F30D} Foreign Used | \\u{1F4C4} Duty Paid \\u{1F1F3}\\u{1F1EC}\\n\\u{1F5A4} Elegant Black Exterior | \\u{1F698} Modern Luxury Sedan\\n\\nExperience modern luxury, comfort, and performance in this 2023 Honda Accord. A stylish and spacious sedan with a smooth automatic transmission, efficient turbocharged petrol engine, refined interior, modern design, and excellent road presence.",
+    "engine": "1.5L Turbo 4-Cylinder",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": false
   }
 ];
 
+
 export const HOW_IT_WORKS_STEPS = [
   {
-    number: '01',
-    title: 'Consultation & Discovery',
-    description: 'Share your vehicle needs, budget range, and lifestyle preferences. Our specialist guides you through optimal options.'
+    number: "01",
+    title: "Browse or Request",
+    description: "Explore our verified catalog or specify your preferred car, budget, and features in our spec finder form."
   },
   {
-    number: '02',
-    title: 'Tailored Vehicle Sourcing',
-    description: 'We scour our network of top verified dealerships across Nigeria to find cars that match your exact criteria.'
+    number: "02",
+    title: "Mechanical Verification",
+    description: "Our certified technicians perform detailed mechanical audits and verify customs paperwork before any agreement."
   },
   {
-    number: '03',
-    title: 'Rigorous Inspection & Dealership Matching',
-    description: 'Every car undergoes a detailed inspection to confirm electrical, mechanical, and documentation status.'
+    number: "03",
+    title: "Consultant Matchmaking",
+    description: "Speak directly with a dedicated vehicle consultant to review options, negotiate prices, and schedule test drives."
   },
   {
-    number: '04',
-    title: 'Seamless Safe Purchase',
-    description: 'We assist with comparison, vehicle test-drives, secure payments, and transfer documents, complete with commission options.'
+    number: "04",
+    title: "Seamless Acquisition",
+    description: "Finalize payment safely and receive your inspected vehicle delivered with all verified documentation."
   }
 ];
 
 export const TRUST_REASONS = [
   {
-    title: 'Deals with Multiple Dealerships',
-    description: 'We are not tied to a single lot. We compare vehicles across multiple top dealerships to get you the absolute best quality and value.'
+    title: "Independent Sourcing",
+    description: "We are not tied to a single dealership lot. We search multiple trusted partners to find the exact match for your budget."
   },
   {
-    title: 'Personalized Sourcing',
-    description: 'Tell us what you want and we find it—even if it is not currently on our lists. No stressful dealer hunting.'
+    title: "Rigorous Mechanical Audits",
+    description: "Every vehicle undergoes thorough gearbox, engine, structural, and electronics diagnostic testing before listing."
   },
   {
-    title: 'Independent Inspection',
-    description: 'We act strictly in your interest. We inspect vehicle history, mechanical integrity, and ownership status before you pay a dime.'
+    title: "Customs & Paperwork Verification",
+    description: "We verify customs clearance documents, VIN history, and registration papers so you never face legal issues."
   },
   {
-    title: 'Comprehensive Guidance',
-    description: 'From choosing the model to paper registration and delivery, a dedicated consultant handles the heavy lifting.'
+    title: "Transparent Pricing",
+    description: "No hidden charges or unexpected dealership markups. Clear, honest pricing negotiated directly on your behalf."
   },
   {
-    title: '24/7 WhatsApp & Phone Support',
-    description: 'Instantly talk to real experts at any stage. Direct chat, quick responses, and no automated telephone queues.'
+    title: "Dedicated Consultant Support",
+    description: "Get 1-on-1 personalized guidance from experienced automotive specialists via WhatsApp or call every step of the way."
   }
 ];

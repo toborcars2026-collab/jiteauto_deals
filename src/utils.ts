@@ -267,7 +267,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     const res = await fetch('/api/vehicles');
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         localStorage.setItem(VEHICLES_KEY, JSON.stringify(data));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: data }));
@@ -290,47 +290,7 @@ export function getVehicles(): Vehicle[] {
   }
   try {
     const parsed = JSON.parse(data) as Vehicle[];
-    let updated = false;
-
-    // Filter out old pre-populated initial vehicles we want to remove
-    const OLD_INITIAL_IDS = [
-      'hyundai-genesis-g80-2018-white',
-      'lexus-rx350-2018',
-      'mercedes-benz-c300-2017',
-      'toyota-hilux-2021',
-      'range-rover-velar-2019',
-      'honda-accord-2018',
-      'lexus-es350-2019',
-      'toyota-rav4-2020',
-      'toyota-camry-2019'
-    ];
-
-    const filtered = parsed.filter(v => !OLD_INITIAL_IDS.includes(v.id));
-    if (filtered.length !== parsed.length) {
-      updated = true;
-    }
-
-    const synced = [...filtered];
-
-    // Ensure all items from INITIAL_VEHICLES exist in synced and have latest initial images
-    [...INITIAL_VEHICLES].reverse().forEach(initial => {
-      const idx = synced.findIndex(v => v.id === initial.id);
-      if (idx === -1) {
-        synced.unshift(initial);
-        updated = true;
-      } else if (initial.id === 'toyota-yaris-2014-white-le-belgium' || initial.id === 'toyota-camry-xse-2020-blue-full-option') {
-        if (JSON.stringify(synced[idx].images) !== JSON.stringify(initial.images) || synced[idx].description !== initial.description) {
-          synced[idx] = initial;
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(synced));
-      return synced;
-    }
-    return synced;
+    return parsed;
   } catch (e) {
     return INITIAL_VEHICLES;
   }

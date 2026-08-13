@@ -1037,6 +1037,18 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                                   }}
                                   referrerPolicy="no-referrer"
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const imgs = [...(newCar.images || [])];
+                                    imgs[idx] = '';
+                                    setNewCar({ ...newCar, images: imgs });
+                                  }}
+                                  className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-md shadow-md transition-all flex items-center justify-center opacity-80 hover:opacity-100"
+                                  title={`Remove picture from Spot ${idx + 1}`}
+                                >
+                                  <X size={12} />
+                                </button>
                               </div>
                             ) : (
                               <div className="h-14 w-20 rounded-lg border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-[10px] text-slate-400 font-mono shrink-0">
