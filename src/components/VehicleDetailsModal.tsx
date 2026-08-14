@@ -2,7 +2,58 @@ import React, { useState, useRef } from 'react';
 import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
+import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicode } from '../utils';
+
+// Helper to safely render description lines with proper formatting, emojis, bolding & line breaks
+function renderDescriptionLine(line: string, idx: number) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return <div key={idx} className="h-2.5" />;
+  }
+
+  // Parse markdown-style **bold text** safely into <strong> elements
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  const formattedContent = parts.map((part, pIdx) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return (
+        <strong key={pIdx} className="font-bold text-slate-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+
+  // Check if line is a major section title or heading
+  const isSectionHeader =
+    /^(✨|⭐|🔍|📋|🚘|🚗|🔥|🔑)?\s*(Key Features|Vehicle Overview|Features|Overview|Specifications|Highlights|Key Highlights)/i.test(trimmed) ||
+    /^(✨\s*.+\s*✨)$/.test(trimmed);
+
+  if (isSectionHeader) {
+    return (
+      <div key={idx} className="pt-2 pb-1 font-display font-bold text-slate-900 text-base sm:text-lg flex items-center gap-1.5">
+        <span>{formattedContent}</span>
+      </div>
+    );
+  }
+
+  // Check if line is a feature bullet / list item
+  const isBulletItem = /^(✅|•|\*|-|⭐|🔑|🚨|📉|🖤|🤍|💎|🚗|🚙|📍|🔥|🧾|🇳🇬|🇧🇪|🌍|🇯🇵|🇺🇸|📱|🌞|🛋️|🌡️|🛡️|⚙️|🚘|🚐|🏎️|📄|⚡|🌅|❤️|💙|🩶|🍷|🏷️|📌)/u.test(trimmed);
+
+  if (isBulletItem) {
+    return (
+      <div key={idx} className="py-0.5 text-slate-700 text-sm sm:text-base leading-relaxed flex items-start gap-2">
+        <span>{formattedContent}</span>
+      </div>
+    );
+  }
+
+  return (
+    <p key={idx} className="text-slate-600 text-sm sm:text-base leading-relaxed font-normal py-0.5">
+      {formattedContent}
+    </p>
+  );
+}
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -257,9 +308,11 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
           {/* Description Section */}
           <div className="space-y-3 pt-4 border-t border-slate-150">
             <h3 className="font-display text-lg font-bold text-slate-900">Vehicle Description & Features</h3>
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-light whitespace-pre-line">
-              {vehicle.description}
-            </p>
+            <div className="space-y-0.5 text-slate-700">
+              {decodeUnicode(vehicle.description || '')
+                .split('\n')
+                .map((line, idx) => renderDescriptionLine(line, idx))}
+            </div>
           </div>
 
           {/* Core Lead Conversion Box */}

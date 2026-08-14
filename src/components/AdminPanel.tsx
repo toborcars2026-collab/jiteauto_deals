@@ -41,7 +41,9 @@ import {
   formatMileage,
   normalizeImageInput,
   resolveImageLink,
-  getImageUrl
+  getImageUrl,
+  decodeUnicode,
+  sanitizeVehicle
 } from '../utils';
 
 interface AdminPanelProps {
@@ -153,25 +155,25 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
     const imageArray = newCar.images.filter(img => img.trim() !== '');
 
-    const addedCar: Vehicle = {
+    const addedCar: Vehicle = sanitizeVehicle({
       id: editingCarId || 'car_' + Math.random().toString(36).substr(2, 9),
-      make: newCar.make,
-      model: newCar.model,
+      make: decodeUnicode(newCar.make || ''),
+      model: decodeUnicode(newCar.model || ''),
       year: Number(newCar.year) || 2020,
       price: Number(newCar.price) || 10000000,
       mileage: Number(newCar.mileage) || 45000,
       transmission: newCar.transmission as 'Automatic' | 'Manual',
       fuelType: newCar.fuelType as any,
       bodyType: newCar.bodyType as any,
-      location: newCar.location || 'Lagos',
-      dealership: newCar.dealership || 'Jite Sourcing',
+      location: decodeUnicode(newCar.location || 'Lagos'),
+      dealership: decodeUnicode(newCar.dealership || 'Jite Sourcing'),
       images: imageArray.length > 0 ? imageArray : ['https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'],
-      description: newCar.description || 'Pristine and clean condition guaranteed.',
-      engine: newCar.engine || '2.0L 4-Cylinder',
-      color: newCar.color || 'Black',
+      description: decodeUnicode(newCar.description || 'Pristine and clean condition guaranteed.'),
+      engine: decodeUnicode(newCar.engine || '2.0L 4-Cylinder'),
+      color: decodeUnicode(newCar.color || 'Black'),
       condition: newCar.condition as any,
       isFeatured: newCar.isFeatured ?? false
-    };
+    });
 
     let updatedVehicles: Vehicle[];
     if (editingCarId) {
@@ -211,7 +213,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   // Edit Car Selector
   const handleStartEdit = (car: Vehicle) => {
     setEditingCarId(car.id);
-    setNewCar(car);
+    setNewCar(sanitizeVehicle(car));
     setActiveTab('add-car');
   };
 
@@ -247,6 +249,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     if (confirm('This will wipe all custom additions and reset the catalog back to the original curated vehicles. Proceed?')) {
       localStorage.removeItem('jite_vehicles_v1');
       localStorage.removeItem('jite_vehicles_v2');
+      localStorage.removeItem('jite_vehicles_v3');
       fetch('/api/vehicles/reset', { method: 'POST' }).finally(() => {
         window.location.reload();
       });

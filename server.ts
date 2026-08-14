@@ -24,28 +24,71 @@ function ensureDataDir() {
 }
 
 // Helper functions for reading and writing JSON storage
+function decodeUnicode(str: any): string {
+  if (!str || typeof str !== "string") return str || "";
+  
+  // 1. Decode curly-brace Unicode escapes: e.g. \u{1F1F3}, \u{1F1EC}, \u{1F9FE}, \u{1F90D}, \u{1F3C1}, \u{1F525}
+  let result = str.replace(/\\u\{([0-9a-fA-F]+)\}/g, (match, hex) => {
+    try {
+      const codePoint = parseInt(hex, 16);
+      if (codePoint >= 0 && codePoint <= 0x10ffff) {
+        return String.fromCodePoint(codePoint);
+      }
+      return match;
+    } catch {
+      return match;
+    }
+  });
+
+  // 2. Decode standard 4-digit Unicode escapes: e.g. \u2728, \u20A6, \u2022, \u2600
+  result = result.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+    try {
+      const charCode = parseInt(hex, 16);
+      return String.fromCharCode(charCode);
+    } catch {
+      return match;
+    }
+  });
+
+  return result;
+}
+
+function sanitizeVehicle(v: any) {
+  if (!v || typeof v !== "object") return v;
+  const clone = { ...v };
+  for (const key of Object.keys(clone)) {
+    if (typeof clone[key] === "string") {
+      clone[key] = decodeUnicode(clone[key]);
+    }
+  }
+  return clone;
+}
+
 function readVehiclesStore() {
   ensureDataDir();
   if (!fs.existsSync(VEHICLES_FILE)) {
-    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(INITIAL_VEHICLES, null, 2), "utf-8");
-    return INITIAL_VEHICLES;
+    const cleanInitial = INITIAL_VEHICLES.map(sanitizeVehicle);
+    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(cleanInitial, null, 2), "utf-8");
+    return cleanInitial;
   }
   try {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
-      return data;
+      return data.map(sanitizeVehicle);
     }
   } catch (e) {
     console.error("Failed to parse vehicles.json, falling back to seed data", e);
   }
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(INITIAL_VEHICLES, null, 2), "utf-8");
-  return INITIAL_VEHICLES;
+  const cleanInitial = INITIAL_VEHICLES.map(sanitizeVehicle);
+  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(cleanInitial, null, 2), "utf-8");
+  return cleanInitial;
 }
 
 function saveVehiclesStore(vehicles: any[]) {
   ensureDataDir();
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(vehicles, null, 2), "utf-8");
+  const sanitized = vehicles.map(sanitizeVehicle);
+  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(sanitized, null, 2), "utf-8");
 }
 
 function readLeadsStore() {

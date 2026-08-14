@@ -2,9 +2,51 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v2';
+const VEHICLES_KEY = 'jite_vehicles_v3';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
+
+// Automatically decode Unicode escape sequences (e.g. \u2728, \u{1F1F3}\u{1F1EC}, \u{1F9FE})
+export function decodeUnicode(str: string): string {
+  if (!str || typeof str !== 'string') return str || '';
+  
+  // 1. Decode curly-brace Unicode escapes: e.g. \u{1F1F3}, \u{1F1EC}, \u{1F9FE}, \u{1F90D}, \u{1F3C1}, \u{1F525}
+  let result = str.replace(/\\u\{([0-9a-fA-F]+)\}/g, (match, hex) => {
+    try {
+      const codePoint = parseInt(hex, 16);
+      if (codePoint >= 0 && codePoint <= 0x10ffff) {
+        return String.fromCodePoint(codePoint);
+      }
+      return match;
+    } catch {
+      return match;
+    }
+  });
+
+  // 2. Decode standard 4-digit Unicode escapes: e.g. \u2728, \u20A6, \u2022, \u2600
+  result = result.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+    try {
+      const charCode = parseInt(hex, 16);
+      return String.fromCharCode(charCode);
+    } catch {
+      return match;
+    }
+  });
+
+  return result;
+}
+
+// Sanitize vehicle data so all string fields have decoded unicode & emojis
+export function sanitizeVehicle<T extends Vehicle | Partial<Vehicle>>(v: T): T {
+  if (!v || typeof v !== 'object') return v;
+  const clone = { ...v } as any;
+  for (const key of Object.keys(clone)) {
+    if (typeof clone[key] === 'string') {
+      clone[key] = decodeUnicode(clone[key]);
+    }
+  }
+  return clone;
+}
 
 // Format Currency to Nigerian Naira (₦)
 export function formatCurrency(amount: number): string {
@@ -266,14 +308,20 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const res = await fetch('/api/vehicles?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        localStorage.removeItem('jite_vehicles_v1');
-        localStorage.setItem(VEHICLES_KEY, JSON.stringify(data));
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: data }));
+      const rawData = await res.json();
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        const sanitized = rawData.map(v => sanitizeVehicle(v));
+        try {
+          localStorage.removeItem('jite_vehicles_v1');
+          localStorage.removeItem('jite_vehicles_v2');
+          localStorage.setItem(VEHICLES_KEY, JSON.stringify(sanitized));
+        } catch {
+          // ignore
         }
-        return data;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: sanitized }));
+        }
+        return sanitized;
       }
     }
   } catch (e) {
@@ -286,34 +334,48 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 export function getVehicles(): Vehicle[] {
   try {
     localStorage.removeItem('jite_vehicles_v1');
+    localStorage.removeItem('jite_vehicles_v2');
   } catch {
     // ignore
   }
   const data = localStorage.getItem(VEHICLES_KEY);
   if (!data) {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(INITIAL_VEHICLES));
-    return INITIAL_VEHICLES;
+    const cleanInitial = INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
+    try {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(cleanInitial));
+    } catch {
+      // ignore
+    }
+    return cleanInitial;
   }
   try {
     const parsed = JSON.parse(data) as Vehicle[];
-    return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map(v => sanitizeVehicle(v));
+    }
+    return INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
   } catch (e) {
-    return INITIAL_VEHICLES;
+    return INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
   }
 }
 
 // Save vehicles to localStorage AND sync to backend server
 export function saveVehicles(vehicles: Vehicle[]): void {
-  localStorage.setItem(VEHICLES_KEY, JSON.stringify(vehicles));
+  const sanitized = vehicles.map(v => sanitizeVehicle(v));
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(sanitized));
+  } catch {
+    // ignore
+  }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: vehicles }));
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: sanitized }));
   }
 
   // Sync to server asynchronously so all devices see the changes
   fetch('/api/vehicles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(vehicles)
+    body: JSON.stringify(sanitized)
   }).catch(err => {
     console.error('Failed to sync vehicles to server:', err);
   });
