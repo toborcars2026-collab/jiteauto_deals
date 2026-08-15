@@ -24,10 +24,15 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  BarChart3
+  BarChart3,
+  Share2,
+  Copy,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { Vehicle, Lead, Inquiry } from '../types';
 import logoImg from '../assets/images/jite_auto_deals_logo_1785026063050.jpg';
+import ShareVehicleModal from './ShareVehicleModal';
 import {
   getVehicles,
   saveVehicles,
@@ -43,7 +48,10 @@ import {
   resolveImageLink,
   getImageUrl,
   decodeUnicodeEscapes,
-  normalizeVehicleData
+  normalizeVehicleData,
+  isVehicleActive,
+  getVehicleShareUrl,
+  getVehicleSlug
 } from '../utils';
 
 interface AdminPanelProps {
@@ -115,6 +123,40 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
   const [totalSlots, setTotalSlots] = useState<number>(5);
+
+  // Sharing Modal State
+  const [sharingVehicle, setSharingVehicle] = useState<Vehicle | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copiedCarId, setCopiedCarId] = useState<string | null>(null);
+
+  const handleShareVehicle = (car: Vehicle) => {
+    setSharingVehicle(car);
+    setIsShareModalOpen(true);
+  };
+
+  const handleQuickCopy = async (car: Vehicle, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = getVehicleShareUrl(car);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedCarId(car.id);
+      setTimeout(() => setCopiedCarId(null), 2500);
+    } catch {
+      handleShareVehicle(car);
+    }
+  };
   const [showBulkBox, setShowBulkBox] = useState<boolean>(false);
   const [bulkLinksText, setBulkLinksText] = useState<string>('');
 
@@ -765,21 +807,58 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                         <p className="text-[10px] text-slate-400 font-mono">
                           {car.transmission} | {car.location}
                         </p>
-                        <div className="flex gap-2 pt-2 border-t border-slate-100/50 mt-1">
-                          <button
-                            onClick={() => handleStartEdit(car)}
-                            className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1"
-                          >
-                            <PenTool size={11} />
-                            <span>Modify Specs</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCar(car.id)}
-                            className="text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1 ml-auto"
-                          >
-                            <Trash2 size={11} />
-                            <span>Delete Listing</span>
-                          </button>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100/70 mt-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              id={`share_car_btn_${car.id}`}
+                              onClick={() => handleShareVehicle(car)}
+                              className="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100/90 border border-amber-200/90 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+                              title="Share vehicle link via WhatsApp, Facebook, Copy Link or Phone Share"
+                            >
+                              <Share2 size={12} className="text-amber-600" />
+                              <span>Share Vehicle</span>
+                            </button>
+
+                            <button
+                              id={`quick_copy_btn_${car.id}`}
+                              onClick={(e) => handleQuickCopy(car, e)}
+                              className={`text-xs font-medium px-2 py-1 rounded-lg border flex items-center gap-1 transition-all ${
+                                copiedCarId === car.id
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                              }`}
+                              title="Copy Direct Public Link"
+                            >
+                              {copiedCarId === car.id ? (
+                                <>
+                                  <Check size={11} className="text-emerald-600" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={11} />
+                                  <span>Link</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleStartEdit(car)}
+                              className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100/80 hover:bg-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                            >
+                              <PenTool size={11} />
+                              <span>Modify</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCar(car.id)}
+                              className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1 hover:bg-rose-50 rounded-md transition-colors"
+                              title="Delete Listing"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1137,6 +1216,16 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
           </div>
         </div>
       </div>
+
+      {/* Share Vehicle Modal for Partner Console */}
+      <ShareVehicleModal
+        vehicle={sharingVehicle}
+        isOpen={isShareModalOpen}
+        onClose={() => {
+          setIsShareModalOpen(false);
+          setSharingVehicle(null);
+        }}
+      />
     </div>
   );
 }

@@ -25,7 +25,16 @@ import ConsultantProfileModal from './components/ConsultantProfileModal';
 import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
 import { Vehicle } from './types';
-import { getVehicles, fetchVehicles, formatCurrency, getWhatsAppLink, getGeneralConsultationMessage, isVehicleActive } from './utils';
+import {
+  getVehicles,
+  fetchVehicles,
+  formatCurrency,
+  getWhatsAppLink,
+  getGeneralConsultationMessage,
+  isVehicleActive,
+  findVehicleBySlugOrId,
+  getVehicleSlug
+} from './utils';
 import { INITIAL_VEHICLES } from './data';
 
 export default function App() {
@@ -69,13 +78,16 @@ export default function App() {
   // Populate state on load & listen for real-time storage/custom events and server updates
   useEffect(() => {
     const handleSync = () => {
-      setVehicles(getVehicles());
+      const vList = getVehicles();
+      setVehicles(vList);
+      checkDirectVehicleUrl(vList);
     };
 
     handleSync();
     fetchVehicles().then(v => {
       if (Array.isArray(v) && v.length > 0) {
         setVehicles(v);
+        checkDirectVehicleUrl(v);
       }
     });
 
@@ -117,22 +129,61 @@ export default function App() {
     };
   }, []);
 
+  // Helper to check and open direct vehicle public links like /vehicles/2014-bmw-328i or ?vehicle=...
+  const checkDirectVehicleUrl = (vehicleList: Vehicle[]) => {
+    if (!Array.isArray(vehicleList) || vehicleList.length === 0) return;
+    try {
+      const pathname = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const vehicleParam = searchParams.get('vehicle') || searchParams.get('v');
+      const hash = window.location.hash;
+
+      let targetIdOrSlug: string | null = null;
+      if (pathname.startsWith('/vehicles/')) {
+        targetIdOrSlug = pathname.replace(/^\/vehicles\/?/, '');
+      } else if (vehicleParam) {
+        targetIdOrSlug = vehicleParam;
+      } else if (hash.startsWith('#/vehicles/')) {
+        targetIdOrSlug = hash.replace(/^#\/vehicles\/?/, '');
+      }
+
+      if (targetIdOrSlug) {
+        const found = findVehicleBySlugOrId(vehicleList, targetIdOrSlug);
+        if (found && isVehicleActive(found)) {
+          setSelectedVehicle(found);
+          setIsDetailsOpen(true);
+          document.title = `${found.year} ${found.make} ${found.model} | Jite Auto Deals Nigeria`;
+        }
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+  };
+
   // Handle phone back button / browser history navigation for sections and modals
   useEffect(() => {
     if (isDetailsOpen || isQualifierOpen || isConsultantOpen || currentTab !== 'home') {
       try {
+        const url = isDetailsOpen && selectedVehicle
+          ? `/vehicles/${getVehicleSlug(selectedVehicle)}`
+          : currentTab !== 'home'
+          ? `/?tab=${currentTab}`
+          : '/';
+
         window.history.pushState(
           {
             modal: isDetailsOpen ? 'details' : isQualifierOpen ? 'qualifier' : isConsultantOpen ? 'consultant' : null,
             tab: currentTab,
+            vehicleId: selectedVehicle?.id,
           },
-          ''
+          '',
+          url
         );
       } catch {
         // Ignore if sandbox limits history
       }
     }
-  }, [isDetailsOpen, isQualifierOpen, isConsultantOpen, currentTab]);
+  }, [isDetailsOpen, isQualifierOpen, isConsultantOpen, currentTab, selectedVehicle]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -149,6 +200,7 @@ export default function App() {
       if (isDetailsOpen) {
         setIsDetailsOpen(false);
         setSelectedVehicle(null);
+        document.title = 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
         return;
       }
       if (currentTab !== 'home') {
@@ -177,6 +229,27 @@ export default function App() {
   const handleViewDetails = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
     setIsDetailsOpen(true);
+    document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
+    try {
+      const slug = getVehicleSlug(vehicle);
+      window.history.pushState(
+        { modal: 'details', vehicleId: vehicle.id, slug },
+        '',
+        `/vehicles/${slug}`
+      );
+    } catch {}
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedVehicle(null);
+    document.title = 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
+    try {
+      if (window.location.pathname.startsWith('/vehicles/')) {
+        const tabQuery = currentTab !== 'home' ? `/?tab=${currentTab}` : '/';
+        window.history.pushState({ modal: null, tab: currentTab }, '', tabQuery);
+      }
+    } catch {}
   };
 
   // Click card "Get This Car"
@@ -775,10 +848,7 @@ export default function App() {
       <VehicleDetailsModal
         vehicle={selectedVehicle}
         isOpen={isDetailsOpen}
-        onClose={() => {
-          setIsDetailsOpen(false);
-          setSelectedVehicle(null);
-        }}
+        onClose={handleCloseDetails}
         onOpenQualifier={(v) => {
           setQualifierVehicle(v);
           setIsQualifierOpen(true);

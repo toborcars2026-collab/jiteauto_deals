@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2 } from 'lucide-react';
+import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
+import ShareVehicleModal from './ShareVehicleModal';
 import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes } from '../utils';
 
 interface VehicleDetailsModalProps {
@@ -15,6 +16,7 @@ interface VehicleDetailsModalProps {
 export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQualifier, onOpenConsultantModal }: VehicleDetailsModalProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isFullscreenZoom, setIsFullscreenZoom] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
 
@@ -95,12 +97,24 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
               {vehicle.year} {vehicle.make} {vehicle.model}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-950 transition-all"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="details_share_vehicle_btn"
+              onClick={() => setIsShareOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-lg transition-all active:scale-95"
+              title="Share vehicle link via WhatsApp, Facebook, Copy Link"
+            >
+              <Share2 size={13} className="text-amber-600" />
+              <span>Share</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-950 transition-all"
+              aria-label="Close modal"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Content */}
@@ -413,6 +427,13 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
           )}
         </div>
       )}
+
+      {/* Share Vehicle Modal */}
+      <ShareVehicleModal
+        vehicle={vehicle}
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+      />
     </div>
   );
 }

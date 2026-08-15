@@ -25,6 +25,92 @@ export function isVehicleActive(v: Vehicle): boolean {
   return !v.status || v.status === 'Active';
 }
 
+/**
+ * Generates a clean, SEO-friendly, permanent slug for a vehicle.
+ * E.g. "2014-bmw-328i"
+ */
+export function getVehicleSlug(vehicle: Vehicle): string {
+  if (!vehicle) return '';
+  const make = (vehicle.make || '').toLowerCase().trim();
+  const model = (vehicle.model || '').toLowerCase().trim();
+  const year = vehicle.year || '';
+  const base = `${year}-${make}-${model}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || vehicle.id || 'car';
+}
+
+/**
+ * Gets the direct, permanent public URL for a vehicle.
+ * e.g. https://domain.com/vehicles/2014-bmw-328i
+ */
+export function getVehicleShareUrl(vehicle: Vehicle): string {
+  if (!vehicle) return '';
+  const slug = getVehicleSlug(vehicle);
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://jiteautodeals-sable.vercel.app';
+  return `${origin}/vehicles/${slug}`;
+}
+
+/**
+ * Locates a vehicle from an array by exact ID, exact slug, or normalized make-model-year.
+ */
+export function findVehicleBySlugOrId(vehicles: Vehicle[], identifier: string): Vehicle | undefined {
+  if (!identifier || !Array.isArray(vehicles) || vehicles.length === 0) return undefined;
+  const clean = decodeURIComponent(identifier).toLowerCase().trim().replace(/^\/vehicles\/?/, '').replace(/\/$/, '');
+  if (!clean) return undefined;
+
+  // 1. Exact ID match (case-insensitive)
+  const byId = vehicles.find(v => v.id && v.id.toLowerCase() === clean);
+  if (byId) return byId;
+
+  // 2. Exact generated slug match
+  const bySlug = vehicles.find(v => getVehicleSlug(v) === clean);
+  if (bySlug) return bySlug;
+
+  // 3. Fallback matching without special characters
+  const cleanAlphaNum = clean.replace(/[^a-z0-9]/g, '');
+  const byFuzzy = vehicles.find(v => {
+    const sAlpha = getVehicleSlug(v).replace(/[^a-z0-9]/g, '');
+    if (sAlpha === cleanAlphaNum) return true;
+    const modelAlpha = (v.model || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const makeAlpha = (v.make || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleanAlphaNum.includes(modelAlpha) && cleanAlphaNum.includes(makeAlpha);
+  });
+
+  return byFuzzy;
+}
+
+/**
+ * Generates formatted social share links and text for a vehicle.
+ */
+export function getVehicleSocialShareLinks(vehicle: Vehicle) {
+  const url = getVehicleShareUrl(vehicle);
+  const title = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+  const price = formatCurrency(vehicle.price);
+  
+  const text = 
+    `✨ *${title}* ✨\n` +
+    `💰 *Price:* ${price}\n` +
+    `🛡️ *Condition:* ${vehicle.condition}\n` +
+    `📍 *Location:* ${vehicle.location}\n` +
+    `🚗 *Transmission:* ${vehicle.transmission}\n\n` +
+    `🔗 *View Full Specs & HD Photos on Jite Auto Deals:*\n${url}`;
+
+  return {
+    url,
+    title,
+    price,
+    text,
+    whatsappUrl: `https://wa.me/?text=${encodeURIComponent(text)}`,
+    facebookUrl: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+    twitterUrl: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out this ${title} for ${price} on Jite Auto Deals!`)}&url=${encodeURIComponent(url)}`,
+    telegramUrl: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`✨ ${title} - ${price} on Jite Auto Deals`)}`
+  };
+}
+
 // Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.5B+, ₦2.3T+)
 export function formatPortfolioValue(totalNGN: number): string {
   if (!totalNGN || isNaN(totalNGN) || totalNGN <= 0) return '₦0';

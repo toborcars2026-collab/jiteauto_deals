@@ -247,15 +247,92 @@ app.post("/api/inquiries", (req, res) => {
   res.json({ success: true });
 });
 
+function getSlug(v: any) {
+  if (!v) return '';
+  const make = (v.make || '').toLowerCase().trim();
+  const model = (v.model || '').toLowerCase().trim();
+  const year = v.year || '';
+  return `${year}-${make}-${model}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function findVehicleBySlug(slug: string) {
+  const vehicles = readVehiclesStore();
+  const clean = decodeURIComponent(slug).toLowerCase().trim();
+  return vehicles.find((v: any) => {
+    return (
+      (v.id && v.id.toLowerCase() === clean) ||
+      getSlug(v) === clean ||
+      getSlug(v).replace(/[^a-z0-9]/g, '') === clean.replace(/[^a-z0-9]/g, '')
+    );
+  });
+}
+
 async function startServer() {
+  let vite: any = null;
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  }
+
+  // OpenGraph metadata injection for direct vehicle links (/vehicles/:slug)
+  app.get("/vehicles/:slug", async (req, res, next) => {
+    try {
+      const slug = req.params.slug;
+      const vehicle = findVehicleBySlug(slug);
+      const host = req.get("host") || "jiteautodeals-sable.vercel.app";
+      const protocol = req.protocol || "https";
+      const fullUrl = `${protocol}://${host}/vehicles/${slug}`;
+
+      let html = "";
+      if (process.env.NODE_ENV !== "production" && vite) {
+        const indexPath = path.join(process.cwd(), "index.html");
+        html = fs.readFileSync(indexPath, "utf-8");
+        html = await vite.transformIndexHtml(req.originalUrl, html);
+      } else {
+        const distIndexPath = path.join(process.cwd(), "dist", "index.html");
+        if (fs.existsSync(distIndexPath)) {
+          html = fs.readFileSync(distIndexPath, "utf-8");
+        } else {
+          return next();
+        }
+      }
+
+      if (vehicle) {
+        const title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ₦${Number(vehicle.price || 0).toLocaleString()} | Jite Auto Deals`;
+        const rawDesc = decodeUnicodeEscapes(vehicle.description || "").replace(/\s+/g, " ").trim();
+        const desc = `${vehicle.condition || "Verified"} • ${vehicle.transmission || "Automatic"} • ${vehicle.location || "Nigeria"}. ${rawDesc.slice(0, 160)}`;
+        const img = vehicle.images && vehicle.images[0] ? vehicle.images[0] : "";
+
+        const metaTags = `<title>${title}</title>
+    <meta name="description" content="${desc}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${desc}" />
+    <meta property="og:image" content="${img}" />
+    <meta property="og:url" content="${fullUrl}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Jite Auto Deals" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${desc}" />
+    <meta name="twitter:image" content="${img}" />`;
+        html = html.replace(/<title>.*?<\/title>/i, metaTags);
+      }
+
+      res.setHeader("Content-Type", "text/html");
+      return res.status(200).send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
+  if (process.env.NODE_ENV === "production") {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
