@@ -23,72 +23,118 @@ function ensureDataDir() {
   }
 }
 
-// Helper functions for reading and writing JSON storage
-function decodeUnicode(str: any): string {
-  if (!str || typeof str !== "string") return str || "";
-  
-  // 1. Decode curly-brace Unicode escapes: e.g. \u{1F1F3}, \u{1F1EC}, \u{1F9FE}, \u{1F90D}, \u{1F3C1}, \u{1F525}
-  let result = str.replace(/\\u\{([0-9a-fA-F]+)\}/g, (match, hex) => {
+// Decode Unicode escape sequences (\uXXXX, \u{XXXXX}, \UXXXXXXXX, \xXX, &#x...;, &#...;)
+function decodeUnicodeEscapes(str: any): any {
+  if (!str || typeof str !== "string") return str;
+  let res = str;
+
+  // 1. ES6 bracketed unicode escape: \u{1F1F3} or \u{1F9FE}
+  res = res.replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, (_: string, hex: string) => {
     try {
-      const codePoint = parseInt(hex, 16);
-      if (codePoint >= 0 && codePoint <= 0x10ffff) {
-        return String.fromCodePoint(codePoint);
-      }
-      return match;
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
     } catch {
-      return match;
+      return _;
     }
   });
 
-  // 2. Decode standard 4-digit Unicode escapes: e.g. \u2728, \u20A6, \u2022, \u2600
-  result = result.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+  // 2. Standard 4-digit hex escape: \u2728, \u2014, \u20A6, \u2022
+  res = res.replace(/\\u([0-9a-fA-F]{4})/g, (_: string, hex: string) => {
     try {
-      const charCode = parseInt(hex, 16);
-      return String.fromCharCode(charCode);
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCharCode(code) : _;
     } catch {
-      return match;
+      return _;
     }
   });
 
-  return result;
+  // 3. 8-digit uppercase \U0001F1F3
+  res = res.replace(/\\U([0-9a-fA-F]{8})/g, (_: string, hex: string) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 4. Hex escape \xB0
+  res = res.replace(/\\x([0-9a-fA-F]{2})/g, (_: string, hex: string) => {
+    try {
+      const code = parseInt(hex, 16);
+      return String.fromCharCode(code);
+    } catch {
+      return _;
+    }
+  });
+
+  // 5. HTML hexadecimal entities: &#x1F1F3;
+  res = res.replace(/&#x([0-9a-fA-F]{1,6});/gi, (_: string, hex: string) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 6. HTML decimal entities: &#128664;
+  res = res.replace(/&#([0-9]{1,7});/g, (_: string, dec: string) => {
+    try {
+      const code = parseInt(dec, 10);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 7. Accidental stripped prefix at start or whitespace: e.g. "2728 2014 BMW" -> "✨ 2014 BMW"
+  res = res.replace(/^2728\s+/g, "✨ ");
+  res = res.replace(/\s+2728$/g, " ✨");
+
+  // 8. Convert literal \n or \r\n to real newlines if present as escaped characters
+  res = res.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n");
+
+  return res;
 }
 
-function sanitizeVehicle(v: any) {
+function normalizeVehicle(v: any): any {
   if (!v || typeof v !== "object") return v;
-  const clone = { ...v };
-  for (const key of Object.keys(clone)) {
-    if (typeof clone[key] === "string") {
-      clone[key] = decodeUnicode(clone[key]);
+  const copy = { ...v };
+  ["description", "make", "model", "dealership", "engine", "color", "condition", "location"].forEach((key) => {
+    if (copy[key] && typeof copy[key] === "string") {
+      copy[key] = decodeUnicodeEscapes(copy[key]);
     }
-  }
-  return clone;
+  });
+  return copy;
 }
 
+// Helper functions for reading and writing JSON storage
 function readVehiclesStore() {
   ensureDataDir();
   if (!fs.existsSync(VEHICLES_FILE)) {
-    const cleanInitial = INITIAL_VEHICLES.map(sanitizeVehicle);
-    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(cleanInitial, null, 2), "utf-8");
-    return cleanInitial;
+    const normalized = INITIAL_VEHICLES.map(normalizeVehicle);
+    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+    return normalized;
   }
   try {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
-      return data.map(sanitizeVehicle);
+      return data.map(normalizeVehicle);
     }
   } catch (e) {
     console.error("Failed to parse vehicles.json, falling back to seed data", e);
   }
-  const cleanInitial = INITIAL_VEHICLES.map(sanitizeVehicle);
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(cleanInitial, null, 2), "utf-8");
-  return cleanInitial;
+  const normalized = INITIAL_VEHICLES.map(normalizeVehicle);
+  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+  return normalized;
 }
 
 function saveVehiclesStore(vehicles: any[]) {
   ensureDataDir();
-  const sanitized = vehicles.map(sanitizeVehicle);
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(sanitized, null, 2), "utf-8");
+  const normalized = vehicles.map(normalizeVehicle);
+  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
 }
 
 function readLeadsStore() {

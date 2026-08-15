@@ -1,5 +1,85 @@
 [
   {
+    "id": "mercedes-benz-c400-2017-black-foreign-used",
+    "make": "Mercedes-Benz",
+    "model": "C400",
+    "year": 2017,
+    "price": 29000000,
+    "mileage": 52000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Foreign Import",
+    "engine": "3.0L V6 Bi-Turbo Engine",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/CsJP9sGq/IMG-20260814-WA0030.jpg",
+      "https://i.ibb.co/Lht3qJTZ/IMG-20260815-WA0009.jpg",
+      "https://i.ibb.co/VKh2x1f/IMG-20260815-WA0011.jpg",
+      "https://i.ibb.co/B2Jc0p0b/IMG-20260814-WA0013.jpg",
+      "https://i.ibb.co/q3MMwxyr/IMG-20260814-WA0015.jpg",
+      "https://i.ibb.co/TMWBmjfk/IMG-20260815-WA0013.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2017 Mercedes-Benz C400 — Full Option\n\n📋 Vehicle Details & Information:\n• Make: Mercedes-Benz\n• Model: C400\n• Year: 2017\n• Condition: Foreign Used / New Arrival\n• Exterior Color: Black\n• Interior Color: Red\n• Duty Status: Duty Paid\n• Roof: Panoramic Sunroof\n• Price: ₦29,000,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA beautiful 2017 Mercedes-Benz C400 with a commanding black exterior and luxurious red interior. This foreign-used arrival comes with a full-option specification, combining premium comfort, sporty styling and Mercedes-Benz performance.\nWith its panoramic roof, keyless entry and striking interior, this C400 is an excellent choice for anyone looking for a sophisticated luxury sedan that stands out on the road.\n\n⚙️ Key Features & Specifications:\n🔥 Mercedes-Benz C400\n🔖 2017 model\n🌍 Foreign Used / New Arrival\n🖤 Black exterior\n❤️ Red interior\n🌌 Panoramic sunroof\n🔑 Keyless entry / Keyless start\n🛞 Premium alloy wheels\n💡 LED headlights & intelligent lighting\n📷 Reverse camera\n🅿️ Parking sensors\n🎵 Bluetooth & infotainment system\n❄️ Automatic climate control\n🪑 Power-adjustable seats\n⚡ Premium interior & comfort features\n🚘 Sporty exterior styling\n📄 Duty paid"
+  },
+  {
+    "id": "mercedes-benz-c43-amg-2018-silver-direct-belgium",
+    "make": "Mercedes-Benz",
+    "model": "C43 AMG",
+    "year": 2018,
+    "price": 35000000,
+    "mileage": 46000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Direct Belgium Import",
+    "engine": "3.0L V6 Biturbo AMG Engine",
+    "color": "Silver",
+    "condition": "Direct Belgium",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/TqKsWm3w/IMG-20260814-WA0011.jpg",
+      "https://i.ibb.co/5hP66x1L/IMG-20260814-WA0014.jpg",
+      "https://i.ibb.co/vxjp2bLP/IMG-20260815-WA0004.jpg",
+      "https://i.ibb.co/cc15H63L/IMG-20260815-WA0005.jpg",
+      "https://i.ibb.co/fGCM4Kvh/IMG-20260815-WA0006.jpg",
+      "https://i.ibb.co/GQBgwjYk/IMG-20260815-WA0007.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2018 Mercedes-Benz C43 AMG — Full Option\n\n📋 Vehicle Details & Information:\n• Make: Mercedes-Benz\n• Model: C43 AMG\n• Year: 2018\n• Condition: Foreign Used / New Arrival (Direct Belgium 🇧🇪)\n• Origin: Belgium 🇧🇪\n• Exterior Color: Silver\n• Interior Color: Premium Red Leather\n• Duty Status: Original Duty Paid\n• Title: Clean Title\n• Price: ₦35,000,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA stunning 2018 Mercedes-Benz C43 AMG, direct from Belgium 🇧🇪 and presented in an elegant silver exterior with a striking red interior.\nThis C43 AMG combines luxury, sporty AMG styling and performance with a premium full-option specification. It comes with a panoramic roof, original duty and a clean title—an excellent choice for someone looking for a sophisticated performance sedan.\n\n⚙️ Key Features & Specifications:\n🔥 C43 AMG Performance Package\n🇧🇪 Direct Belgium arrival\n❤️ Red leather interior\n🌌 Panoramic glass roof\n🔑 Keyless entry / Keyless start\n🛞 AMG alloy wheels\n💡 LED intelligent lighting system\n📷 Reverse camera with parking guidance\n🎵 Bluetooth / premium infotainment sound system\n❄️ Automatic multi-zone climate control\n⚡ AMG performance powertrain & switchable driving modes\n🪑 Electrically adjustable memory seats\n🚘 AMG exterior aerodynamics styling\n🅿️ Front & rear parking sensors\n🛡️ Multiple driver & passenger safety assist systems\n📄 Original duty fully paid\n📑 Clean title verified"
+  },
+  {
+    "id": "toyota-corolla-2009-champagne-extremely-clean-used",
+    "make": "Toyota",
+    "model": "Corolla",
+    "year": 2009,
+    "price": 7500000,
+    "mileage": 85000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "1.8L 4-Cylinder Petrol Engine",
+    "color": "Champagne",
+    "condition": "Extremely Clean Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/m5DqNndC/IMG-20260814-WA0028.jpg",
+      "https://i.ibb.co/xq22t5mF/IMG-20260815-WA0000.jpg",
+      "https://i.ibb.co/RkFzcX7p/IMG-20260815-WA0001.jpg",
+      "https://i.ibb.co/Jjjms1Sm/IMG-20260815-WA0002.jpg",
+      "https://i.ibb.co/nqhrCwkL/IMG-20260815-WA0003.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2009 Toyota Corolla — Extremely Clean Used\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Corolla\n• Year: 2009\n• Condition: Extremely Clean Used\n• Body Type: Sedan\n• Exterior Color: Champagne\n• Duty Status: Duty Paid\n• Price: ₦7,500,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA very clean and well-presented 2009 Toyota Corolla suitable for personal use, business, daily commuting and family transportation. This Corolla offers Toyota's reputation for reliability, practical fuel economy and relatively affordable maintenance.\n\nThe vehicle is duty paid and available in Abuja, making it a practical option for buyers looking for a dependable car within a more affordable budget.\n\n⚙️ Features & Specifications:\n✅ Toyota Corolla 2009 model\n✅ Extremely clean interior & exterior\n✅ Duty paid\n✅ Automatic transmission\n✅ Petrol engine\n✅ Air conditioning\n✅ Power steering\n✅ Power windows\n✅ Central door locking\n✅ Alloy wheels\n✅ CD/Audio entertainment system\n✅ Comfortable interior\n✅ Spacious boot\n✅ Reliable Toyota engine\n✅ Fuel-efficient for everyday use\n✅ Easy-to-maintain Toyota platform\n✅ Ready to Drive"
+  },
+  {
     "id": "lexus-rx-350-2012-black-foreign-used",
     "make": "Lexus",
     "model": "RX 350",
@@ -232,7 +312,7 @@
       "https://i.ibb.co/sJQFgHDy/IMG-20260805-WA0077.jpg",
       "https://i.ibb.co/gM2m6985/IMG-20260805-WA0079.jpg"
     ],
-    "description": "✨ 2022 Mercedes-Benz GLB250 ✨\n🇩🇪 Foreign Used | New Arrival | Original Duty Paid 🇳🇬\n🤍 Elegant White Exterior | 🚘 Compact Luxury SUV | ⚡ Accident Free & Clean Title\n\nExperience modern luxury, versatility, and advanced technology with this pristine 2022 Mercedes-Benz GLB250. Featuring a bold design, panoramic glass roof, 360\\xB0 surround camera system, and a turbocharged engine, this compact luxury SUV offers exceptional comfort and performance.\n\n⭐ Features & Highlights\n✅ Panoramic Glass Roof\n✅ 360\\xB0 Surround-View Camera\n✅ Keyless Entry & Push Button Start\n✅ Premium Mercedes-Benz Leather Interior\n✅ Digital Instrument Display & Touchscreen Infotainment\n✅ LED Lighting\n✅ Mercedes-Benz Safety & Driver-Assistance Features\n✅ Roof Rails & Alloy Wheels\n✅ 2.0L Turbocharged 4-Cylinder Engine\n✅ 8-Speed Automatic Transmission with AWD/4MATIC\n✅ Original Duty Paid"
+    "description": "✨ 2022 Mercedes-Benz GLB250 ✨\n🇩🇪 Foreign Used | New Arrival | Original Duty Paid 🇳🇬\n🤍 Elegant White Exterior | 🚘 Compact Luxury SUV | ⚡ Accident Free & Clean Title\n\nExperience modern luxury, versatility, and advanced technology with this pristine 2022 Mercedes-Benz GLB250. Featuring a bold design, panoramic glass roof, 360° surround camera system, and a turbocharged engine, this compact luxury SUV offers exceptional comfort and performance.\n\n⭐ Features & Highlights\n✅ Panoramic Glass Roof\n✅ 360° Surround-View Camera\n✅ Keyless Entry & Push Button Start\n✅ Premium Mercedes-Benz Leather Interior\n✅ Digital Instrument Display & Touchscreen Infotainment\n✅ LED Lighting\n✅ Mercedes-Benz Safety & Driver-Assistance Features\n✅ Roof Rails & Alloy Wheels\n✅ 2.0L Turbocharged 4-Cylinder Engine\n✅ 8-Speed Automatic Transmission with AWD/4MATIC\n✅ Original Duty Paid"
   },
   {
     "id": "mercedes-benz-glk-350-4matic-2014-deep-blue",
@@ -408,7 +488,7 @@
       "https://i.ibb.co/n8jvMwk0/IMG-20260729-WA0018.jpg",
       "https://i.ibb.co/gMykm5wL/IMG-20260729-WA0022.jpg"
     ],
-    "description": "🚘 VEHICLE PROFILE SHEET\\n2014 Toyota Yaris LE\\n📍 Location: Abuja\\n💰 Price: ₦14,000,000\\n🎨 Color: White\\n📦 Condition: Direct Belgium (Foreign Used) 🇧🇪\\n📄 Duty: Paid\\n\\n📝 Description\\nLooking for a reliable, fuel-efficient, and low-maintenance car? This 2014 Toyota Yaris LE is an excellent choice. Directly imported from Belgium and finished in a clean White exterior, this hatchback offers Toyota's legendary durability, impressive fuel economy, and practical design. Perfect for daily commuting, ride-hailing, or first-time car owners.\\n\\n⭐ Key Features\\n✅ LE Trim\\n✅ Fuel-Efficient 1.5L 4-Cylinder Engine\\n✅ Automatic Transmission\\n✅ Air Conditioning\\n✅ Power Steering\\n✅ Power Windows\\n✅ Power Door Locks\\n✅ Remote Keyless Entry\\n✅ Multi-Function Steering Wheel\\n✅ Bluetooth Hands-Free Connectivity\\n✅ USB & AUX Audio Input\\n✅ Factory Audio System\\n✅ Touchscreen Display (where equipped)\\n✅ Rear View Camera (where equipped)\\n✅ Electric Side Mirrors\\n✅ Split Folding Rear Seats\\n✅ ABS Braking System\\n✅ Vehicle Stability Control (VSC)\\n✅ Traction Control\\n✅ Multiple Airbags\\n✅ Daytime Running Lights\\n✅ Excellent Fuel Economy",
+    "description": "🚘 VEHICLE PROFILE SHEET\n2014 Toyota Yaris LE\n📍 Location: Abuja\n💰 Price: ₦14,000,000\n🎨 Color: White\n📦 Condition: Direct Belgium (Foreign Used) 🇧🇪\n📄 Duty: Paid\n\n📝 Description\nLooking for a reliable, fuel-efficient, and low-maintenance car? This 2014 Toyota Yaris LE is an excellent choice. Directly imported from Belgium and finished in a clean White exterior, this hatchback offers Toyota's legendary durability, impressive fuel economy, and practical design. Perfect for daily commuting, ride-hailing, or first-time car owners.\n\n⭐ Key Features\n✅ LE Trim\n✅ Fuel-Efficient 1.5L 4-Cylinder Engine\n✅ Automatic Transmission\n✅ Air Conditioning\n✅ Power Steering\n✅ Power Windows\n✅ Power Door Locks\n✅ Remote Keyless Entry\n✅ Multi-Function Steering Wheel\n✅ Bluetooth Hands-Free Connectivity\n✅ USB & AUX Audio Input\n✅ Factory Audio System\n✅ Touchscreen Display (where equipped)\n✅ Rear View Camera (where equipped)\n✅ Electric Side Mirrors\n✅ Split Folding Rear Seats\n✅ ABS Braking System\n✅ Vehicle Stability Control (VSC)\n✅ Traction Control\n✅ Multiple Airbags\n✅ Daytime Running Lights\n✅ Excellent Fuel Economy",
     "engine": "1.5L 4-Cylinder Engine",
     "color": "White",
     "condition": "Foreign Used",
@@ -429,7 +509,7 @@
     "images": [
       "https://i.ibb.co/SwHYr8TF/IMG-20260723-WA0035.jpg"
     ],
-    "description": "✨ 2017 Mercedes-Benz GLA 250 (Fullest Option) ✨\\n🇧🇪 Direct Belgium (Foreign Used) | ✅ Original Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nThis 2017 Direct Belgium Mercedes-Benz GLA 250 Full Option is finished in a stunning Red exterior and comes loaded with premium features including Keyless Entry, Push Button Start, and a Full Panoramic Sunroof. It offers a powerful yet fuel-efficient 2.0L turbocharged engine, a luxurious interior, and the comfort and technology expected from Mercedes-Benz. Ideal for buyers seeking a stylish, reliable, and premium compact SUV at ₦27M.\\n\\nKey Features & Highlights:\\n🌞 Full Panoramic Sunroof & 🔑 Keyless Entry (KEYLESS-GO) & 🔘 Push Button Start\\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\\n❄️ Dual-Zone Climate Control & 🏎️ Paddle Shifters\\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\\n🧭 Navigation System & 📱 Bluetooth, USB & AUX Connectivity\\n🚪 Power Tailgate & 💡 LED Daytime Running Lights\\n🛞 Premium Alloy Wheels & 🛣️ Cruise Control",
+    "description": "✨ 2017 Mercedes-Benz GLA 250 (Fullest Option) ✨\n🇧🇪 Direct Belgium (Foreign Used) | ✅ Original Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nThis 2017 Direct Belgium Mercedes-Benz GLA 250 Full Option is finished in a stunning Red exterior and comes loaded with premium features including Keyless Entry, Push Button Start, and a Full Panoramic Sunroof. It offers a powerful yet fuel-efficient 2.0L turbocharged engine, a luxurious interior, and the comfort and technology expected from Mercedes-Benz. Ideal for buyers seeking a stylish, reliable, and premium compact SUV at ₦27M.\n\nKey Features & Highlights:\n🌞 Full Panoramic Sunroof & 🔑 Keyless Entry (KEYLESS-GO) & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\n❄️ Dual-Zone Climate Control & 🏎️ Paddle Shifters\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n🧭 Navigation System & 📱 Bluetooth, USB & AUX Connectivity\n🚪 Power Tailgate & 💡 LED Daytime Running Lights\n🛞 Premium Alloy Wheels & 🛣️ Cruise Control",
     "engine": "2.0L Turbocharged 4-Cylinder Petrol",
     "color": "Red",
     "condition": "Direct Belgium",
@@ -450,7 +530,7 @@
     "images": [
       "https://i.ibb.co/Lzn146bw/IMG-20260728-WA0091.jpg"
     ],
-    "description": "🏁 2018 Dodge Challenger 🏁\\n🇧🇪 Direct Belgium | Duty Paid | 📍 Located in Abuja\\n🖤 Bold Black Exterior | 💪 Powerful Performance | 🚗 American Muscle Car\\n\\nVehicle Overview:\\nTurn heads wherever you go with this stunning 2018 Dodge Challenger. Imported directly from Belgium and finished in an elegant Black exterior, this iconic muscle car combines aggressive styling with impressive performance and everyday comfort. Whether cruising through the city or enjoying long highway drives, the Challenger delivers a thrilling driving experience with its powerful 3.6L V6 engine, smooth 8-speed automatic transmission, and spacious interior at ₦39M.\\n\\nKey Features & Highlights:\\n✅ Direct Belgium Import & Duty Paid\\n⚡ 8-Speed Automatic Transmission & Powerful 3.6L V6 Petrol Engine\\n🔑 Smart Key / Keyless Entry & Push-Button Start\\n📷 Reverse Camera & Rear Parking Sensors\\n❄️ Dual-Zone Automatic Climate Control & Multifunction Steering Wheel\\n📱 Touchscreen Infotainment System with Bluetooth, USB & AUX\\n🎵 Premium Audio System & LED Halo Headlights\\n🛞 Alloy Wheels, ABS Braking, Traction & Stability Control",
+    "description": "🏁 2018 Dodge Challenger 🏁\n🇧🇪 Direct Belgium | Duty Paid | 📍 Located in Abuja\n🖤 Bold Black Exterior | 💪 Powerful Performance | 🚗 American Muscle Car\n\nVehicle Overview:\nTurn heads wherever you go with this stunning 2018 Dodge Challenger. Imported directly from Belgium and finished in an elegant Black exterior, this iconic muscle car combines aggressive styling with impressive performance and everyday comfort. Whether cruising through the city or enjoying long highway drives, the Challenger delivers a thrilling driving experience with its powerful 3.6L V6 engine, smooth 8-speed automatic transmission, and spacious interior at ₦39M.\n\nKey Features & Highlights:\n✅ Direct Belgium Import & Duty Paid\n⚡ 8-Speed Automatic Transmission & Powerful 3.6L V6 Petrol Engine\n🔑 Smart Key / Keyless Entry & Push-Button Start\n📷 Reverse Camera & Rear Parking Sensors\n❄️ Dual-Zone Automatic Climate Control & Multifunction Steering Wheel\n📱 Touchscreen Infotainment System with Bluetooth, USB & AUX\n🎵 Premium Audio System & LED Halo Headlights\n🛞 Alloy Wheels, ABS Braking, Traction & Stability Control",
     "engine": "3.6L V6 Petrol",
     "color": "Black",
     "condition": "Direct Belgium",
@@ -471,7 +551,7 @@
     "images": [
       "https://i.ibb.co/dsVMH8nF/IMG-20260728-WA0090.jpg"
     ],
-    "description": "✨ 2017 Lexus RX350 F Sport ✨\\n🏁 Tokunbo Grade | F Sport Package | 📍 Located in Abuja\\n🖤 Black Exterior | Tan (Brown) Leather Interior | 🔧 Dry Engine, Gear & AC Intact\\n\\nVehicle Overview:\\nExperience sporty luxury with this neatly used 2017 Lexus RX350 F Sport. Finished in a sleek Black exterior with a premium Tan leather interior, this SUV combines aggressive styling with Lexus' legendary comfort and reliability. Powered by a responsive 3.5L V6 engine and smooth 8-speed automatic transmission, it delivers outstanding performance, a refined ride, and excellent durability for both city and highway driving at ₦36M.\\n\\nKey Features & Highlights:\\n🏁 F Sport Package & Sport Seats\\n🔑 Smart Key / Keyless Entry & Push-Button Start\\n🪑 Premium Tan/Brown Leather Interior\\n📷 Reverse Camera & Parking Sensors\\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\\n🚪 Power Tailgate & Dual-Zone Automatic Climate Control\\n💡 LED Headlights & Daytime Running Lights\\n⚠️ Blind Spot Monitoring, Lane Departure Alert & Adaptive Cruise Control\\n🎵 Premium Audio System with Bluetooth, USB & Apple CarPlay",
+    "description": "✨ 2017 Lexus RX350 F Sport ✨\n🏁 Tokunbo Grade | F Sport Package | 📍 Located in Abuja\n🖤 Black Exterior | Tan (Brown) Leather Interior | 🔧 Dry Engine, Gear & AC Intact\n\nVehicle Overview:\nExperience sporty luxury with this neatly used 2017 Lexus RX350 F Sport. Finished in a sleek Black exterior with a premium Tan leather interior, this SUV combines aggressive styling with Lexus' legendary comfort and reliability. Powered by a responsive 3.5L V6 engine and smooth 8-speed automatic transmission, it delivers outstanding performance, a refined ride, and excellent durability for both city and highway driving at ₦36M.\n\nKey Features & Highlights:\n🏁 F Sport Package & Sport Seats\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Premium Tan/Brown Leather Interior\n📷 Reverse Camera & Parking Sensors\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\n🚪 Power Tailgate & Dual-Zone Automatic Climate Control\n💡 LED Headlights & Daytime Running Lights\n⚠️ Blind Spot Monitoring, Lane Departure Alert & Adaptive Cruise Control\n🎵 Premium Audio System with Bluetooth, USB & Apple CarPlay",
     "engine": "3.5L V6 Petrol",
     "color": "Black",
     "condition": "Foreign Used",
@@ -492,7 +572,7 @@
     "images": [
       "https://i.ibb.co/VWpHZXfn/IMG-20260728-WA0089.jpg"
     ],
-    "description": "✨ 2013 Lexus RX350 ✨\\n🇧🇪 Direct Belgium | New Entry | 2025 Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nEnjoy the perfect blend of luxury, reliability, and performance with this clean 2013 Lexus RX350. Finished in a classy Milky Pearl White exterior, this premium SUV is powered by a dependable 3.5L V6 engine paired with a smooth automatic transmission. It delivers a quiet ride, excellent comfort, and outstanding durability, making it ideal for both city driving and long-distance journeys at ₦23.7M.\\n\\nKey Features & Highlights:\\n✅ Direct Belgium Import & 2025 Duty Paid\\n🔑 Smart Key / Keyless Entry & Push-Button Start\\n🪑 Luxury Leather Interior & Power Front Seats with Driver Memory\\n📷 Reverse Camera & Parking Sensors\\n❄️ Dual-Zone Automatic Climate Control & Power Tailgate\\n🎵 Premium Audio System with Bluetooth Connectivity & Cruise Control\\n💡 LED Daytime Running Lights, Alloy Wheels & Roof Rails\\n🛡️ ABS, Traction Control, Multiple Airbags & Spacious Cargo Cabin",
+    "description": "✨ 2013 Lexus RX350 ✨\n🇧🇪 Direct Belgium | New Entry | 2025 Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nEnjoy the perfect blend of luxury, reliability, and performance with this clean 2013 Lexus RX350. Finished in a classy Milky Pearl White exterior, this premium SUV is powered by a dependable 3.5L V6 engine paired with a smooth automatic transmission. It delivers a quiet ride, excellent comfort, and outstanding durability, making it ideal for both city driving and long-distance journeys at ₦23.7M.\n\nKey Features & Highlights:\n✅ Direct Belgium Import & 2025 Duty Paid\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Luxury Leather Interior & Power Front Seats with Driver Memory\n📷 Reverse Camera & Parking Sensors\n❄️ Dual-Zone Automatic Climate Control & Power Tailgate\n🎵 Premium Audio System with Bluetooth Connectivity & Cruise Control\n💡 LED Daytime Running Lights, Alloy Wheels & Roof Rails\n🛡️ ABS, Traction Control, Multiple Airbags & Spacious Cargo Cabin",
     "engine": "3.5L V6 Petrol",
     "color": "Milky White",
     "condition": "Direct Belgium",
@@ -513,7 +593,7 @@
     "images": [
       "https://i.ibb.co/DfyYmPxJ/IMG-20260728-WA0088.jpg"
     ],
-    "description": "✨ 2023 Lexus RX350 Full Option ✨\\n🌍 Foreign Used | ✅ Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience premium luxury, cutting-edge technology, and exceptional comfort in this beautifully maintained 2023 Lexus RX350. With its bold spindle grille, elegant design, powerful turbocharged engine, and refined interior, this SUV delivers outstanding performance and a smooth, quiet ride. Ideal for those seeking reliability, prestige, and advanced safety in one package at ₦70M.\\n\\nKey Features & Highlights:\\n✨ Full Option Package & Accident-Free\\n📸 360\\xB0 Camera & 🔑 Smart Key / Keyless Entry & Push-Button Start\\n🪑 Leather Interior & 🌞 Panoramic Sunroof\\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\\n📱 Large Touchscreen Infotainment with Apple CarPlay & Android Auto\\n🎵 Premium Sound System & ⚡ Wireless Phone Charger\\n❄️ Dual-Zone Automatic Climate Control & 💡 LED Headlights & DRLs\\n⚠️ Blind Spot Monitoring, Lane Keeping Assist & Adaptive Cruise Control\\n🅿️ Parking Sensors, Premium Alloy Wheels & 🚪 Power Tailgate",
+    "description": "✨ 2023 Lexus RX350 Full Option ✨\n🌍 Foreign Used | ✅ Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium luxury, cutting-edge technology, and exceptional comfort in this beautifully maintained 2023 Lexus RX350. With its bold spindle grille, elegant design, powerful turbocharged engine, and refined interior, this SUV delivers outstanding performance and a smooth, quiet ride. Ideal for those seeking reliability, prestige, and advanced safety in one package at ₦70M.\n\nKey Features & Highlights:\n✨ Full Option Package & Accident-Free\n📸 360° Camera & 🔑 Smart Key / Keyless Entry & Push-Button Start\n🪑 Leather Interior & 🌞 Panoramic Sunroof\n💺 Power Front Seats with Memory, Heated & Ventilated Front Seats\n📱 Large Touchscreen Infotainment with Apple CarPlay & Android Auto\n🎵 Premium Sound System & ⚡ Wireless Phone Charger\n❄️ Dual-Zone Automatic Climate Control & 💡 LED Headlights & DRLs\n⚠️ Blind Spot Monitoring, Lane Keeping Assist & Adaptive Cruise Control\n🅿️ Parking Sensors, Premium Alloy Wheels & 🚪 Power Tailgate",
     "engine": "2.4L Turbocharged 4-Cylinder Petrol",
     "color": "Deep Blue",
     "condition": "Foreign Used",
@@ -534,7 +614,7 @@
     "images": [
       "https://i.ibb.co/5yqp4dy/IMG-20260728-WA0087.jpg"
     ],
-    "description": "🚘 2007 Honda Civic\\n🇧🇪 Accident-Free | Direct Belgium | June 2026 Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nEnjoy reliability, comfort, and excellent fuel economy with this clean Direct Belgium Honda Civic. The vehicle features a stylish Sky Blue exterior, a smooth automatic transmission, and Honda's dependable 1.8L i-VTEC engine, making it perfect for daily commuting or long-distance travel. It offers a spacious interior, responsive handling, and low maintenance costs.\\n\\nKey Features:\\n✅ Accident-Free & Direct Belgium\\n✅ Automatic Transmission & 1.8L i-VTEC Petrol Engine\\n❄️ Air Conditioning & Power Steering/Windows/Locks\\n🛞 Alloy Wheels & ABS Braking System\\n🛡️ Dual Front Airbags & Factory Audio System\\n🪑 Foldable Rear Seats & Comfortable Interior\\n⛽ Excellent Fuel Economy & June 2026 Duty Paid",
+    "description": "🚘 2007 Honda Civic\n🇧🇪 Accident-Free | Direct Belgium | June 2026 Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nEnjoy reliability, comfort, and excellent fuel economy with this clean Direct Belgium Honda Civic. The vehicle features a stylish Sky Blue exterior, a smooth automatic transmission, and Honda's dependable 1.8L i-VTEC engine, making it perfect for daily commuting or long-distance travel. It offers a spacious interior, responsive handling, and low maintenance costs.\n\nKey Features:\n✅ Accident-Free & Direct Belgium\n✅ Automatic Transmission & 1.8L i-VTEC Petrol Engine\n❄️ Air Conditioning & Power Steering/Windows/Locks\n🛞 Alloy Wheels & ABS Braking System\n🛡️ Dual Front Airbags & Factory Audio System\n🪑 Foldable Rear Seats & Comfortable Interior\n⛽ Excellent Fuel Economy & June 2026 Duty Paid",
     "engine": "1.8L i-VTEC 4-Cylinder Petrol",
     "color": "Sky Blue",
     "condition": "Direct Belgium",
@@ -559,7 +639,7 @@
       "https://i.ibb.co/0RmRB0gF/IMG-20260728-WA0086.jpg",
       "https://i.ibb.co/VWwDGk3Y/IMG-20260728-WA0084.jpg"
     ],
-    "description": "✨ 2012 Lexus RX 350 Full Option ✨\\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience premium comfort, reliability, and timeless luxury with this 2012 Lexus RX 350 Full Option. Finished in elegant Black, this foreign-used SUV delivers a smooth V6 engine, a refined cabin, and the legendary dependability Lexus is known for. An excellent choice for daily driving or long-distance travel, available for ₦24M.\\n\\nKey Features & Highlights:\\n🔑 Smart Keyless Entry & 🔘 Push Button Start\\n🪑 Premium Leather Interior & 💺 Power Adjustable & Memory Seats\\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\\n🌞 Panoramic Sunroof & ❄️ Dual-Zone Automatic Climate Control\\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\\n🧭 Factory Navigation System & 💡 HID/LED Headlights with DRLs\\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\\n🛣️ Cruise Control & 🪟 Factory Privacy Glass",
+    "description": "✨ 2012 Lexus RX 350 Full Option ✨\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium comfort, reliability, and timeless luxury with this 2012 Lexus RX 350 Full Option. Finished in elegant Black, this foreign-used SUV delivers a smooth V6 engine, a refined cabin, and the legendary dependability Lexus is known for. An excellent choice for daily driving or long-distance travel, available for ₦24M.\n\nKey Features & Highlights:\n🔑 Smart Keyless Entry & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable & Memory Seats\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n🌞 Panoramic Sunroof & ❄️ Dual-Zone Automatic Climate Control\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\n🧭 Factory Navigation System & 💡 HID/LED Headlights with DRLs\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\n🛣️ Cruise Control & 🪟 Factory Privacy Glass",
     "engine": "3.5L V6 Petrol",
     "color": "Black",
     "condition": "Foreign Used",
@@ -584,7 +664,7 @@
       "https://i.ibb.co/wrQczs1s/IMG-20260728-WA0075.jpg",
       "https://i.ibb.co/214V6Cn6/IMG-20260728-WA0077.jpg"
     ],
-    "description": "✨ 2016 Lexus RX 350 ✨\\n🇳🇬 Abuja Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience luxury, comfort, and Lexus reliability with this 2016 Lexus RX 350. Finished in elegant Black, this exceptionally clean Abuja-used SUV offers a smooth ride, premium interior, advanced safety features, and the durability Lexus is known for. An excellent choice for anyone seeking a refined luxury SUV at ₦29M.\\n\\nKey Features & Highlights:\\n🔑 Smart Keyless Entry & 🔘 Push Button Start\\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\\n❄️ Dual-Zone Automatic Climate Control\\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\\n🌞 Panoramic Sunroof & 💡 LED Headlights & DRLs\\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\\n🛣️ Cruise Control & 🪟 Factory Tinted Glass",
+    "description": "✨ 2016 Lexus RX 350 ✨\n🇳🇬 Abuja Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience luxury, comfort, and Lexus reliability with this 2016 Lexus RX 350. Finished in elegant Black, this exceptionally clean Abuja-used SUV offers a smooth ride, premium interior, advanced safety features, and the durability Lexus is known for. An excellent choice for anyone seeking a refined luxury SUV at ₦29M.\n\nKey Features & Highlights:\n🔑 Smart Keyless Entry & 🔘 Push Button Start\n🪑 Premium Leather Interior & 💺 Power Adjustable Seats\n📷 Reverse Camera & 🅿️ Front & Rear Parking Sensors\n❄️ Dual-Zone Automatic Climate Control\n🎵 Premium Lexus Audio System & 📱 Bluetooth Connectivity\n🌞 Panoramic Sunroof & 💡 LED Headlights & DRLs\n🛞 Premium Alloy Wheels & 🚪 Power Tailgate\n🛣️ Cruise Control & 🪟 Factory Tinted Glass",
     "engine": "3.5L V6 Petrol",
     "color": "Black",
     "condition": "Extremely Clean",
@@ -610,7 +690,7 @@
       "https://i.ibb.co/zWqfZDTF/IMG-20260715-WA0069.jpg",
       "https://i.ibb.co/C30qMbWV/IMG-20260715-WA0060.jpg"
     ],
-    "description": "✨ 2021 BMW X5 M Sport ✨\\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience first-class luxury, thrilling performance, and cutting-edge technology with this 2021 BMW X5 M Sport. Designed for drivers who demand comfort, prestige, and dynamic handling, this SUV delivers a refined driving experience with premium features and an aggressive M Sport appearance. A perfect blend of luxury and performance, offered at ₦100M.\\n\\nKey Features & Highlights:\\n🔑 Comfort Access Keyless Entry & 🔘 Push Button Start\\n📷 360\\xB0 Surround View Camera & 🅿️ Front & Rear Parking Sensors\\n🌞 Panoramic Glass Sunroof & 🪑 Premium Leather Interior\\n💺 Heated & Memory Seats & ❄️ 4-Zone Automatic Climate Control\\n📱 Apple CarPlay & Android Auto & 🧭 Navigation System\\n🎵 Harman Kardon Premium Sound System\\n⚡ Wireless Charging & 🚪 Power Tailgate\\n🛣️ Adaptive Cruise Control & ⚠️ Blind Spot Monitoring\\n🚘 Lane Departure Warning & 💡 Adaptive LED Headlights\\n🛞 21-Inch M Sport Alloy Wheels & 🏁 M Sport Body Kit",
+    "description": "✨ 2021 BMW X5 M Sport ✨\n🌍 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience first-class luxury, thrilling performance, and cutting-edge technology with this 2021 BMW X5 M Sport. Designed for drivers who demand comfort, prestige, and dynamic handling, this SUV delivers a refined driving experience with premium features and an aggressive M Sport appearance. A perfect blend of luxury and performance, offered at ₦100M.\n\nKey Features & Highlights:\n🔑 Comfort Access Keyless Entry & 🔘 Push Button Start\n📷 360° Surround View Camera & 🅿️ Front & Rear Parking Sensors\n🌞 Panoramic Glass Sunroof & 🪑 Premium Leather Interior\n💺 Heated & Memory Seats & ❄️ 4-Zone Automatic Climate Control\n📱 Apple CarPlay & Android Auto & 🧭 Navigation System\n🎵 Harman Kardon Premium Sound System\n⚡ Wireless Charging & 🚪 Power Tailgate\n🛣️ Adaptive Cruise Control & ⚠️ Blind Spot Monitoring\n🚘 Lane Departure Warning & 💡 Adaptive LED Headlights\n🛞 21-Inch M Sport Alloy Wheels & 🏁 M Sport Body Kit",
     "engine": "3.0L TwinPower Turbo Inline-6",
     "color": "White",
     "condition": "Foreign Used",
@@ -631,7 +711,7 @@
     "images": [
       "https://i.ibb.co/27cXwLCb/IMG-20260728-WA0063.jpg"
     ],
-    "description": "✨ 2021 Ford Explorer Full Option ✨\\n🇧🇪 Direct Belgium | ✅ 2026 Custom Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience premium luxury, advanced technology, and exceptional performance with this 2021 Direct Belgium Ford Explorer Full Option. Designed for comfort, safety, and family adventures, it combines a bold exterior, refined interior, and powerful performance with all the modern features you expect in a flagship SUV. A superb choice for anyone seeking luxury and reliability at ₦48M.\\n\\nKey Features & Specifications:\\n🔑 Keyless Entry, 🔘 Push Button Start & 🚘 Remote Start\\n📷 360\\xB0 Camera & 🅿️ Front & Rear Parking Sensors\\n🪑 Premium Leather Seats, 💺 Heated & Ventilated Front Seats\\n🌞 Panoramic Sunroof & 🧭 Navigation System\\n📱 Apple CarPlay & Android Auto | 🎵 Premium B&O Sound System\\n⚡ Wireless Charging & ❄️ Tri-Zone Climate Control\\n🚗 Adaptive Cruise Control, ⚠️ Blind Spot Monitoring & 🛣️ Lane Keep Assist\\n💡 Full LED Headlights & DRLs | 🛞 Premium Alloy Wheels | 🧳 Power Tailgate | 👨‍👩‍👧‍👦 7-Seater Luxury SUV",
+    "description": "✨ 2021 Ford Explorer Full Option ✨\n🇧🇪 Direct Belgium | ✅ 2026 Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience premium luxury, advanced technology, and exceptional performance with this 2021 Direct Belgium Ford Explorer Full Option. Designed for comfort, safety, and family adventures, it combines a bold exterior, refined interior, and powerful performance with all the modern features you expect in a flagship SUV. A superb choice for anyone seeking luxury and reliability at ₦48M.\n\nKey Features & Specifications:\n🔑 Keyless Entry, 🔘 Push Button Start & 🚘 Remote Start\n📷 360° Camera & 🅿️ Front & Rear Parking Sensors\n🪑 Premium Leather Seats, 💺 Heated & Ventilated Front Seats\n🌞 Panoramic Sunroof & 🧭 Navigation System\n📱 Apple CarPlay & Android Auto | 🎵 Premium B&O Sound System\n⚡ Wireless Charging & ❄️ Tri-Zone Climate Control\n🚗 Adaptive Cruise Control, ⚠️ Blind Spot Monitoring & 🛣️ Lane Keep Assist\n💡 Full LED Headlights & DRLs | 🛞 Premium Alloy Wheels | 🧳 Power Tailgate | 👨‍👩‍👧‍👦 7-Seater Luxury SUV",
     "engine": "3.0L EcoBoost V6 / 2.3L EcoBoost",
     "color": "Blue",
     "condition": "Direct Belgium",
@@ -652,7 +732,7 @@
     "images": [
       "https://i.ibb.co/0yh8B7Qf/IMG-20260728-WA0040.jpg"
     ],
-    "description": "✨ 2015 Ford Explorer Limited ✨\\n🇺🇸 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\\n\\nVehicle Overview:\\nExperience comfort, power, and versatility with this 2015 Ford Explorer Limited. It offers a refined interior, smooth automatic transmission, 3.5L V6 engine with 4WD/AWD capability, excellent road presence, and ample space for family or business use. This 7-seater SUV is exceptionally clean inside and out, offering outstanding luxury value.\\n\\nKey Features & Highlights:\\n🔑 Keyless Entry & 🔘 Push Start\\n🛋️ Premium Leather Interior & 🧳 Spacious 7-Seater Cabin\\n📷 Reverse Camera & 🅿️ Parking Sensors\\n🌡️ Dual-Zone Climate Control & 🎵 Premium Audio System\\n🛞 Alloy Wheels & 💡 LED Daytime Running Lights\\n🛣️ Cruise Control, 🪟 Tinted Glass & 3.5L V6 Engine",
+    "description": "✨ 2015 Ford Explorer Limited ✨\n🇺🇸 Foreign Used | ✅ Original Custom Duty Paid | 📍 Located in Abuja\n\nVehicle Overview:\nExperience comfort, power, and versatility with this 2015 Ford Explorer Limited. It offers a refined interior, smooth automatic transmission, 3.5L V6 engine with 4WD/AWD capability, excellent road presence, and ample space for family or business use. This 7-seater SUV is exceptionally clean inside and out, offering outstanding luxury value.\n\nKey Features & Highlights:\n🔑 Keyless Entry & 🔘 Push Start\n🛋️ Premium Leather Interior & 🧳 Spacious 7-Seater Cabin\n📷 Reverse Camera & 🅿️ Parking Sensors\n🌡️ Dual-Zone Climate Control & 🎵 Premium Audio System\n🛞 Alloy Wheels & 💡 LED Daytime Running Lights\n🛣️ Cruise Control, 🪟 Tinted Glass & 3.5L V6 Engine",
     "engine": "3.5L V6 Petrol",
     "color": "Red",
     "condition": "Extremely Clean",
@@ -673,7 +753,7 @@
     "images": [
       "https://i.ibb.co/vCqpr68F/IMG-20260728-WA0038.jpg"
     ],
-    "description": "✨ 2012 Toyota RAV4 Last Batch (XA30 Facelift) ✨\\n💎 Condition: Foreign Used | 🖤 Sleek Black Exterior | 📄 Customs Duty Paid\\n\\nVehicle Overview:\\nExperience the perfect blend of reliability, comfort, and practicality with this foreign-used 2012 Toyota RAV4 Last Batch. Finished in a sleek black exterior, this SUV is exceptionally clean inside and out, making it an excellent choice for daily commuting, family trips, or business use. Renowned for its durability, fuel efficiency, and low maintenance costs.\\n\\nKey Features & Specifications:\\n⚙️ Efficient 2.5L 4-Cylinder Petrol Engine & Smooth Automatic Transmission\\n❄️ Air Conditioning & Climate Control\\n🔑 Remote Keyless Entry & Power Windows/Door Locks\\n🎵 Audio System with AUX, USB & Bluetooth Connectivity\\n🛞 Alloy Wheels, Fog Lights, Roof Rails & Rear Window Wiper\\n🪑 Split Folding Rear Seats (60:40) & Spacious Cargo Area\\n🛡️ Multiple Airbags, ABS & Traction Control",
+    "description": "✨ 2012 Toyota RAV4 Last Batch (XA30 Facelift) ✨\n💎 Condition: Foreign Used | 🖤 Sleek Black Exterior | 📄 Customs Duty Paid\n\nVehicle Overview:\nExperience the perfect blend of reliability, comfort, and practicality with this foreign-used 2012 Toyota RAV4 Last Batch. Finished in a sleek black exterior, this SUV is exceptionally clean inside and out, making it an excellent choice for daily commuting, family trips, or business use. Renowned for its durability, fuel efficiency, and low maintenance costs.\n\nKey Features & Specifications:\n⚙️ Efficient 2.5L 4-Cylinder Petrol Engine & Smooth Automatic Transmission\n❄️ Air Conditioning & Climate Control\n🔑 Remote Keyless Entry & Power Windows/Door Locks\n🎵 Audio System with AUX, USB & Bluetooth Connectivity\n🛞 Alloy Wheels, Fog Lights, Roof Rails & Rear Window Wiper\n🪑 Split Folding Rear Seats (60:40) & Spacious Cargo Area\n🛡️ Multiple Airbags, ABS & Traction Control",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Black",
     "condition": "Foreign Used",
@@ -698,7 +778,7 @@
       "https://i.ibb.co/67bXyBCX/IMG-20260728-WA0034.jpg",
       "https://i.ibb.co/v6HKh71B/IMG-20260728-WA0036.jpg"
     ],
-    "description": "✨ 2017 Mercedes-Benz E300 (4-door Luxury Sedan) ✨\\n💎 Condition: Extremely Clean Used (as advertised) | 📄 Customs Duty Paid 📜 | 🖤 Obsidian Black Exterior\\n\\nVehicle Overview:\\nThe 2017 Mercedes-Benz E300 represents the benchmark of executive luxury sedans. Powered by a responsive 2.0L Turbocharged Inline-4 engine paired with a 9-Speed Automatic 9G-TRONIC transmission delivering 241 hp, this unit is extremely clean, well-maintained, and fully duty paid.\\n\\nKey Performance & Luxury Features:\\n⚙️ 2.0L Turbocharged Inline-4 (241 hp / 273 lb-ft Torque)\\n🕹️ 9-Speed Automatic Transmission (9G-TRONIC)\\n💡 LED Intelligent Headlamps & Daytime Running Lights\\n🔑 Keyless Start & Smart Access\\n🛋️ Premium Leather Interior with Power Front Seats & Memory\\n❄️ Dual-Zone Automatic Climate Control\\n🏎️ Multifunction Steering Wheel & Cruise Control\\n📱 Large High-Resolution Infotainment Display with Bluetooth\\n📷 Reverse Camera with Front & Rear Parking Sensors\\n🛞 Executive Alloy Wheels\\n🛡️ Collision Prevention Assist, Attention Assist, ESP, Traction Control & Multiple Airbags",
+    "description": "✨ 2017 Mercedes-Benz E300 (4-door Luxury Sedan) ✨\n💎 Condition: Extremely Clean Used (as advertised) | 📄 Customs Duty Paid 📜 | 🖤 Obsidian Black Exterior\n\nVehicle Overview:\nThe 2017 Mercedes-Benz E300 represents the benchmark of executive luxury sedans. Powered by a responsive 2.0L Turbocharged Inline-4 engine paired with a 9-Speed Automatic 9G-TRONIC transmission delivering 241 hp, this unit is extremely clean, well-maintained, and fully duty paid.\n\nKey Performance & Luxury Features:\n⚙️ 2.0L Turbocharged Inline-4 (241 hp / 273 lb-ft Torque)\n🕹️ 9-Speed Automatic Transmission (9G-TRONIC)\n💡 LED Intelligent Headlamps & Daytime Running Lights\n🔑 Keyless Start & Smart Access\n🛋️ Premium Leather Interior with Power Front Seats & Memory\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n📱 Large High-Resolution Infotainment Display with Bluetooth\n📷 Reverse Camera with Front & Rear Parking Sensors\n🛞 Executive Alloy Wheels\n🛡️ Collision Prevention Assist, Attention Assist, ESP, Traction Control & Multiple Airbags",
     "engine": "2.0L Turbocharged Inline-4 (241 hp)",
     "color": "Black",
     "condition": "Extremely Clean",
@@ -723,7 +803,7 @@
       "https://i.ibb.co/m5Hdg2S1/IMG-20260728-WA0022.jpg",
       "https://i.ibb.co/v4Lh1pfV/IMG-20260728-WA0014.jpg"
     ],
-    "description": "✨ 2024 Toyota Hilux (Registered, Like New) ✨\\n🌍 Registered, Bought Brand New in 2024 | 📄 Duty Paid 📜 | 💎 Like New Condition\\n\\nVehicle Overview:\\nThe 2024 Toyota Hilux is one of the most dependable pickup trucks on the market, renowned for its rugged durability, exceptional performance, and outstanding reliability. This unit was purchased brand new last year, is Nigerian registered, and remains in like-new condition with genuine duty paid. It is ideal for both commercial operations and personal use.\\n\\nKey Features:\\n⚙️ 2.8L Turbo Diesel Engine\\n🏎️ Automatic Transmission & 4WD Capability\\n🔑 Smart Key / Keyless Entry & Push-Button Start\\n📱 Touchscreen Infotainment System with Apple CarPlay & Android Auto\\n📶 Bluetooth Connectivity\\n📷 Reverse Camera & Rear Parking Sensors\\n🏎️ Multifunction Steering Wheel & Cruise Control\\n❄️ Automatic Climate Control\\n💡 LED Headlights, Daytime Running Lights & Fog Lights\\n🛞 Alloy Wheels, Side Steps, Bed Cover (Tonneau Cover) & Sports Bar\\n⚡ Power Windows & Mirrors\\n🛡️ Multiple Airbags, ABS, Vehicle Stability Control (VSC) & Traction Control",
+    "description": "✨ 2024 Toyota Hilux (Registered, Like New) ✨\n🌍 Registered, Bought Brand New in 2024 | 📄 Duty Paid 📜 | 💎 Like New Condition\n\nVehicle Overview:\nThe 2024 Toyota Hilux is one of the most dependable pickup trucks on the market, renowned for its rugged durability, exceptional performance, and outstanding reliability. This unit was purchased brand new last year, is Nigerian registered, and remains in like-new condition with genuine duty paid. It is ideal for both commercial operations and personal use.\n\nKey Features:\n⚙️ 2.8L Turbo Diesel Engine\n🏎️ Automatic Transmission & 4WD Capability\n🔑 Smart Key / Keyless Entry & Push-Button Start\n📱 Touchscreen Infotainment System with Apple CarPlay & Android Auto\n📶 Bluetooth Connectivity\n📷 Reverse Camera & Rear Parking Sensors\n🏎️ Multifunction Steering Wheel & Cruise Control\n❄️ Automatic Climate Control\n💡 LED Headlights, Daytime Running Lights & Fog Lights\n🛞 Alloy Wheels, Side Steps, Bed Cover (Tonneau Cover) & Sports Bar\n⚡ Power Windows & Mirrors\n🛡️ Multiple Airbags, ABS, Vehicle Stability Control (VSC) & Traction Control",
     "engine": "2.8L Turbo Diesel",
     "color": "White",
     "condition": "Like New",
@@ -748,7 +828,7 @@
       "https://i.ibb.co/XZQqJ3NY/IMG-20260728-WA0016.jpg",
       "https://i.ibb.co/mFh4cKD9/IMG-20260728-WA0018.jpg"
     ],
-    "description": "✨ 2021 Honda CR-V Limited Edition (Slightly Used, Unregistered) ✨\\n🌍 Slightly Used, Unregistered | 📄 Original Papers Available 📜 | 💎 Excellent Condition\\n\\nVehicle Overview:\\nThe 2021 Honda CR-V Limited Edition is a premium compact SUV that blends modern styling, exceptional comfort, advanced safety, and fuel-efficient performance. This unregistered Nigerian unit is in excellent condition and comes with sought-after features including keyless entry and a panoramic sunroof, making it an ideal SUV for families and professionals alike.\\n\\nKey Features:\\n⚙️ 1.5L Turbocharged Petrol Engine\\n🏎️ Automatic Transmission (CVT) & Front-Wheel Drive (FWD)\\n🌟 Limited Edition Trim\\n🔑 Smart Key / Keyless Entry & Push-Button Start\\n🌅 Panoramic Sunroof\\n💡 LED Headlights, Daytime Running Lights & LED Fog Lights\\n🛞 Alloy Wheels\\n📷 Reverse Camera & Front & Rear Parking Sensors\\n📱 Touchscreen Infotainment System with Apple CarPlay, Android Auto & Bluetooth\\n⚡ USB Charging Ports & Power Tailgate\\n❄️ Dual-Zone Automatic Climate Control\\n🏎️ Multifunction Steering Wheel & Cruise Control\\n🅿️ Electric Parking Brake with Auto Hold\\n🪑 Premium Interior Finish\\n🛡️ Multiple Airbags, ABS, Vehicle Stability Assist (VSA) & Traction Control",
+    "description": "✨ 2021 Honda CR-V Limited Edition (Slightly Used, Unregistered) ✨\n🌍 Slightly Used, Unregistered | 📄 Original Papers Available 📜 | 💎 Excellent Condition\n\nVehicle Overview:\nThe 2021 Honda CR-V Limited Edition is a premium compact SUV that blends modern styling, exceptional comfort, advanced safety, and fuel-efficient performance. This unregistered Nigerian unit is in excellent condition and comes with sought-after features including keyless entry and a panoramic sunroof, making it an ideal SUV for families and professionals alike.\n\nKey Features:\n⚙️ 1.5L Turbocharged Petrol Engine\n🏎️ Automatic Transmission (CVT) & Front-Wheel Drive (FWD)\n🌟 Limited Edition Trim\n🔑 Smart Key / Keyless Entry & Push-Button Start\n🌅 Panoramic Sunroof\n💡 LED Headlights, Daytime Running Lights & LED Fog Lights\n🛞 Alloy Wheels\n📷 Reverse Camera & Front & Rear Parking Sensors\n📱 Touchscreen Infotainment System with Apple CarPlay, Android Auto & Bluetooth\n⚡ USB Charging Ports & Power Tailgate\n❄️ Dual-Zone Automatic Climate Control\n🏎️ Multifunction Steering Wheel & Cruise Control\n🅿️ Electric Parking Brake with Auto Hold\n🪑 Premium Interior Finish\n🛡️ Multiple Airbags, ABS, Vehicle Stability Assist (VSA) & Traction Control",
     "engine": "1.5L Turbocharged Petrol",
     "color": "White",
     "condition": "Slightly Used",
@@ -769,7 +849,7 @@
     "images": [
       "https://i.ibb.co/qMcQ5ckY/IMG-20260728-WA0003.jpg"
     ],
-    "description": "✨ 2017 Toyota Tacoma (Direct Belgium) – Full Option ✨\\n🌍 Direct Belgium | 📄 Valid Duty (Expires April 2026) 📜 | 💎 Accident-Free\\n\\nVehicle Overview:\\nThe 2017 Toyota Tacoma is a rugged midsize pickup built for both everyday driving and demanding off-road adventures. This accident-free, Direct Belgium unit comes in full-option specification with a powerful engine, premium features, and a well-maintained exterior and interior. With duty valid until April 2026, it's ready for immediate use.\\n\\nKey Features:\\n⚙️ 3.5L V6 Petrol Engine\\n🏎️ 6-Speed Automatic Transmission\\n🛣️ 4WD (Four-Wheel Drive)\\n🌟 Full Option Package\\n🏎️ TRD-Style Front Grille & Hood Scoop\\n💡 LED Daytime Running Lights & Fog Lights\\n🛞 Alloy Wheels with All-Terrain Tires & Side Steps\\n📱 Touchscreen Infotainment System with Bluetooth, Apple CarPlay & Android Auto\\n📷 Reverse Camera & Push-Button Start / Smart Key Entry\\n🏎️ Cruise Control & Dual-Zone Automatic Climate Control\\n🪑 Leather/Fabric Premium Interior & Multifunction Steering Wheel\\n🛡️ Multiple Airbags, ABS, Traction Control, Vehicle Stability Control, Hill Start Assist & Trailer Sway Control",
+    "description": "✨ 2017 Toyota Tacoma (Direct Belgium) – Full Option ✨\n🌍 Direct Belgium | 📄 Valid Duty (Expires April 2026) 📜 | 💎 Accident-Free\n\nVehicle Overview:\nThe 2017 Toyota Tacoma is a rugged midsize pickup built for both everyday driving and demanding off-road adventures. This accident-free, Direct Belgium unit comes in full-option specification with a powerful engine, premium features, and a well-maintained exterior and interior. With duty valid until April 2026, it's ready for immediate use.\n\nKey Features:\n⚙️ 3.5L V6 Petrol Engine\n🏎️ 6-Speed Automatic Transmission\n🛣️ 4WD (Four-Wheel Drive)\n🌟 Full Option Package\n🏎️ TRD-Style Front Grille & Hood Scoop\n💡 LED Daytime Running Lights & Fog Lights\n🛞 Alloy Wheels with All-Terrain Tires & Side Steps\n📱 Touchscreen Infotainment System with Bluetooth, Apple CarPlay & Android Auto\n📷 Reverse Camera & Push-Button Start / Smart Key Entry\n🏎️ Cruise Control & Dual-Zone Automatic Climate Control\n🪑 Leather/Fabric Premium Interior & Multifunction Steering Wheel\n🛡️ Multiple Airbags, ABS, Traction Control, Vehicle Stability Control, Hill Start Assist & Trailer Sway Control",
     "engine": "3.5L V6 Petrol",
     "color": "Orange",
     "condition": "Direct Belgium",
@@ -790,7 +870,7 @@
     "images": [
       "https://i.ibb.co/tMr2rYx4/IMG-20260723-WA0028.jpg"
     ],
-    "description": "✨ 2015 Toyota Camry SE ✨\\n🌍 Mint Foreign Used | 📄 Genuine Duty Paid 📜 | 🏎️ Sport Trim\\n\\nThe 2015 Toyota Camry SE offers a perfect combination of sporty styling, reliability, fuel efficiency, and comfort. This foreign-used unit is in mint condition with a clean interior, factory reverse camera, and an untampered engine and transmission, making it an excellent choice for personal or family use.\\n\\nKey Features:\\n⚙️ 2.5L 4-Cylinder DOHC Engine\\n🏎️ Automatic Transmission & Front-Wheel Drive (FWD)\\n📷 Factory Reverse Camera & Sport (SE) Body Kit\\n🛞 Alloy Wheels & Fabric Sport Seats\\n🎡 Multifunction Steering Wheel & Cruise Control\\n🎵 Bluetooth, USB & AUX Audio Input\\n❄️ Air Conditioning & Keyless Entry\\n⚡ Power Windows & Mirrors & Fog Lights\\n🛡️ ABS Braking System, VSC & Driver/Passenger Airbags\\n\\nCondition Report:\\n✅ Mint Foreign Used\\n✅ Clean and well-kept interior\\n✅ Untampered engine & smooth automatic transmission\\n✅ Excellent suspension & neat exterior paintwork\\n✅ Genuine duty paid & ready to drive",
+    "description": "✨ 2015 Toyota Camry SE ✨\n🌍 Mint Foreign Used | 📄 Genuine Duty Paid 📜 | 🏎️ Sport Trim\n\nThe 2015 Toyota Camry SE offers a perfect combination of sporty styling, reliability, fuel efficiency, and comfort. This foreign-used unit is in mint condition with a clean interior, factory reverse camera, and an untampered engine and transmission, making it an excellent choice for personal or family use.\n\nKey Features:\n⚙️ 2.5L 4-Cylinder DOHC Engine\n🏎️ Automatic Transmission & Front-Wheel Drive (FWD)\n📷 Factory Reverse Camera & Sport (SE) Body Kit\n🛞 Alloy Wheels & Fabric Sport Seats\n🎡 Multifunction Steering Wheel & Cruise Control\n🎵 Bluetooth, USB & AUX Audio Input\n❄️ Air Conditioning & Keyless Entry\n⚡ Power Windows & Mirrors & Fog Lights\n🛡️ ABS Braking System, VSC & Driver/Passenger Airbags\n\nCondition Report:\n✅ Mint Foreign Used\n✅ Clean and well-kept interior\n✅ Untampered engine & smooth automatic transmission\n✅ Excellent suspension & neat exterior paintwork\n✅ Genuine duty paid & ready to drive",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Silver",
     "condition": "Foreign Used",
@@ -811,7 +891,7 @@
     "images": [
       "https://i.ibb.co/cS42nbXX/9ab7afef35ae48c88563da945ef8ad76.jpg"
     ],
-    "description": "✨ 2014 Mercedes-Benz CLA 250 ✨\\n🌍 Foreign Used | 📄 Custom Duty Paid | 🌟 Excellent Luxury Condition\\n\\nThe 2014 Mercedes-Benz CLA 250 is a stylish luxury compact sedan that combines sporty performance with premium comfort and advanced technology. Featuring a sleek coupe-inspired design, turbocharged power, and a refined interior, this foreign-used unit offers an excellent blend of elegance and driving excitement.\\n\\nKey Features:\\n⚙️ 2.0L Turbocharged Inline-4 Engine\\n🏎️ 7-Speed Dual-Clutch Automatic Transmission (7G-DCT)\\n🔑 Push-Button Start & Keyless Entry\\n🪑 Leather Upholstery with Memory Power Front Seats\\n❄️ Dual-Zone Automatic Climate Control\\n🎡 Multifunction Leather Steering Wheel with Paddle Shifters\\n🎵 Premium Audio System with Bluetooth, USB & AUX Input\\n📷 Reverse Camera with Front & Rear Parking Sensors\\n🏎️ Cruise Control & Automatic Headlights with LED DRLs\\n🛞 Alloy Wheels & Power Windows/Mirrors",
+    "description": "✨ 2014 Mercedes-Benz CLA 250 ✨\n🌍 Foreign Used | 📄 Custom Duty Paid | 🌟 Excellent Luxury Condition\n\nThe 2014 Mercedes-Benz CLA 250 is a stylish luxury compact sedan that combines sporty performance with premium comfort and advanced technology. Featuring a sleek coupe-inspired design, turbocharged power, and a refined interior, this foreign-used unit offers an excellent blend of elegance and driving excitement.\n\nKey Features:\n⚙️ 2.0L Turbocharged Inline-4 Engine\n🏎️ 7-Speed Dual-Clutch Automatic Transmission (7G-DCT)\n🔑 Push-Button Start & Keyless Entry\n🪑 Leather Upholstery with Memory Power Front Seats\n❄️ Dual-Zone Automatic Climate Control\n🎡 Multifunction Leather Steering Wheel with Paddle Shifters\n🎵 Premium Audio System with Bluetooth, USB & AUX Input\n📷 Reverse Camera with Front & Rear Parking Sensors\n🏎️ Cruise Control & Automatic Headlights with LED DRLs\n🛞 Alloy Wheels & Power Windows/Mirrors",
     "engine": "2.0L Turbocharged Inline-4",
     "color": "Grey",
     "condition": "Foreign Used",
@@ -832,7 +912,7 @@
     "images": [
       "https://i.ibb.co/1Y5qvg2j/IMG-20260702-WA0012.jpg"
     ],
-    "description": "✨ 2019 MINI Cooper Countryman S ✨\\n🇧🇪 Direct Belgium Import | 📄 Duty Paid | 💎 Mint Condition (Full Option)\\n\\nThe 2019 MINI Cooper Countryman S is a premium compact SUV that delivers sporty performance, luxury comfort, and distinctive British styling. This Direct Belgium import comes in full-option specification and is in mint condition, making it an excellent choice for buyers seeking a unique luxury crossover with modern technology and premium features.\\n\\nKey Features:\\n⚙️ 2.0L TwinPower Turbo 4-Cylinder Engine\\n🏎️ Automatic Transmission\\n🔑 Push-Button Start & Keyless Entry\\n🪑 Full Leather Interior with Power Front Seats\\n☀️ Panoramic Sunroof\\n❄️ Dual-Zone Automatic Climate Control\\n🎵 MINI Connected Infotainment System with Large Display\\n📱 Apple CarPlay, Bluetooth, USB & AUX Ports\\n🎧 Premium Sound System\\n📷 Reverse Camera with Front & Rear Parking Sensors\\n💡 LED Headlights & Daytime Running Lights\\n🛞 Alloy Wheels",
+    "description": "✨ 2019 MINI Cooper Countryman S ✨\n🇧🇪 Direct Belgium Import | 📄 Duty Paid | 💎 Mint Condition (Full Option)\n\nThe 2019 MINI Cooper Countryman S is a premium compact SUV that delivers sporty performance, luxury comfort, and distinctive British styling. This Direct Belgium import comes in full-option specification and is in mint condition, making it an excellent choice for buyers seeking a unique luxury crossover with modern technology and premium features.\n\nKey Features:\n⚙️ 2.0L TwinPower Turbo 4-Cylinder Engine\n🏎️ Automatic Transmission\n🔑 Push-Button Start & Keyless Entry\n🪑 Full Leather Interior with Power Front Seats\n☀️ Panoramic Sunroof\n❄️ Dual-Zone Automatic Climate Control\n🎵 MINI Connected Infotainment System with Large Display\n📱 Apple CarPlay, Bluetooth, USB & AUX Ports\n🎧 Premium Sound System\n📷 Reverse Camera with Front & Rear Parking Sensors\n💡 LED Headlights & Daytime Running Lights\n🛞 Alloy Wheels",
     "engine": "2.0L TwinPower Turbo 4-Cylinder",
     "color": "Silver",
     "condition": "Direct Belgium",
@@ -857,7 +937,7 @@
       "https://i.ibb.co/cc0DMd89/IMG-20260727-WA0069.jpg",
       "https://i.ibb.co/G4GGB0FD/IMG-20260727-WA0067.jpg"
     ],
-    "description": "✨ 2019 Toyota Camry XSE ✨\\n🌍 Foreign Used | 📄 Custom Duty Paid | 🔑 Keyless Entry\\n\\nThe 2019 Toyota Camry XSE is a premium sport sedan that combines bold styling, advanced technology, and outstanding reliability. With its aggressive exterior, luxurious interior, and smooth performance, this foreign-used unit is an excellent choice for buyers seeking comfort, style, and long-term dependability.\\n\\nKey Features:\\n⚙️ 2.5L Dynamic Force 4-Cylinder Engine\\n🏎️ 8-Speed Automatic Transmission & XSE Sport Trim\\n🔑 Keyless Entry with Push-Button Start & Smart Key System\\n🪑 Leather-Trimmed Sport Seats with Power Driver & Front Passenger Seats\\n❄️ Dual-Zone Automatic Climate Control\\n🎡 Multifunction Steering Wheel & Paddle Shifters\\n🎵 Touchscreen Infotainment System with Apple CarPlay, Bluetooth & USB\\n📷 Reverse Camera & Blind Spot Monitor\\n🛣️ Adaptive Cruise Control & Lane Departure Alert\\n🛡️ ABS, Traction Control, Vehicle Stability Control & Multiple Airbags",
+    "description": "✨ 2019 Toyota Camry XSE ✨\n🌍 Foreign Used | 📄 Custom Duty Paid | 🔑 Keyless Entry\n\nThe 2019 Toyota Camry XSE is a premium sport sedan that combines bold styling, advanced technology, and outstanding reliability. With its aggressive exterior, luxurious interior, and smooth performance, this foreign-used unit is an excellent choice for buyers seeking comfort, style, and long-term dependability.\n\nKey Features:\n⚙️ 2.5L Dynamic Force 4-Cylinder Engine\n🏎️ 8-Speed Automatic Transmission & XSE Sport Trim\n🔑 Keyless Entry with Push-Button Start & Smart Key System\n🪑 Leather-Trimmed Sport Seats with Power Driver & Front Passenger Seats\n❄️ Dual-Zone Automatic Climate Control\n🎡 Multifunction Steering Wheel & Paddle Shifters\n🎵 Touchscreen Infotainment System with Apple CarPlay, Bluetooth & USB\n📷 Reverse Camera & Blind Spot Monitor\n🛣️ Adaptive Cruise Control & Lane Departure Alert\n🛡️ ABS, Traction Control, Vehicle Stability Control & Multiple Airbags",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Red",
     "condition": "Foreign Used",
@@ -881,7 +961,7 @@
       "https://i.ibb.co/B2NWNR2L/IMG-20260727-WA0077.jpg",
       "https://i.ibb.co/bg52qTdz/IMG-20260727-WA0078.jpg"
     ],
-    "description": "✨ 2013 Toyota Camry SE ✨\\n🇳🇬 Nigerian Used | 📄 Custom Duty Paid | 🌟 Extremely Clean\\n\\nThe 2013 Toyota Camry SE blends sporty styling, comfort, and Toyota's renowned reliability. This Nigerian-used unit is exceptionally clean, making it an excellent choice for buyers seeking a dependable midsize sedan with premium driving comfort at an affordable price.\\n\\nKey Features:\\n⚙️ 2.5L 4-Cylinder DOHC Engine\\n🏎️ Sport (SE) Trim & Sport-Tuned Suspension\\n🪑 Fabric Sport Seats\\n🎡 Multifunction Steering Wheel with Cruise Control\\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX Connectivity\\n📷 Reverse Camera\\n❄️ Dual-Zone Automatic Climate Control\\n🔑 Keyless Entry\\n🛞 Alloy Wheels & Fog Lights\\n⚡ Power Windows & Mirrors\\n🛡️ ABS, Vehicle Stability Control (VSC) & Multiple Airbags",
+    "description": "✨ 2013 Toyota Camry SE ✨\n🇳🇬 Nigerian Used | 📄 Custom Duty Paid | 🌟 Extremely Clean\n\nThe 2013 Toyota Camry SE blends sporty styling, comfort, and Toyota's renowned reliability. This Nigerian-used unit is exceptionally clean, making it an excellent choice for buyers seeking a dependable midsize sedan with premium driving comfort at an affordable price.\n\nKey Features:\n⚙️ 2.5L 4-Cylinder DOHC Engine\n🏎️ Sport (SE) Trim & Sport-Tuned Suspension\n🪑 Fabric Sport Seats\n🎡 Multifunction Steering Wheel with Cruise Control\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX Connectivity\n📷 Reverse Camera\n❄️ Dual-Zone Automatic Climate Control\n🔑 Keyless Entry\n🛞 Alloy Wheels & Fog Lights\n⚡ Power Windows & Mirrors\n🛡️ ABS, Vehicle Stability Control (VSC) & Multiple Airbags",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Silver",
     "condition": "Nigerian Used",
@@ -906,7 +986,7 @@
       "https://i.ibb.co/RkFcVDWJ/IMG-20260727-WA0057.jpg",
       "https://i.ibb.co/3YVPNdQ6/IMG-20260727-WA0059.jpg"
     ],
-    "description": "✨ 2007 Toyota Camry LE ✨\\n📄 Duty Paid | 🌟 Extremely Clean\\n\\nThe 2007 Toyota Camry LE is a reliable and fuel-efficient midsize sedan renowned for its durability, comfort, and low maintenance costs. It's an excellent choice for daily commuting, ride-hailing, family use, or first-time car buyers seeking dependable transportation.\\n\\nKey Features:\\n⚙️ Automatic Transmission\\n⛽ 2.4L 4-Cylinder Engine (Fuel Efficient)\\n🪑 Fabric Interior\\n❄️ Air Conditioning\\n🚗 Power Steering\\n🪟 Power Windows & Door Locks\\n🎡 Multifunction Steering Wheel\\n🎵 AM/FM/CD Audio System\\n🏎️ Cruise Control\\n🛞 Alloy Wheel Covers\\n🧳 Spacious Cabin & Large Boot\\n🛡️ Dual Front Airbags, ABS & Remote Central Locking\\n\\nPerformance:\\n• Smooth and dependable engine\\n• Comfortable suspension for city and highway driving\\n• Excellent fuel economy\\n• Affordable maintenance with widely available spare parts",
+    "description": "✨ 2007 Toyota Camry LE ✨\n📄 Duty Paid | 🌟 Extremely Clean\n\nThe 2007 Toyota Camry LE is a reliable and fuel-efficient midsize sedan renowned for its durability, comfort, and low maintenance costs. It's an excellent choice for daily commuting, ride-hailing, family use, or first-time car buyers seeking dependable transportation.\n\nKey Features:\n⚙️ Automatic Transmission\n⛽ 2.4L 4-Cylinder Engine (Fuel Efficient)\n🪑 Fabric Interior\n❄️ Air Conditioning\n🚗 Power Steering\n🪟 Power Windows & Door Locks\n🎡 Multifunction Steering Wheel\n🎵 AM/FM/CD Audio System\n🏎️ Cruise Control\n🛞 Alloy Wheel Covers\n🧳 Spacious Cabin & Large Boot\n🛡️ Dual Front Airbags, ABS & Remote Central Locking\n\nPerformance:\n• Smooth and dependable engine\n• Comfortable suspension for city and highway driving\n• Excellent fuel economy\n• Affordable maintenance with widely available spare parts",
     "engine": "2.4L 4-Cylinder Petrol",
     "color": "Silver",
     "condition": "Extremely Clean",
@@ -931,7 +1011,7 @@
       "https://i.ibb.co/7xhHCHZC/IMG-20260727-WA0046.jpg",
       "https://i.ibb.co/mCnrBMkQ/IMG-20260727-WA0047.jpg"
     ],
-    "description": "✨ 2016 Toyota Camry SE ✨\\n🌍 Foreign Used | 📄 Duty Paid | 🤍 Elegant White Exterior\\nExperience comfort, reliability, and sporty styling with this 2016 Toyota Camry SE. Designed for everyday driving and long-distance comfort, this sedan offers excellent fuel economy, responsive performance, and Toyota's renowned durability.\\n\\nKey Features:\\n🔑 Keyless Entry\\n⚙️ Automatic Transmission\\n⛽ Fuel-Efficient Petrol Engine\\n🪑 Premium Cloth Interior\\n❄️ Chilled Air Conditioning\\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX\\n📷 Reverse Camera\\n🛞 Factory Alloy Wheels\\n🛣️ Smooth Suspension & Comfortable Ride\\n🧳 Spacious Boot\\n🛡️ ABS, Airbags & Vehicle Stability Control",
+    "description": "✨ 2016 Toyota Camry SE ✨\n🌍 Foreign Used | 📄 Duty Paid | 🤍 Elegant White Exterior\nExperience comfort, reliability, and sporty styling with this 2016 Toyota Camry SE. Designed for everyday driving and long-distance comfort, this sedan offers excellent fuel economy, responsive performance, and Toyota's renowned durability.\n\nKey Features:\n🔑 Keyless Entry\n⚙️ Automatic Transmission\n⛽ Fuel-Efficient Petrol Engine\n🪑 Premium Cloth Interior\n❄️ Chilled Air Conditioning\n🎵 Touchscreen Audio System with Bluetooth, USB & AUX\n📷 Reverse Camera\n🛞 Factory Alloy Wheels\n🛣️ Smooth Suspension & Comfortable Ride\n🧳 Spacious Boot\n🛡️ ABS, Airbags & Vehicle Stability Control",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "White",
     "condition": "Foreign Used",
@@ -955,7 +1035,7 @@
       "https://i.ibb.co/qM1wHf4v/IMG-20260727-WA0037.jpg",
       "https://i.ibb.co/QFN5Dp1k/IMG-20260727-WA0036.jpg"
     ],
-    "description": "✨ 2013 Toyota Camry SE ✨\\n📄 Duty Paid | ☀️ Sunroof | ❤️ Sporty Red Exterior\\nEnjoy comfort, style, and Toyota's legendary reliability with this 2013 Toyota Camry SE. This sporty sedan offers a smooth ride, responsive performance, a spacious cabin, and excellent fuel efficiency—making it ideal for both daily commuting and long-distance travel.\\n\\nKey Features:\\n☀️ Factory Sunroof\\n🔑 Keyless Entry\\n⚙️ Automatic Transmission\\n⛽ Petrol Engine\\n🪑 Premium Cloth Interior\\n❄️ Chilled Air Conditioning\\n🎵 AM/FM Audio System with Bluetooth/USB\\n🛞 Alloy Wheels\\n🛣️ Smooth Suspension & Comfortable Ride\\n🧳 Spacious Boot\\n🛡️ ABS, Airbags & Stability Control",
+    "description": "✨ 2013 Toyota Camry SE ✨\n📄 Duty Paid | ☀️ Sunroof | ❤️ Sporty Red Exterior\nEnjoy comfort, style, and Toyota's legendary reliability with this 2013 Toyota Camry SE. This sporty sedan offers a smooth ride, responsive performance, a spacious cabin, and excellent fuel efficiency—making it ideal for both daily commuting and long-distance travel.\n\nKey Features:\n☀️ Factory Sunroof\n🔑 Keyless Entry\n⚙️ Automatic Transmission\n⛽ Petrol Engine\n🪑 Premium Cloth Interior\n❄️ Chilled Air Conditioning\n🎵 AM/FM Audio System with Bluetooth/USB\n🛞 Alloy Wheels\n🛣️ Smooth Suspension & Comfortable Ride\n🧳 Spacious Boot\n🛡️ ABS, Airbags & Stability Control",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Red",
     "condition": "Extremely Clean",
@@ -980,7 +1060,7 @@
       "https://i.ibb.co/GQBVnXss/IMG-20260706-WA0035.jpg",
       "https://i.ibb.co/NgwdLsTY/IMG-20260706-WA0037.jpg"
     ],
-    "description": "✨ 2020 Hyundai Elantra SE ✨\\n🇳🇬 Nigerian Used | 📄 Duty Paid | 🤍 Clean White Exterior\\nEnjoy a stylish, comfortable, and fuel-efficient driving experience with this clean 2020 Hyundai Elantra SE. This modern sedan offers sleek styling, a spacious cabin, smooth performance, and excellent everyday practicality.\\n🚘 Clean exterior\\n🪑 Comfortable and spacious interior\\n⚙️ Automatic transmission\\n⛽ Petrol engine\\n🛣️ Smooth and reliable performance\\n🔑 Excellent for city and long-distance driving",
+    "description": "✨ 2020 Hyundai Elantra SE ✨\n🇳🇬 Nigerian Used | 📄 Duty Paid | 🤍 Clean White Exterior\nEnjoy a stylish, comfortable, and fuel-efficient driving experience with this clean 2020 Hyundai Elantra SE. This modern sedan offers sleek styling, a spacious cabin, smooth performance, and excellent everyday practicality.\n🚘 Clean exterior\n🪑 Comfortable and spacious interior\n⚙️ Automatic transmission\n⛽ Petrol engine\n🛣️ Smooth and reliable performance\n🔑 Excellent for city and long-distance driving",
     "engine": "2.0L 4-Cylinder Petrol",
     "color": "White",
     "condition": "Nigerian Used",
@@ -1005,7 +1085,7 @@
       "https://i.ibb.co/2p7bCFT/IMG-20260706-WA0045.jpg",
       "https://i.ibb.co/vxsHHCd9/IMG-20260708-WA0030.jpg"
     ],
-    "description": "✨ 2010 Toyota Venza ✨\\n🇺🇸 Foreign Used | 📄 Duty Paid | ❤️ Beautiful Red Exterior\\nExperience comfort, reliability, and practicality in this clean Toyota Venza crossover SUV. It offers a spacious cabin, smooth driving experience, stylish design, and the dependable performance Toyota is known for.\\n🚘 Clean exterior\\n🛞 Comfortable and spacious interior\\n⚙️ Automatic transmission\\n⛽ Petrol engine\\n🛣️ Excellent for city and long-distance driving\\n🔑 Reliable Toyota performance",
+    "description": "✨ 2010 Toyota Venza ✨\n🇺🇸 Foreign Used | 📄 Duty Paid | ❤️ Beautiful Red Exterior\nExperience comfort, reliability, and practicality in this clean Toyota Venza crossover SUV. It offers a spacious cabin, smooth driving experience, stylish design, and the dependable performance Toyota is known for.\n🚘 Clean exterior\n🛞 Comfortable and spacious interior\n⚙️ Automatic transmission\n⛽ Petrol engine\n🛣️ Excellent for city and long-distance driving\n🔑 Reliable Toyota performance",
     "engine": "2.7L 4-Cylinder Petrol",
     "color": "Red",
     "condition": "Foreign Used",
@@ -1028,7 +1108,7 @@
       "https://i.ibb.co/TB8X4FGb/IMG-20260715-WA0076.jpg",
       "https://i.ibb.co/PGYDnWbz/IMG-20260715-WA0074.jpg?id=7tzk5pTN"
     ],
-    "description": "✨ 2015 Mercedes-Benz ML350 ✨\\n🇧🇪 Clean Used | 2026 Duty Paid 🇬🇭\\n🔑 Keyless Entry | 🚘 Luxury SUV | 🤍 Elegant Pearl White Exterior\\nExperience luxury, comfort, and performance in this beautiful Mercedes-Benz ML350. A stylish and spacious SUV with a premium look, excellent road presence, and the comfort you expect from Mercedes-Benz.",
+    "description": "✨ 2015 Mercedes-Benz ML350 ✨\n🇧🇪 Clean Used | 2026 Duty Paid 🇬🇭\n🔑 Keyless Entry | 🚘 Luxury SUV | 🤍 Elegant Pearl White Exterior\nExperience luxury, comfort, and performance in this beautiful Mercedes-Benz ML350. A stylish and spacious SUV with a premium look, excellent road presence, and the comfort you expect from Mercedes-Benz.",
     "engine": "3.5L V6",
     "color": "pearl white",
     "condition": "Clean Used",
@@ -1052,7 +1132,7 @@
       "https://i.ibb.co/kVbLptWR/IMG-20260716-WA0036.jpg",
       "https://i.ibb.co/ymLwFgS2/IMG-20260716-WA0038.jpg"
     ],
-    "description": "✨ 2010 Mercedes-Benz E350 ✨\\n🇩🇪 Clean Used | Duty Paid 🇩🇪\\n💎 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\\nExperience luxury, comfort, and performance in this clean Mercedes-Benz E350. Featuring a refined leather interior, wood-trim dashboard and steering wheel, panoramic sunroof, premium alloy wheels, and the comfort and road presence expected from Mercedes-Benz.",
+    "description": "✨ 2010 Mercedes-Benz E350 ✨\n🇩🇪 Clean Used | Duty Paid 🇩🇪\n💎 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\nExperience luxury, comfort, and performance in this clean Mercedes-Benz E350. Featuring a refined leather interior, wood-trim dashboard and steering wheel, panoramic sunroof, premium alloy wheels, and the comfort and road presence expected from Mercedes-Benz.",
     "engine": "3.5L V6",
     "color": "White",
     "condition": "Clean Used",
@@ -1077,7 +1157,7 @@
       "https://i.ibb.co/k2RCcvvm/IMG-20260713-WA0060.jpg",
       "https://i.ibb.co/xK5JL063/IMG-20260713-WA0058.jpg"
     ],
-    "description": "✨ 2026 Honda Accord ✨\\n🇧🇪 Foreign Used | Original Duty Paid 🇧🇪\\n🚘 Just Arrived | 🩶 Elegant Silver Exterior | ⚡ Modern Honda Accord\\nExperience modern styling, comfort, and advanced technology in this beautiful 2026 Honda Accord. With its sleek exterior design, refined interior, digital instrument cluster, touchscreen infotainment system, automatic transmission, spacious cabin, and excellent road presence, this Accord is a perfect choice for anyone looking for a fresh, modern sedan.",
+    "description": "✨ 2026 Honda Accord ✨\n🇧🇪 Foreign Used | Original Duty Paid 🇧🇪\n🚘 Just Arrived | 🩶 Elegant Silver Exterior | ⚡ Modern Honda Accord\nExperience modern styling, comfort, and advanced technology in this beautiful 2026 Honda Accord. With its sleek exterior design, refined interior, digital instrument cluster, touchscreen infotainment system, automatic transmission, spacious cabin, and excellent road presence, this Accord is a perfect choice for anyone looking for a fresh, modern sedan.",
     "engine": "1.5L Turbo",
     "color": "Silver",
     "condition": "Foreign Used",
@@ -1102,7 +1182,7 @@
       "https://i.ibb.co/d0XzKGJr/IMG-20260611-WA0049.jpg",
       "https://i.ibb.co/SX8QzFG5/IMG-20260611-WA0051.jpg"
     ],
-    "description": "✨ 2015 Lexus IS250 F Sport ✨\\n🇳🇬 Abuja Used | Duty Paid 🇳🇬\\n🏁 F Sport Package | 🩶 Elegant Silver Exterior | 🖤 Premium Black Leather Interior\\nExperience luxury, performance, and sporty styling in this clean 2015 Lexus IS250 F Sport. Featuring a powerful 2.5L V6 engine, sporty F Sport design, premium leather interior, sunroof, stylish alloy wheels, and excellent road presence, this Lexus delivers the perfect balance of comfort and performance.",
+    "description": "✨ 2015 Lexus IS250 F Sport ✨\n🇳🇬 Abuja Used | Duty Paid 🇳🇬\n🏁 F Sport Package | 🩶 Elegant Silver Exterior | 🖤 Premium Black Leather Interior\nExperience luxury, performance, and sporty styling in this clean 2015 Lexus IS250 F Sport. Featuring a powerful 2.5L V6 engine, sporty F Sport design, premium leather interior, sunroof, stylish alloy wheels, and excellent road presence, this Lexus delivers the perfect balance of comfort and performance.",
     "engine": "2.5L V6",
     "color": "Silver",
     "condition": "Nigerian Used",
@@ -1127,7 +1207,7 @@
       "https://i.ibb.co/NgpwqDKT/IMG-20260722-WA0013.jpg",
       "https://i.ibb.co/ymPHSvFZ/IMG-20260722-WA0016.jpg"
     ],
-    "description": "✨ 2011 Lexus ES350 ✨\\n🇧🇪 Extremely Clean Used | 🇳🇬 2026 Duty Paid\\n🔑 Keyless Entry | 💺 Luxury Leather Interior | ❄️ Dual-Zone Climate Control\\nExperience premium comfort, reliability, and smooth performance in this exceptionally clean 2011 Lexus ES350. Powered by a refined 3.5L V6 engine paired with an automatic transmission, this luxury sedan delivers a quiet ride, excellent fuel efficiency for its class, and legendary Lexus dependability.",
+    "description": "✨ 2011 Lexus ES350 ✨\n🇧🇪 Extremely Clean Used | 🇳🇬 2026 Duty Paid\n🔑 Keyless Entry | 💺 Luxury Leather Interior | ❄️ Dual-Zone Climate Control\nExperience premium comfort, reliability, and smooth performance in this exceptionally clean 2011 Lexus ES350. Powered by a refined 3.5L V6 engine paired with an automatic transmission, this luxury sedan delivers a quiet ride, excellent fuel efficiency for its class, and legendary Lexus dependability.",
     "engine": "3.5L V6",
     "color": "Dark Grey (Metallic)",
     "condition": "Direct Belgium",
@@ -1152,7 +1232,7 @@
       "https://i.ibb.co/DgpJtZRW/IMG-20260721-WA0040.jpg",
       "https://i.ibb.co/zW5pFRR7/IMG-20260721-WA0039.jpg"
     ],
-    "description": "✨ 2014 Hyundai Santa Fe ✨\\n🌍 Foreign Used | Duty Paid 🇳🇬\\n🔑 Keyless Entry | 🚙 Luxury SUV | 💎 Elegant Silver Exterior\\nExperience comfort, reliability, and performance with this well-maintained 2014 Hyundai Santa Fe. It offers a spacious 7-seater cabin, smooth automatic transmission, excellent fuel efficiency, premium interior, alloy wheels, fog lamps, multifunction steering controls, air conditioning, and ample cargo space—making it an ideal SUV for both family and business use.",
+    "description": "✨ 2014 Hyundai Santa Fe ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚙 Luxury SUV | 💎 Elegant Silver Exterior\nExperience comfort, reliability, and performance with this well-maintained 2014 Hyundai Santa Fe. It offers a spacious 7-seater cabin, smooth automatic transmission, excellent fuel efficiency, premium interior, alloy wheels, fog lamps, multifunction steering controls, air conditioning, and ample cargo space—making it an ideal SUV for both family and business use.",
     "engine": "3.3L V6",
     "color": "Silver",
     "condition": "Foreign Used",
@@ -1177,7 +1257,7 @@
       "https://i.ibb.co/MyDmWVP8/IMG-20260721-WA0060.jpg",
       "https://i.ibb.co/NdcNCBwx/IMG-20260721-WA0056.jpg"
     ],
-    "description": "✨ 2023 Hyundai Azera (Full Option) ✨\\n🌍 Foreign Used | Duty Paid 🇳🇬\\n🔑 Keyless Entry | 🌅 Full Panoramic Roof | 💎 Premium Grey Exterior\\nExperience first-class luxury, advanced technology, and exceptional comfort with this stunning 2023 Hyundai Azera Full Option. Equipped with a powerful yet fuel-efficient engine, premium leather interior, panoramic sunroof, push-to-start ignition, smart keyless entry, large infotainment display, reverse camera, front & rear parking sensors, wireless charging, premium alloy wheels, LED headlights, dual-zone climate control, and advanced driver-assistance features.",
+    "description": "✨ 2023 Hyundai Azera (Full Option) ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🌅 Full Panoramic Roof | 💎 Premium Grey Exterior\nExperience first-class luxury, advanced technology, and exceptional comfort with this stunning 2023 Hyundai Azera Full Option. Equipped with a powerful yet fuel-efficient engine, premium leather interior, panoramic sunroof, push-to-start ignition, smart keyless entry, large infotainment display, reverse camera, front & rear parking sensors, wireless charging, premium alloy wheels, LED headlights, dual-zone climate control, and advanced driver-assistance features.",
     "engine": "2.5L Smartstream",
     "color": "Grey",
     "condition": "Foreign Used",
@@ -1203,7 +1283,7 @@
       "https://i.ibb.co/pvrFHp2c/IMG-20260611-WA0083.jpg",
       "https://i.ibb.co/TBsJVjY0/IMG-20260611-WA0084.jpg"
     ],
-    "description": "✨ 2014 Lexus IS350 F Sport ✨\\n🇧🇪 Accident Free | Direct Belgium | Original Custom Duty 🇳🇬\\n🔑 Keyless Entry | 🔥 AMG Sound System | 💎 Elegant Deep Blue Exterior\\nExperience luxury, power, and sporty performance with this accident-free 2014 Lexus IS350 F Sport. Powered by a responsive 3.5L V6 engine paired with a smooth automatic transmission, this premium sports sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, premium AMG sound system, reverse camera, parking sensors, LED daytime running lights, alloy wheels, dual-zone climate control, multifunction steering wheel, cruise control, and exceptional driving comfort. A perfect choice for anyone seeking performance, reliability, and executive class.",
+    "description": "✨ 2014 Lexus IS350 F Sport ✨\n🇧🇪 Accident Free | Direct Belgium | Original Custom Duty 🇳🇬\n🔑 Keyless Entry | 🔥 AMG Sound System | 💎 Elegant Deep Blue Exterior\nExperience luxury, power, and sporty performance with this accident-free 2014 Lexus IS350 F Sport. Powered by a responsive 3.5L V6 engine paired with a smooth automatic transmission, this premium sports sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, premium AMG sound system, reverse camera, parking sensors, LED daytime running lights, alloy wheels, dual-zone climate control, multifunction steering wheel, cruise control, and exceptional driving comfort. A perfect choice for anyone seeking performance, reliability, and executive class.",
     "engine": "3.5L V6 Petrol",
     "color": "Deep Blue",
     "condition": "Direct Belgium",
@@ -1228,7 +1308,7 @@
       "https://i.ibb.co/3mMvFPMz/IMG-20260722-WA0005.jpg",
       "https://i.ibb.co/b53c0SX6/IMG-20260722-WA0026.jpg"
     ],
-    "description": "✨ 2004 Toyota Corolla ✨\\n🇳🇬 Nigeria Used | Duty Paid\\n🔑 Reliable Sedan | ⛽ Fuel Efficient | 🖤 Classic Black Exterior\\nOwn one of Toyota's most dependable sedans with this well-maintained 2004 Toyota Corolla. Renowned for its durability, fuel economy, and low maintenance costs, this sedan features a smooth automatic transmission, comfortable fabric interior, air conditioning, power windows, power steering, central locking, factory audio system, spacious cabin, and a generous boot space. An excellent choice for daily commuting, ride-hailing, or personal use.",
+    "description": "✨ 2004 Toyota Corolla ✨\n🇳🇬 Nigeria Used | Duty Paid\n🔑 Reliable Sedan | ⛽ Fuel Efficient | 🖤 Classic Black Exterior\nOwn one of Toyota's most dependable sedans with this well-maintained 2004 Toyota Corolla. Renowned for its durability, fuel economy, and low maintenance costs, this sedan features a smooth automatic transmission, comfortable fabric interior, air conditioning, power windows, power steering, central locking, factory audio system, spacious cabin, and a generous boot space. An excellent choice for daily commuting, ride-hailing, or personal use.",
     "engine": "1.8L 4-Cylinder Petrol",
     "color": "Black",
     "condition": "Nigerian Used",
@@ -1254,7 +1334,7 @@
       "https://i.ibb.co/mVmnY14D/IMG-20260630-WA0126.jpg",
       "https://i.ibb.co/rGBttmMg/IMG-20260630-WA0128.jpg"
     ],
-    "description": "✨ 2013 Toyota Camry SE ✨\\n🌍 Foreign Used | Duty Paid 🇳🇬\\n🔑 Keyless Entry | 🏁 Sport Edition (SE) | ❤️ Premium Red Exterior\\nEnjoy the perfect blend of sporty styling, comfort, and Toyota reliability with this clean 2013 Toyota Camry SE. Powered by a fuel-efficient 2.5L 4-cylinder engine and paired with a smooth automatic transmission, this sedan features a premium fabric interior, smart keyless entry, push-to-start ignition, reverse camera, Bluetooth connectivity, multifunction steering wheel, alloy wheels, cruise control, dual-zone climate control, sport-tuned suspension, LED daytime running lights, and a spacious cabin. An excellent choice for daily driving with impressive performance and low maintenance costs.",
+    "description": "✨ 2013 Toyota Camry SE ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 🏁 Sport Edition (SE) | ❤️ Premium Red Exterior\nEnjoy the perfect blend of sporty styling, comfort, and Toyota reliability with this clean 2013 Toyota Camry SE. Powered by a fuel-efficient 2.5L 4-cylinder engine and paired with a smooth automatic transmission, this sedan features a premium fabric interior, smart keyless entry, push-to-start ignition, reverse camera, Bluetooth connectivity, multifunction steering wheel, alloy wheels, cruise control, dual-zone climate control, sport-tuned suspension, LED daytime running lights, and a spacious cabin. An excellent choice for daily driving with impressive performance and low maintenance costs.",
     "engine": "2.5L 4-Cylinder Petrol",
     "color": "Red",
     "condition": "Foreign Used",
@@ -1279,7 +1359,7 @@
       "https://i.ibb.co/0ypVrhpS/IMG-20260721-WA0014.jpg",
       "https://i.ibb.co/350Jt7xK/IMG-20260721-WA0004.jpg"
     ],
-    "description": "✨ 2013 Mercedes-Benz C300 4MATIC ✨\\n🇳🇬 Clean Nigeria Used | Duty Paid\\n🔑 Keyless Entry | ⭐ 4MATIC AWD | 💙 Elegant Navy Blue Exterior\\nExperience luxury, comfort, and confident performance with this well-maintained 2013 Mercedes-Benz C300 4MATIC. Powered by a 3.5L V6 engine and paired with a smooth automatic transmission, this premium sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, reverse camera, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, premium alloy wheels, LED daytime running lights, Bluetooth connectivity, and Mercedes-Benz's renowned 4MATIC all-wheel-drive system for enhanced stability and control.",
+    "description": "✨ 2013 Mercedes-Benz C300 4MATIC ✨\n🇳🇬 Clean Nigeria Used | Duty Paid\n🔑 Keyless Entry | ⭐ 4MATIC AWD | 💙 Elegant Navy Blue Exterior\nExperience luxury, comfort, and confident performance with this well-maintained 2013 Mercedes-Benz C300 4MATIC. Powered by a 3.5L V6 engine and paired with a smooth automatic transmission, this premium sedan features a luxurious leather interior, push-to-start ignition, smart keyless entry, reverse camera, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, premium alloy wheels, LED daytime running lights, Bluetooth connectivity, and Mercedes-Benz's renowned 4MATIC all-wheel-drive system for enhanced stability and control.",
     "engine": "3.5L V6 Petrol",
     "color": "Navy Blue",
     "condition": "Nigerian Used",
@@ -1304,7 +1384,7 @@
       "https://i.ibb.co/0Vy9gdJs/IMG-20260723-WA0019.jpg",
       "https://i.ibb.co/4RRZTxMC/IMG-20260723-WA0022.jpg"
     ],
-    "description": "✨ 2016 Mercedes-Benz GLE 400 4MATIC ✨\\n🌍 Foreign Used | Duty Paid 🇳🇬\\n🔑 Keyless Entry | 📹 360\\xB0 Camera | ⭐ 4MATIC AWD | ❤️ Premium Red Exterior\\nExperience exceptional luxury, performance, and innovation with this stunning 2016 Mercedes-Benz GLE 400 4MATIC. Powered by a 3.0L Twin-Turbo V6 engine and paired with a smooth automatic transmission, this premium SUV delivers refined power and outstanding comfort. It features 360\\xB0 surround-view camera, smart keyless entry, push-to-start ignition, premium leather interior, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, LED headlights, premium alloy wheels, Bluetooth connectivity, power tailgate, and Mercedes-Benz's intelligent 4MATIC all-wheel-drive system for superior handling in all driving conditions.",
+    "description": "✨ 2016 Mercedes-Benz GLE 400 4MATIC ✨\n🌍 Foreign Used | Duty Paid 🇳🇬\n🔑 Keyless Entry | 📹 360° Camera | ⭐ 4MATIC AWD | ❤️ Premium Red Exterior\nExperience exceptional luxury, performance, and innovation with this stunning 2016 Mercedes-Benz GLE 400 4MATIC. Powered by a 3.0L Twin-Turbo V6 engine and paired with a smooth automatic transmission, this premium SUV delivers refined power and outstanding comfort. It features 360° surround-view camera, smart keyless entry, push-to-start ignition, premium leather interior, front & rear parking sensors, multifunction steering wheel, cruise control, dual-zone climate control, LED headlights, premium alloy wheels, Bluetooth connectivity, power tailgate, and Mercedes-Benz's intelligent 4MATIC all-wheel-drive system for superior handling in all driving conditions.",
     "engine": "3.0L Twin-Turbo V6 Petrol",
     "color": "Red",
     "condition": "Foreign Used",
@@ -1329,7 +1409,7 @@
       "https://i.ibb.co/pryzWvKj/IMG-20260713-WA0070.jpg",
       "https://i.ibb.co/PvqJt47b/IMG-20260713-WA0072.jpg"
     ],
-    "description": "✨ 2014 Lexus ES350 ✨\\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\\n🔑 Keyless Entry | 🛋️ Premium Leather Interior | 🌡️ Dual-Zone Climate Control\\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 💡 LED Daytime Running Lights\\n🪑 Power Seats | 🎵 Premium Audio System | 🛞 Alloy Wheels\\nExperience luxury, comfort, and legendary Lexus reliability in this elegant 2014 ES350. Powered by a smooth 3.5L V6 engine with automatic transmission, it delivers excellent performance, exceptional ride comfort, low maintenance costs, and outstanding fuel efficiency. A perfect executive sedan for both city driving and long-distance travel.",
+    "description": "✨ 2014 Lexus ES350 ✨\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\n🔑 Keyless Entry | 🛋️ Premium Leather Interior | 🌡️ Dual-Zone Climate Control\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 💡 LED Daytime Running Lights\n🪑 Power Seats | 🎵 Premium Audio System | 🛞 Alloy Wheels\nExperience luxury, comfort, and legendary Lexus reliability in this elegant 2014 ES350. Powered by a smooth 3.5L V6 engine with automatic transmission, it delivers excellent performance, exceptional ride comfort, low maintenance costs, and outstanding fuel efficiency. A perfect executive sedan for both city driving and long-distance travel.",
     "engine": "3.5L V6",
     "color": "Pearl White",
     "condition": "Direct Belgium",
@@ -1355,7 +1435,7 @@
       "https://i.ibb.co/xSJ1kSLw/IMG-20260721-WA0030.jpg",
       "https://i.ibb.co/7tZLX1GB/IMG-20260721-WA0009.jpg"
     ],
-    "description": "✨ 2022 Toyota RAV4 XLE AWD ✨\\n🌍 Foreign Used | 🇳🇬 Duty Paid\\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛡️ Toyota Safety Sense\\n📱 Apple CarPlay & Android Auto | 📷 Reverse Camera | 🌡️ Dual-Zone Climate Control\\n🪑 Premium Fabric Seats | 🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 Alloy Wheels\\nExperience outstanding reliability, comfort, and versatility in this beautiful 2022 Toyota RAV4 XLE AWD. Powered by a fuel-efficient 2.5L engine with automatic transmission, it delivers excellent performance, modern technology, impressive safety features, and the legendary durability Toyota is known for. An ideal SUV for city driving, family use, and long-distance travel.",
+    "description": "✨ 2022 Toyota RAV4 XLE AWD ✨\n🌍 Foreign Used | 🇳🇬 Duty Paid\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛡️ Toyota Safety Sense\n📱 Apple CarPlay & Android Auto | 📷 Reverse Camera | 🌡️ Dual-Zone Climate Control\n🪑 Premium Fabric Seats | 🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 Alloy Wheels\nExperience outstanding reliability, comfort, and versatility in this beautiful 2022 Toyota RAV4 XLE AWD. Powered by a fuel-efficient 2.5L engine with automatic transmission, it delivers excellent performance, modern technology, impressive safety features, and the legendary durability Toyota is known for. An ideal SUV for city driving, family use, and long-distance travel.",
     "engine": "2.5L 4-Cylinder",
     "color": "Silver",
     "condition": "Foreign Used",
@@ -1380,7 +1460,7 @@
       "https://i.ibb.co/RTTdFFQb/IMG-20260721-WA0021.jpg",
       "https://i.ibb.co/21fz4sXX/IMG-20260721-WA0005.jpg"
     ],
-    "description": "✨ 2018 Toyota Highlander Limited AWD ✨\\n🇳🇬 Extremely Clean Abuja Used | 🇳🇬 Duty Paid\\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛋️ Premium Leather Interior\\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\\n🌡️ Tri-Zone Automatic Climate Control | 🪑 Heated & Ventilated Power Seats\\n🎵 JBL Premium Audio System | 💡 LED Headlights | 🛞 Alloy Wheels | 🅿️ Front & Rear Parking Sensors\\nExperience luxury, space, and Toyota's legendary reliability in this exceptionally clean 2018 Toyota Highlander Limited AWD. Powered by a refined 3.5L V6 engine with automatic transmission, it delivers strong performance, a smooth ride, advanced safety features, and outstanding comfort for both family and executive use. A premium SUV built for city driving, highway cruising, and long-distance travel.",
+    "description": "✨ 2018 Toyota Highlander Limited AWD ✨\n🇳🇬 Extremely Clean Abuja Used | 🇳🇬 Duty Paid\n🔑 Smart Keyless Entry | 🚙 All-Wheel Drive (AWD) | 🛋️ Premium Leather Interior\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\n🌡️ Tri-Zone Automatic Climate Control | 🪑 Heated & Ventilated Power Seats\n🎵 JBL Premium Audio System | 💡 LED Headlights | 🛞 Alloy Wheels | 🅿️ Front & Rear Parking Sensors\nExperience luxury, space, and Toyota's legendary reliability in this exceptionally clean 2018 Toyota Highlander Limited AWD. Powered by a refined 3.5L V6 engine with automatic transmission, it delivers strong performance, a smooth ride, advanced safety features, and outstanding comfort for both family and executive use. A premium SUV built for city driving, highway cruising, and long-distance travel.",
     "engine": "3.5L V6",
     "color": "Pearl White",
     "condition": "Nigerian Used",
@@ -1405,7 +1485,7 @@
       "https://i.ibb.co/5X53MJYB/IMG-20260630-WA0137-1.jpg",
       "https://i.ibb.co/23jpPDQS/IMG-20260630-WA0139-1.jpg"
     ],
-    "description": "✨ 2015 Lexus GS350 F SPORT ✨\\n🇳🇬 Slightly Used | 🇳🇬 Original Duty Paid\\n🔑 Smart Keyless Entry | 🌞 Sunroof | 🛋️ Premium Leather Interior\\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\\n🪑 Power Memory Seats | 🌡️ Dual-Zone Automatic Climate Control\\n🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 F SPORT Alloy Wheels\\nExperience premium luxury, sporty performance, and legendary Lexus reliability in this stunning 2015 Lexus GS350 F SPORT. Powered by a responsive 3.5L V6 engine with automatic transmission, it offers exceptional driving dynamics, refined comfort, advanced technology, and low maintenance costs. An ideal executive sedan for drivers who appreciate both performance and elegance.",
+    "description": "✨ 2015 Lexus GS350 F SPORT ✨\n🇳🇬 Slightly Used | 🇳🇬 Original Duty Paid\n🔑 Smart Keyless Entry | 🌞 Sunroof | 🛋️ Premium Leather Interior\n📱 Bluetooth Connectivity | 📷 Reverse Camera | 🛰️ Navigation System\n🪑 Power Memory Seats | 🌡️ Dual-Zone Automatic Climate Control\n🎵 Premium Audio System | 💡 LED Headlights & DRLs | 🛞 F SPORT Alloy Wheels\nExperience premium luxury, sporty performance, and legendary Lexus reliability in this stunning 2015 Lexus GS350 F SPORT. Powered by a responsive 3.5L V6 engine with automatic transmission, it offers exceptional driving dynamics, refined comfort, advanced technology, and low maintenance costs. An ideal executive sedan for drivers who appreciate both performance and elegance.",
     "engine": "3.5L V6",
     "color": "Silver",
     "condition": "Nigerian Used",
@@ -1430,7 +1510,7 @@
       "https://i.ibb.co/spw8MV1v/IMG-20260721-WA0048.jpg",
       "https://i.ibb.co/7JPXK02n/IMG-20260721-WA0050.jpg"
     ],
-    "description": "✨ 2017 Mercedes-Benz E300 ✨\\n🇧🇪 Extremely Clean Used | 2026 Duty Paid 🇳🇬\\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant Silver Metallic Exterior\\nExperience luxury, comfort, and advanced German engineering with this stunning 2017 Mercedes-Benz E300. It offers a refined driving experience, premium interior, smooth 9-speed automatic transmission, and excellent fuel efficiency. Perfect for anyone seeking style, reliability, and executive-class comfort.",
+    "description": "✨ 2017 Mercedes-Benz E300 ✨\n🇧🇪 Extremely Clean Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🤍 Elegant Silver Metallic Exterior\nExperience luxury, comfort, and advanced German engineering with this stunning 2017 Mercedes-Benz E300. It offers a refined driving experience, premium interior, smooth 9-speed automatic transmission, and excellent fuel efficiency. Perfect for anyone seeking style, reliability, and executive-class comfort.",
     "engine": "2.0L Turbocharged Inline-4",
     "color": "Silver Metallic",
     "condition": "Direct Belgium",
@@ -1456,7 +1536,7 @@
       "https://i.ibb.co/LdzT376r/IMG-20260723-WA0051.jpg",
       "https://i.ibb.co/qMLvBmrv/IMG-20260716-WA0045.jpg"
     ],
-    "description": "✨ 2013 Mercedes-Benz C300 ✨\\n🇺🇸 Foreign Used | 🇳🇬 Duty Paid\\n🖤 Black Engine | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\\nExperience luxury, comfort, and performance in this beautiful 2013 Mercedes-Benz C300. A stylish and well-equipped luxury sedan with a premium look, smooth automatic transmission, powerful 3.5L V6 petrol engine, and the comfort you expect from Mercedes-Benz.",
+    "description": "✨ 2013 Mercedes-Benz C300 ✨\n🇺🇸 Foreign Used | 🇳🇬 Duty Paid\n🖤 Black Engine | 🚘 Luxury Sedan | 🤍 Elegant White Exterior\nExperience luxury, comfort, and performance in this beautiful 2013 Mercedes-Benz C300. A stylish and well-equipped luxury sedan with a premium look, smooth automatic transmission, powerful 3.5L V6 petrol engine, and the comfort you expect from Mercedes-Benz.",
     "engine": "3.5L V6",
     "color": "White",
     "condition": "Foreign Used",
@@ -1481,7 +1561,7 @@
       "https://i.ibb.co/4gSFXZvg/IMG-20260713-WA0082.jpg",
       "https://i.ibb.co/6Rsj91c7/IMG-20260713-WA0080.jpg"
     ],
-    "description": "✨ 2012 Toyota Sienna ✨\\n🇳🇬 Abuja Used | 📄 Duty Paid\\n🩶 Elegant Silver Exterior | 🚐 Spacious Family Minivan\\nExperience comfort, reliability, and practicality in this extremely clean 2012 Toyota Sienna. A spacious and comfortable family vehicle with a powerful 3.5L V6 petrol engine, smooth automatic transmission, and excellent road presence.",
+    "description": "✨ 2012 Toyota Sienna ✨\n🇳🇬 Abuja Used | 📄 Duty Paid\n🩶 Elegant Silver Exterior | 🚐 Spacious Family Minivan\nExperience comfort, reliability, and practicality in this extremely clean 2012 Toyota Sienna. A spacious and comfortable family vehicle with a powerful 3.5L V6 petrol engine, smooth automatic transmission, and excellent road presence.",
     "engine": "3.5L V6",
     "color": "Silver",
     "condition": "Nigerian Used",
@@ -1507,7 +1587,7 @@
       "https://i.ibb.co/99bzKxz4/IMG-20260724-WA0048.jpg",
       "https://i.ibb.co/QFhsPtG6/IMG-20260724-WA0049.jpg"
     ],
-    "description": "✨ 2011 Toyota Highlander ✨\\n🇳🇬 Duty Paid | ⭐ Full Option\\n🔑 Keyless Entry | 🌞 Sunroof | 🍷 Elegant Wine Exterior\\nExperience comfort, reliability, and premium utility in this extremely clean 2011 Toyota Highlander. A stylish and spacious SUV with a powerful 3.5L V6 petrol engine, smooth automatic transmission, keyless entry, sunroof, and excellent road presence.",
+    "description": "✨ 2011 Toyota Highlander ✨\n🇳🇬 Duty Paid | ⭐ Full Option\n🔑 Keyless Entry | 🌞 Sunroof | 🍷 Elegant Wine Exterior\nExperience comfort, reliability, and premium utility in this extremely clean 2011 Toyota Highlander. A stylish and spacious SUV with a powerful 3.5L V6 petrol engine, smooth automatic transmission, keyless entry, sunroof, and excellent road presence.",
     "engine": "3.5L V6",
     "color": "Wine/Burgundy",
     "condition": "Nigerian Used",
@@ -1532,7 +1612,7 @@
       "https://i.ibb.co/Hfcbtfhh/IMG-20260630-WA0148.jpg",
       "https://i.ibb.co/RGLtGzzf/IMG-20260630-WA0150.jpg"
     ],
-    "description": "✨ 2015 Hyundai Sonata ✨\\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\\n🩶 Elegant Grey Exterior | 🚘 Luxury Sedan\\nExperience style, comfort, and smooth performance in this 2015 Hyundai Sonata, directly imported from Belgium and fully duty paid. A stylish and spacious sedan with a smooth automatic transmission, efficient petrol engine, premium interior comfort, and excellent road presence.",
+    "description": "✨ 2015 Hyundai Sonata ✨\n🇧🇪 Direct Belgium | 🇳🇬 Duty Paid\n🩶 Elegant Grey Exterior | 🚘 Luxury Sedan\nExperience style, comfort, and smooth performance in this 2015 Hyundai Sonata, directly imported from Belgium and fully duty paid. A stylish and spacious sedan with a smooth automatic transmission, efficient petrol engine, premium interior comfort, and excellent road presence.",
     "engine": "2.4L 4-Cylinder",
     "color": "Grey",
     "condition": "Direct Belgium",
@@ -1557,7 +1637,7 @@
       "https://i.ibb.co/bM5GKLGv/IMG-20260725-WA0011.jpg",
       "https://i.ibb.co/TXcP108/IMG-20260725-WA0009.jpg"
     ],
-    "description": "✨ 2003 Toyota Sienna ✨\\n🇳🇬 Duty Paid | 🩶 Elegant Silver Exterior\\n🚐 Spacious Family Minivan | ⚙️ Reliable V6 Performance\\nExperience comfort, practicality, and reliability in this clean used 2003 Toyota Sienna. A spacious family minivan powered by a reliable 3.0L V6 petrol engine, with automatic transmission and excellent practicality for everyday use and family trips.",
+    "description": "✨ 2003 Toyota Sienna ✨\n🇳🇬 Duty Paid | 🩶 Elegant Silver Exterior\n🚐 Spacious Family Minivan | ⚙️ Reliable V6 Performance\nExperience comfort, practicality, and reliability in this clean used 2003 Toyota Sienna. A spacious family minivan powered by a reliable 3.0L V6 petrol engine, with automatic transmission and excellent practicality for everyday use and family trips.",
     "engine": "3.0L V6",
     "color": "Silver",
     "condition": "Nigerian Used",
@@ -1581,7 +1661,7 @@
       "https://i.ibb.co/P7D3S3C/IMG-20260725-WA0016.jpg",
       "https://i.ibb.co/4nTydxQs/IMG-20260725-WA0019.jpg"
     ],
-    "description": "✨ 2016 Lexus ES 350 ✨\\n🇯🇵 Foreign Used | Tincan Cleared 🇳🇬\\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🖤 Elegant Black Exterior\\nExperience luxury, comfort, and legendary Lexus reliability with this stunning 2016 Lexus ES 350. Powered by a refined 3.5L V6 engine, this executive sedan delivers smooth performance, premium comfort, and outstanding durability, making it the perfect choice for both city driving and long-distance travel.",
+    "description": "✨ 2016 Lexus ES 350 ✨\n🇯🇵 Foreign Used | Tincan Cleared 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sedan | 🖤 Elegant Black Exterior\nExperience luxury, comfort, and legendary Lexus reliability with this stunning 2016 Lexus ES 350. Powered by a refined 3.5L V6 engine, this executive sedan delivers smooth performance, premium comfort, and outstanding durability, making it the perfect choice for both city driving and long-distance travel.",
     "engine": "3.5L V6",
     "color": "Black",
     "condition": "Foreign Used",
@@ -1606,7 +1686,7 @@
       "https://i.ibb.co/rKJNdhzk/IMG-20260725-WA0021.jpg",
       "https://i.ibb.co/FL5Ttvck/IMG-20260703-WA0019.jpg"
     ],
-    "description": "✨ 2015 Lexus IS 250 AWD ✨\\n🇳🇬 Abuja Used | Just Like Tokunbo | 2026 Duty Paid 🇳🇬\\n🔑 Keyless Entry | 🚘 Luxury Sports Sedan | 🤍 Elegant Pearl White Exterior\\n\\nFeatures:\\n• All-Wheel Drive (AWD)\\n• Smart Keyless Entry & Push Start\\n• Premium Leather Interior\\n• Reverse Camera & Bluetooth Connectivity\\n• Dual-Zone Climate Control & Power Front Seats\\n• Alloy Wheels & LED Daytime Running Lights\\n• Parking Sensors, ABS & Multiple Airbags",
+    "description": "✨ 2015 Lexus IS 250 AWD ✨\n🇳🇬 Abuja Used | Just Like Tokunbo | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry | 🚘 Luxury Sports Sedan | 🤍 Elegant Pearl White Exterior\n\nFeatures:\n• All-Wheel Drive (AWD)\n• Smart Keyless Entry & Push Start\n• Premium Leather Interior\n• Reverse Camera & Bluetooth Connectivity\n• Dual-Zone Climate Control & Power Front Seats\n• Alloy Wheels & LED Daytime Running Lights\n• Parking Sensors, ABS & Multiple Airbags",
     "engine": "2.5L V6",
     "color": "Pearl White",
     "condition": "Nigerian Used",
@@ -1631,7 +1711,7 @@
       "https://i.ibb.co/ZbS9Pqp/IMG-20260725-WA0029.jpg",
       "https://i.ibb.co/vvMWVqQ7/IMG-20260725-WA0027.jpg"
     ],
-    "description": "✨ 2015 Hyundai i30 GT ✨\\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\\n🔑 Keyless Entry & Push Start | 🚗 Hatchback | 🖤 Elegant Black Exterior\\n\\nExperience sporty performance, practicality, and excellent fuel efficiency with this 2015 Hyundai i30 GT. This well-maintained hatchback offers a comfortable cabin, smooth automatic transmission, 2.0L Inline-4 engine, and modern features making it ideal for daily commuting and long-distance travel.\\n\\nFeatures:\\n• Keyless Entry & Push Start Button\\n• Bluetooth Connectivity & Reverse Camera\\n• Premium Interior & Multifunction Steering Wheel\\n• Cruise Control & Automatic Climate Control\\n• Alloy Wheels & LED Daytime Running Lights\\n• Front Fog Lamps, ABS, ESC & Multiple Airbags",
+    "description": "✨ 2015 Hyundai i30 GT ✨\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚗 Hatchback | 🖤 Elegant Black Exterior\n\nExperience sporty performance, practicality, and excellent fuel efficiency with this 2015 Hyundai i30 GT. This well-maintained hatchback offers a comfortable cabin, smooth automatic transmission, 2.0L Inline-4 engine, and modern features making it ideal for daily commuting and long-distance travel.\n\nFeatures:\n• Keyless Entry & Push Start Button\n• Bluetooth Connectivity & Reverse Camera\n• Premium Interior & Multifunction Steering Wheel\n• Cruise Control & Automatic Climate Control\n• Alloy Wheels & LED Daytime Running Lights\n• Front Fog Lamps, ABS, ESC & Multiple Airbags",
     "engine": "2.0L Inline-4",
     "color": "Black",
     "condition": "Foreign Used",
@@ -1656,7 +1736,7 @@
       "https://i.ibb.co/4g2yQwSw/IMG-20260725-WA0039.jpg",
       "https://i.ibb.co/Y4q6fvXq/IMG-20260725-WA0034.jpg"
     ],
-    "description": "✨ 2009 Toyota Sienna XLE Limited ✨\\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\\n🔑 Keyless Entry & Push Start | 🚐 Premium Minivan | 💙 Elegant Blue Exterior\\n\\nExperience unmatched comfort, reliability, and spaciousness with this 2009 Toyota Sienna XLE Limited. Designed for families and long-distance travel, this premium minivan offers a smooth ride, powerful 3.5L V6 engine, and Toyota's legendary durability.\\n\\nFeatures:\\n• XLE Limited Trim\\n• Smart Keyless Entry & Push Start Button\\n• Premium Leather Interior & Power Sliding Doors\\n• Power Tailgate & Reverse Camera\\n• Tri-Zone Automatic Climate Control\\n• Power Front Seats, Cruise Control & Alloy Wheels\\n• Roof Rails, ABS, Vehicle Stability Control & Multiple Airbags",
+    "description": "✨ 2009 Toyota Sienna XLE Limited ✨\n🇧🇪 Foreign Used | 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚐 Premium Minivan | 💙 Elegant Blue Exterior\n\nExperience unmatched comfort, reliability, and spaciousness with this 2009 Toyota Sienna XLE Limited. Designed for families and long-distance travel, this premium minivan offers a smooth ride, powerful 3.5L V6 engine, and Toyota's legendary durability.\n\nFeatures:\n• XLE Limited Trim\n• Smart Keyless Entry & Push Start Button\n• Premium Leather Interior & Power Sliding Doors\n• Power Tailgate & Reverse Camera\n• Tri-Zone Automatic Climate Control\n• Power Front Seats, Cruise Control & Alloy Wheels\n• Roof Rails, ABS, Vehicle Stability Control & Multiple Airbags",
     "engine": "3.5L V6",
     "color": "Blue",
     "condition": "Foreign Used",
@@ -1681,7 +1761,7 @@
       "https://i.ibb.co/YTT457jr/IMG-20260725-WA0049.jpg",
       "https://i.ibb.co/PvqKqsPt/IMG-20260725-WA0045.jpg"
     ],
-    "description": "✨ 2015 Toyota Corolla LE ✨\\n🇧🇪 Foreign Used | Original 2026 Duty Paid 🇳🇬\\n🔑 Keyless Entry & Push Start | 🚗 Sedan | 🤍 Elegant Pearl White Exterior\\n\\nExperience comfort, reliability, and exceptional fuel economy with this 2015 Toyota Corolla LE. This foreign-used sedan has original 2026 duty paid and is in excellent condition. Renowned for its durability, low maintenance costs, and smooth driving experience, it's an ideal choice for both personal and commercial use.\\n\\nFeatures:\\n• Keyless Entry & Push Start Button\\n• Reverse Camera & Bluetooth Connectivity\\n• Touchscreen Multimedia System & Premium Fabric Interior\\n• Multifunction Steering Wheel & Cruise Control\\n• Automatic Climate Control & Alloy Wheels\\n• LED Daytime Running Lights, Power Windows & Power Mirrors\\n• ABS, Vehicle Stability Control & Multiple Airbags",
+    "description": "✨ 2015 Toyota Corolla LE ✨\n🇧🇪 Foreign Used | Original 2026 Duty Paid 🇳🇬\n🔑 Keyless Entry & Push Start | 🚗 Sedan | 🤍 Elegant Pearl White Exterior\n\nExperience comfort, reliability, and exceptional fuel economy with this 2015 Toyota Corolla LE. This foreign-used sedan has original 2026 duty paid and is in excellent condition. Renowned for its durability, low maintenance costs, and smooth driving experience, it's an ideal choice for both personal and commercial use.\n\nFeatures:\n• Keyless Entry & Push Start Button\n• Reverse Camera & Bluetooth Connectivity\n• Touchscreen Multimedia System & Premium Fabric Interior\n• Multifunction Steering Wheel & Cruise Control\n• Automatic Climate Control & Alloy Wheels\n• LED Daytime Running Lights, Power Windows & Power Mirrors\n• ABS, Vehicle Stability Control & Multiple Airbags",
     "engine": "1.8L Inline-4",
     "color": "Pearl White",
     "condition": "Foreign Used",
@@ -1707,7 +1787,7 @@
       "https://i.ibb.co/d0YVRmKB/IMG-20260725-WA0071.jpg",
       "https://i.ibb.co/prKHXqKL/IMG-20260725-WA0072.jpg"
     ],
-    "description": "✨ 2016 Honda Accord ✨\\n🇳🇬 Abuja Used | Duty Paid 📄\\n🔑 Keyless Entry | 📱 Double Screen | 🌞 Sunroof | 🩶 Elegant Dark Grey Exterior\\n\\nExperience style, comfort, and performance in this extremely clean 2016 Honda Accord. A premium and spacious sedan featuring keyless entry, double-screen infotainment system, sunroof, smooth automatic transmission, 2.4L 4-Cylinder engine, and excellent road presence.",
+    "description": "✨ 2016 Honda Accord ✨\n🇳🇬 Abuja Used | Duty Paid 📄\n🔑 Keyless Entry | 📱 Double Screen | 🌞 Sunroof | 🩶 Elegant Dark Grey Exterior\n\nExperience style, comfort, and performance in this extremely clean 2016 Honda Accord. A premium and spacious sedan featuring keyless entry, double-screen infotainment system, sunroof, smooth automatic transmission, 2.4L 4-Cylinder engine, and excellent road presence.",
     "engine": "2.4L 4-Cylinder",
     "color": "Dark Grey",
     "condition": "Nigerian Used",
@@ -1731,7 +1811,7 @@
       "https://i.ibb.co/39M2Qb70/IMG-20260725-WA0102.jpg",
       "https://i.ibb.co/fVTQ9b7J/IMG-20260725-WA0108.jpg"
     ],
-    "description": "✨ 2020 Lexus NX300 ✨\\n🇳🇬 Abuja Used | Clean Used | Duty Paid 📄\\n🩶 Elegant Grey Exterior | 🚘 Luxury SUV\\n\\nExperience luxury, comfort, and performance in this clean 2020 Lexus NX300. A stylish and premium SUV featuring a powerful 2.0L turbocharged petrol engine, smooth automatic transmission, modern styling, excellent road presence, and the comfort and refinement expected from Lexus.",
+    "description": "✨ 2020 Lexus NX300 ✨\n🇳🇬 Abuja Used | Clean Used | Duty Paid 📄\n🩶 Elegant Grey Exterior | 🚘 Luxury SUV\n\nExperience luxury, comfort, and performance in this clean 2020 Lexus NX300. A stylish and premium SUV featuring a powerful 2.0L turbocharged petrol engine, smooth automatic transmission, modern styling, excellent road presence, and the comfort and refinement expected from Lexus.",
     "engine": "2.0L Turbo 4-Cylinder",
     "color": "Grey",
     "condition": "Nigerian Used",
@@ -1756,7 +1836,7 @@
       "https://i.ibb.co/LXV08cQM/IMG-20260725-WA0058.jpg",
       "https://i.ibb.co/s9tnsHnd/IMG-20260725-WA0056.jpg"
     ],
-    "description": "✨ 2022 Toyota Camry XSE ✨\\n🇧🇪 Direct Belgium Import | Foreign Used | Original Duty Paid (July 18, 2026) 📄\\n⭐ Full Option | 🌞 Panoramic Roof | 🔑 Keyless Entry | 📉 Low Mileage | 🖤 Elegant Black Exterior\\n\\nExperience premium comfort, style, and performance in this 2022 Toyota Camry XSE, directly imported from Belgium. This full-option luxury sedan features a panoramic roof, keyless entry, low mileage, sporty XSE styling, 2.5L 4-Cylinder engine, and excellent road presence.",
+    "description": "✨ 2022 Toyota Camry XSE ✨\n🇧🇪 Direct Belgium Import | Foreign Used | Original Duty Paid (July 18, 2026) 📄\n⭐ Full Option | 🌞 Panoramic Roof | 🔑 Keyless Entry | 📉 Low Mileage | 🖤 Elegant Black Exterior\n\nExperience premium comfort, style, and performance in this 2022 Toyota Camry XSE, directly imported from Belgium. This full-option luxury sedan features a panoramic roof, keyless entry, low mileage, sporty XSE styling, 2.5L 4-Cylinder engine, and excellent road presence.",
     "engine": "2.5L 4-Cylinder",
     "color": "Black",
     "condition": "Foreign Used",
@@ -1781,7 +1861,7 @@
       "https://i.ibb.co/pr2CV6PR/IMG-20260724-WA0035-1.jpg",
       "https://i.ibb.co/TD2CyYRb/IMG-20260724-WA0037-1.jpg"
     ],
-    "description": "✨ 2015 Toyota 4Runner ✨\\n🌍 Foreign Used | 📄 Duty Fully Paid 🇳🇬\\n🖤 Elegant Black Exterior | 🚘 Rugged Luxury SUV | ⚡ Powerful V6 Performance\\n\\nExperience rugged capability, comfort, and reliability in this 2015 Toyota 4Runner. A powerful and spacious SUV featuring a 4.0L V6 petrol engine, smooth automatic transmission, excellent ground clearance, strong road presence, and the durability Toyota 4Runner is known for.",
+    "description": "✨ 2015 Toyota 4Runner ✨\n🌍 Foreign Used | 📄 Duty Fully Paid 🇳🇬\n🖤 Elegant Black Exterior | 🚘 Rugged Luxury SUV | ⚡ Powerful V6 Performance\n\nExperience rugged capability, comfort, and reliability in this 2015 Toyota 4Runner. A powerful and spacious SUV featuring a 4.0L V6 petrol engine, smooth automatic transmission, excellent ground clearance, strong road presence, and the durability Toyota 4Runner is known for.",
     "engine": "4.0L V6",
     "color": "Black",
     "condition": "Foreign Used",
@@ -1806,7 +1886,7 @@
       "https://i.ibb.co/tpvbqm7t/IMG-20260716-WA0031.jpg",
       "https://i.ibb.co/ZzdTbSXh/IMG-20260716-WA0033.jpg"
     ],
-    "description": "✨ 2023 Honda Accord ✨\\n🌍 Foreign Used | 📄 Duty Paid 🇳🇬\\n🖤 Elegant Black Exterior | 🚘 Modern Luxury Sedan\\n\\nExperience modern luxury, comfort, and performance in this 2023 Honda Accord. A stylish and spacious sedan with a smooth automatic transmission, efficient turbocharged petrol engine, refined interior, modern design, and excellent road presence.",
+    "description": "✨ 2023 Honda Accord ✨\n🌍 Foreign Used | 📄 Duty Paid 🇳🇬\n🖤 Elegant Black Exterior | 🚘 Modern Luxury Sedan\n\nExperience modern luxury, comfort, and performance in this 2023 Honda Accord. A stylish and spacious sedan with a smooth automatic transmission, efficient turbocharged petrol engine, refined interior, modern design, and excellent road presence.",
     "engine": "1.5L Turbo 4-Cylinder",
     "color": "Black",
     "condition": "Foreign Used",

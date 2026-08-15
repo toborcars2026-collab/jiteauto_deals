@@ -2,51 +2,9 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v3';
+const VEHICLES_KEY = 'jite_vehicles_v2';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
-
-// Automatically decode Unicode escape sequences (e.g. \u2728, \u{1F1F3}\u{1F1EC}, \u{1F9FE})
-export function decodeUnicode(str: string): string {
-  if (!str || typeof str !== 'string') return str || '';
-  
-  // 1. Decode curly-brace Unicode escapes: e.g. \u{1F1F3}, \u{1F1EC}, \u{1F9FE}, \u{1F90D}, \u{1F3C1}, \u{1F525}
-  let result = str.replace(/\\u\{([0-9a-fA-F]+)\}/g, (match, hex) => {
-    try {
-      const codePoint = parseInt(hex, 16);
-      if (codePoint >= 0 && codePoint <= 0x10ffff) {
-        return String.fromCodePoint(codePoint);
-      }
-      return match;
-    } catch {
-      return match;
-    }
-  });
-
-  // 2. Decode standard 4-digit Unicode escapes: e.g. \u2728, \u20A6, \u2022, \u2600
-  result = result.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
-    try {
-      const charCode = parseInt(hex, 16);
-      return String.fromCharCode(charCode);
-    } catch {
-      return match;
-    }
-  });
-
-  return result;
-}
-
-// Sanitize vehicle data so all string fields have decoded unicode & emojis
-export function sanitizeVehicle<T extends Vehicle | Partial<Vehicle>>(v: T): T {
-  if (!v || typeof v !== 'object') return v;
-  const clone = { ...v } as any;
-  for (const key of Object.keys(clone)) {
-    if (typeof clone[key] === 'string') {
-      clone[key] = decodeUnicode(clone[key]);
-    }
-  }
-  return clone;
-}
 
 // Format Currency to Nigerian Naira (₦)
 export function formatCurrency(amount: number): string {
@@ -87,6 +45,103 @@ export function formatPortfolioValue(totalNGN: number): string {
     return `₦${val}K+`;
   }
   return formatCurrency(totalNGN);
+}
+
+/**
+ * Decodes all forms of Unicode escape sequences (\uXXXX, \u{XXXXX}, \UXXXXXXXX, \xXX, &#x...;, &#...;)
+ * into real, properly rendered Unicode emoji and text characters.
+ * Preserves original line breaks, bullet points, and existing UTF-8 characters without double-decoding.
+ */
+export function decodeUnicodeEscapes(str: string | undefined | null): string {
+  if (!str || typeof str !== 'string') return '';
+  let res = str;
+
+  // 1. ES6 bracketed unicode escape: \u{1F1F3} or \u{1F9FE}
+  res = res.replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, (_, hex) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 2. Standard 4-digit hex escape: \u2728, \u2014, \u20A6, \u2022
+  res = res.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCharCode(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 3. 8-digit uppercase \U0001F1F3
+  res = res.replace(/\\U([0-9a-fA-F]{8})/g, (_, hex) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 4. Hex escape \xB0 (degree symbol, etc.)
+  res = res.replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => {
+    try {
+      const code = parseInt(hex, 16);
+      return String.fromCharCode(code);
+    } catch {
+      return _;
+    }
+  });
+
+  // 5. HTML hexadecimal entities: &#x1F1F3;
+  res = res.replace(/&#x([0-9a-fA-F]{1,6});/gi, (_, hex) => {
+    try {
+      const code = parseInt(hex, 16);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 6. HTML decimal entities: &#128664;
+  res = res.replace(/&#([0-9]{1,7});/g, (_, dec) => {
+    try {
+      const code = parseInt(dec, 10);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
+    } catch {
+      return _;
+    }
+  });
+
+  // 7. Accidental stripped prefix at start or whitespace: e.g. "2728 2014 BMW" -> "✨ 2014 BMW"
+  res = res.replace(/^2728\s+/g, '✨ ');
+  res = res.replace(/\s+2728$/g, ' ✨');
+
+  // 8. Convert literal \n or \r\n to real newlines if present as escaped character sequences
+  res = res.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+
+  return res;
+}
+
+/**
+ * Normalizes vehicle data by decoding all text fields and descriptions.
+ */
+export function normalizeVehicleData(vehicle: Vehicle): Vehicle {
+  if (!vehicle) return vehicle;
+  return {
+    ...vehicle,
+    make: decodeUnicodeEscapes(vehicle.make),
+    model: decodeUnicodeEscapes(vehicle.model),
+    dealership: decodeUnicodeEscapes(vehicle.dealership),
+    engine: decodeUnicodeEscapes(vehicle.engine),
+    color: decodeUnicodeEscapes(vehicle.color),
+    condition: decodeUnicodeEscapes(vehicle.condition) as any,
+    location: decodeUnicodeEscapes(vehicle.location),
+    description: decodeUnicodeEscapes(vehicle.description),
+  };
 }
 
 // Map of known ImgBB page codes to 100% full original resolution direct CDN URLs
@@ -220,6 +275,23 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'CKqf709N': 'https://i.ibb.co/8gJH58xT/IMG-20260811-WA0163.jpg',
   'MxM3t1C8': 'https://i.ibb.co/gLzBfWRv/IMG-20260811-WA0165.jpg',
   '0pDPJxh6': 'https://i.ibb.co/nqghkFzY/IMG-20260811-WA0166.jpg',
+  'pj0zhHNv': 'https://i.ibb.co/m5DqNndC/IMG-20260814-WA0028.jpg',
+  'jk88P4VJ': 'https://i.ibb.co/xq22t5mF/IMG-20260815-WA0000.jpg',
+  'NdvZK076': 'https://i.ibb.co/RkFzcX7p/IMG-20260815-WA0001.jpg',
+  '5hhGR0JG': 'https://i.ibb.co/Jjjms1Sm/IMG-20260815-WA0002.jpg',
+  'SDqNr6v3': 'https://i.ibb.co/nqhrCwkL/IMG-20260815-WA0003.jpg',
+  '4gsH1PrF': 'https://i.ibb.co/TqKsWm3w/IMG-20260814-WA0011.jpg',
+  'WvL66pHf': 'https://i.ibb.co/5hP66x1L/IMG-20260814-WA0014.jpg',
+  'TBg6zZP8': 'https://i.ibb.co/vxjp2bLP/IMG-20260815-WA0004.jpg',
+  'pvxD8fwy': 'https://i.ibb.co/cc15H63L/IMG-20260815-WA0005.jpg',
+  'cXNJDpLG': 'https://i.ibb.co/fGCM4Kvh/IMG-20260815-WA0006.jpg',
+  'wh3DH1GC': 'https://i.ibb.co/GQBgwjYk/IMG-20260815-WA0007.jpg',
+  'Qj8DHjwZ': 'https://i.ibb.co/CsJP9sGq/IMG-20260814-WA0030.jpg',
+  'WpyLdPr2': 'https://i.ibb.co/Lht3qJTZ/IMG-20260815-WA0009.jpg',
+  'zkLGFMq': 'https://i.ibb.co/VKh2x1f/IMG-20260815-WA0011.jpg',
+  'YBSPHCHm': 'https://i.ibb.co/B2Jc0p0b/IMG-20260814-WA0013.jpg',
+  'ycnnJVfQ': 'https://i.ibb.co/q3MMwxyr/IMG-20260814-WA0015.jpg',
+  'QvDFrSgf': 'https://i.ibb.co/TMWBmjfk/IMG-20260815-WA0013.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -308,20 +380,15 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const res = await fetch('/api/vehicles?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
-      const rawData = await res.json();
-      if (Array.isArray(rawData) && rawData.length > 0) {
-        const sanitized = rawData.map(v => sanitizeVehicle(v));
-        try {
-          localStorage.removeItem('jite_vehicles_v1');
-          localStorage.removeItem('jite_vehicles_v2');
-          localStorage.setItem(VEHICLES_KEY, JSON.stringify(sanitized));
-        } catch {
-          // ignore
-        }
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const normalized = data.map(normalizeVehicleData);
+        localStorage.removeItem('jite_vehicles_v1');
+        localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: sanitized }));
+          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
         }
-        return sanitized;
+        return normalized;
       }
     }
   } catch (e) {
@@ -334,48 +401,37 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 export function getVehicles(): Vehicle[] {
   try {
     localStorage.removeItem('jite_vehicles_v1');
-    localStorage.removeItem('jite_vehicles_v2');
   } catch {
     // ignore
   }
   const data = localStorage.getItem(VEHICLES_KEY);
   if (!data) {
-    const cleanInitial = INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
-    try {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(cleanInitial));
-    } catch {
-      // ignore
-    }
-    return cleanInitial;
+    const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
+    return normalizedSeed;
   }
   try {
     const parsed = JSON.parse(data) as Vehicle[];
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.map(v => sanitizeVehicle(v));
-    }
-    return INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
+    const normalized = Array.isArray(parsed) ? parsed.map(normalizeVehicleData) : INITIAL_VEHICLES.map(normalizeVehicleData);
+    return normalized;
   } catch (e) {
-    return INITIAL_VEHICLES.map(v => sanitizeVehicle(v));
+    return INITIAL_VEHICLES.map(normalizeVehicleData);
   }
 }
 
 // Save vehicles to localStorage AND sync to backend server
 export function saveVehicles(vehicles: Vehicle[]): void {
-  const sanitized = vehicles.map(v => sanitizeVehicle(v));
-  try {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(sanitized));
-  } catch {
-    // ignore
-  }
+  const normalized = vehicles.map(normalizeVehicleData);
+  localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: sanitized }));
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
   }
 
   // Sync to server asynchronously so all devices see the changes
   fetch('/api/vehicles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(sanitized)
+    body: JSON.stringify(normalized)
   }).catch(err => {
     console.error('Failed to sync vehicles to server:', err);
   });
