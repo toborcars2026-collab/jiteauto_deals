@@ -37,6 +37,13 @@ import {
 } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
+interface AppHistoryState {
+  tab: 'home' | 'browse' | 'admin';
+  modal?: 'details' | 'qualifier' | 'consultant' | null;
+  vehicleId?: string | null;
+  vehicleSlug?: string | null;
+}
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'browse' | 'admin'>('home');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -53,17 +60,6 @@ export default function App() {
   const [consultantCustomMessage, setConsultantCustomMessage] = useState<string | undefined>(undefined);
   const [consultantChannel, setConsultantChannel] = useState<'whatsapp' | 'call' | 'email'>('whatsapp');
 
-  const handleOpenConsultant = (
-    vehicle?: Vehicle | null,
-    customMsg?: string,
-    channel: 'whatsapp' | 'call' | 'email' = 'whatsapp'
-  ) => {
-    setConsultantContextVehicle(vehicle || null);
-    setConsultantCustomMessage(customMsg);
-    setConsultantChannel(channel);
-    setIsConsultantOpen(true);
-  };
-
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('All');
@@ -75,26 +71,257 @@ export default function App() {
   const [showOnlyCustom, setShowOnlyCustom] = useState(false);
   const [homeActiveTab, setHomeActiveTab] = useState<'featured' | 'added'>('featured');
 
-  // Populate state on load & listen for real-time storage/custom events and server updates
+  // Navigation: Change Tab with Clean History State (prevents duplicate pushes)
+  const handleTabChange = (newTab: 'home' | 'browse' | 'admin', replace: boolean = false) => {
+    // If already on the same tab and no modal is open, just smooth scroll to top
+    if (currentTab === newTab && !isDetailsOpen && !isQualifierOpen && !isConsultantOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const newState: AppHistoryState = {
+      tab: newTab,
+      modal: null,
+    };
+    const newUrl = newTab === 'home' ? '/' : `/?tab=${newTab}`;
+
+    try {
+      if (replace) {
+        window.history.replaceState(newState, '', newUrl);
+      } else {
+        const currentHistState = window.history.state as AppHistoryState | null;
+        if (!currentHistState || currentHistState.tab !== newTab || currentHistState.modal) {
+          window.history.pushState(newState, '', newUrl);
+        }
+      }
+    } catch {}
+
+    setCurrentTab(newTab);
+    setIsDetailsOpen(false);
+    setSelectedVehicle(null);
+    setIsQualifierOpen(false);
+    setQualifierVehicle(null);
+    setIsConsultantOpen(false);
+    document.title = newTab === 'admin'
+      ? 'Partner Console | Jite Auto Deals'
+      : newTab === 'browse'
+      ? 'Browse Verified Cars | Jite Auto Deals'
+      : 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Navigation: Open Vehicle Details (Pushes Vehicle Details history state)
+  const handleViewDetails = (vehicle: Vehicle) => {
+    const slug = getVehicleSlug(vehicle);
+    const newState: AppHistoryState = {
+      tab: currentTab,
+      modal: 'details',
+      vehicleId: vehicle.id,
+      vehicleSlug: slug,
+    };
+    const newUrl = `/?vehicle=${encodeURIComponent(slug)}`;
+
+    try {
+      window.history.pushState(newState, '', newUrl);
+    } catch {}
+
+    setSelectedVehicle(vehicle);
+    setIsDetailsOpen(true);
+    document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
+  };
+
+  // Navigation: Close Vehicle Details (Uses history.back to cleanly pop history)
+  const handleCloseDetails = () => {
+    try {
+      const histState = window.history.state as AppHistoryState | null;
+      if (histState && histState.modal === 'details') {
+        window.history.back();
+        return;
+      }
+    } catch {}
+
+    setIsDetailsOpen(false);
+    setSelectedVehicle(null);
+    const targetTab = currentTab || 'home';
+    const newUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
+    try {
+      window.history.replaceState({ tab: targetTab, modal: null }, '', newUrl);
+    } catch {}
+    document.title = targetTab === 'browse'
+      ? 'Browse Verified Cars | Jite Auto Deals'
+      : 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
+  };
+
+  // Navigation: Open Qualifier Modal ("Get This Car")
+  const handleOpenQualifier = (vehicle: Vehicle) => {
+    const slug = getVehicleSlug(vehicle);
+    const newState: AppHistoryState = {
+      tab: currentTab,
+      modal: 'qualifier',
+      vehicleId: vehicle.id,
+      vehicleSlug: slug,
+    };
+    const newUrl = `/?vehicle=${encodeURIComponent(slug)}&qualify=1`;
+    try {
+      window.history.pushState(newState, '', newUrl);
+    } catch {}
+
+    setQualifierVehicle(vehicle);
+    setIsQualifierOpen(true);
+  };
+
+  // Navigation: Close Qualifier Modal
+  const handleCloseQualifier = () => {
+    try {
+      const histState = window.history.state as AppHistoryState | null;
+      if (histState && histState.modal === 'qualifier') {
+        window.history.back();
+        return;
+      }
+    } catch {}
+    setIsQualifierOpen(false);
+    setQualifierVehicle(null);
+  };
+
+  // Navigation: Open Consultant Modal ("Talk to Consultant" / WhatsApp / Call)
+  const handleOpenConsultant = (
+    vehicle?: Vehicle | null,
+    customMsg?: string,
+    channel: 'whatsapp' | 'call' | 'email' = 'whatsapp'
+  ) => {
+    const slug = vehicle ? getVehicleSlug(vehicle) : null;
+    const newState: AppHistoryState = {
+      tab: currentTab,
+      modal: 'consultant',
+      vehicleId: vehicle?.id || null,
+      vehicleSlug: slug,
+    };
+    const newUrl = vehicle
+      ? `/?vehicle=${encodeURIComponent(slug!)}&consult=1`
+      : currentTab === 'home'
+      ? '/?consult=1'
+      : `/?tab=${currentTab}&consult=1`;
+
+    try {
+      window.history.pushState(newState, '', newUrl);
+    } catch {}
+
+    setConsultantContextVehicle(vehicle || null);
+    setConsultantCustomMessage(customMsg);
+    setConsultantChannel(channel);
+    setIsConsultantOpen(true);
+  };
+
+  // Navigation: Close Consultant Modal
+  const handleCloseConsultant = () => {
+    try {
+      const histState = window.history.state as AppHistoryState | null;
+      if (histState && histState.modal === 'consultant') {
+        window.history.back();
+        return;
+      }
+    } catch {}
+    setIsConsultantOpen(false);
+  };
+
+  // General Sourcing click
+  const handleGeneralConsultation = () => {
+    handleOpenConsultant(null, getGeneralConsultationMessage());
+  };
+
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedBrand('All');
+    setSelectedBodyType('All');
+    setSelectedLocation('All');
+    setSelectedTransmission('All');
+    setSelectedFuelType('All');
+    setPriceRange(150000000);
+    setShowOnlyCustom(false);
+  };
+
+  // 1. Initial Page Load and Data Initialization
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname;
+    const hash = window.location.hash;
+    const tabParam = searchParams.get('tab');
+    let initialTab: 'home' | 'browse' | 'admin' = 'home';
+    if (tabParam === 'browse' || tabParam === 'admin') {
+      initialTab = tabParam;
+    }
+    setCurrentTab(initialTab);
+
+    let initialVehicleSlugOrId: string | null = null;
+    if (pathname.startsWith('/vehicles/')) {
+      initialVehicleSlugOrId = pathname.replace(/^\/vehicles\/?/, '');
+    } else if (searchParams.get('vehicle')) {
+      initialVehicleSlugOrId = searchParams.get('vehicle');
+    } else if (searchParams.get('v')) {
+      initialVehicleSlugOrId = searchParams.get('v');
+    } else if (hash.startsWith('#/vehicles/')) {
+      initialVehicleSlugOrId = hash.replace(/^#\/vehicles\/?/, '');
+    }
+
+    let initialModal: 'details' | 'qualifier' | 'consultant' | null = null;
+    if (initialVehicleSlugOrId) {
+      initialModal = searchParams.get('qualify') ? 'qualifier' : 'details';
+    } else if (searchParams.get('consult')) {
+      initialModal = 'consultant';
+    }
+
+    // Root the initial history entry with replaceState (so no duplicate forward/back entries are created on initial load)
+    try {
+      const initialNavState: AppHistoryState = {
+        tab: initialTab,
+        modal: initialModal,
+        vehicleSlug: initialVehicleSlugOrId,
+      };
+      window.history.replaceState(initialNavState, '', window.location.href);
+    } catch {}
+
     const handleSync = () => {
       const vList = getVehicles();
       setVehicles(vList);
-      checkDirectVehicleUrl(vList);
+      if (initialVehicleSlugOrId) {
+        const found = findVehicleBySlugOrId(vList, initialVehicleSlugOrId);
+        if (found && isVehicleActive(found)) {
+          if (initialModal === 'qualifier') {
+            setQualifierVehicle(found);
+            setIsQualifierOpen(true);
+          } else {
+            setSelectedVehicle(found);
+            setIsDetailsOpen(true);
+            document.title = `${found.year} ${found.make} ${found.model} - ${formatCurrency(found.price)} | Jite Auto Deals`;
+          }
+        }
+      }
     };
 
     handleSync();
     fetchVehicles().then(v => {
       if (Array.isArray(v) && v.length > 0) {
         setVehicles(v);
-        checkDirectVehicleUrl(v);
+        if (initialVehicleSlugOrId) {
+          const found = findVehicleBySlugOrId(v, initialVehicleSlugOrId);
+          if (found && isVehicleActive(found)) {
+            if (initialModal === 'qualifier') {
+              setQualifierVehicle(found);
+              setIsQualifierOpen(true);
+            } else {
+              setSelectedVehicle(found);
+              setIsDetailsOpen(true);
+              document.title = `${found.year} ${found.make} ${found.model} - ${formatCurrency(found.price)} | Jite Auto Deals`;
+            }
+          }
+        }
       }
     });
 
     window.addEventListener('vehiclesUpdated', handleSync);
     window.addEventListener('storage', handleSync);
 
-    // Periodically sync with backend server so all devices get live updates when edits are made in Partner Console
     const interval = setInterval(() => {
       fetchVehicles().then(v => {
         if (Array.isArray(v) && v.length > 0) {
@@ -112,15 +339,6 @@ export default function App() {
     };
     window.addEventListener('focus', handleFocus);
 
-    // Check if we should switch to browse or admin tab from URL query params
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    if (tabParam === 'browse') {
-      setCurrentTab('browse');
-    } else if (tabParam === 'admin') {
-      setCurrentTab('admin');
-    }
-
     return () => {
       window.removeEventListener('vehiclesUpdated', handleSync);
       window.removeEventListener('storage', handleSync);
@@ -129,83 +347,70 @@ export default function App() {
     };
   }, []);
 
-  // Helper to check and open direct vehicle public links like /vehicles/2014-bmw-328i or ?vehicle=...
-  const checkDirectVehicleUrl = (vehicleList: Vehicle[]) => {
-    if (!Array.isArray(vehicleList) || vehicleList.length === 0) return;
-    try {
-      const pathname = window.location.pathname;
-      const searchParams = new URLSearchParams(window.location.search);
-      const vehicleParam = searchParams.get('vehicle') || searchParams.get('v');
-      const hash = window.location.hash;
+  // 2. Native Mobile Back Button & PopState History Listener
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as AppHistoryState | null;
 
-      let targetIdOrSlug: string | null = null;
-      if (pathname.startsWith('/vehicles/')) {
-        targetIdOrSlug = pathname.replace(/^\/vehicles\/?/, '');
-      } else if (vehicleParam) {
-        targetIdOrSlug = vehicleParam;
-      } else if (hash.startsWith('#/vehicles/')) {
-        targetIdOrSlug = hash.replace(/^#\/vehicles\/?/, '');
-      }
-
-      if (targetIdOrSlug) {
-        const found = findVehicleBySlugOrId(vehicleList, targetIdOrSlug);
-        if (found && isVehicleActive(found)) {
-          setSelectedVehicle(found);
-          setIsDetailsOpen(true);
-          document.title = `${found.year} ${found.make} ${found.model} | Jite Auto Deals Nigeria`;
+      // Determine target tab
+      let targetTab: 'home' | 'browse' | 'admin' = 'home';
+      if (state?.tab) {
+        targetTab = state.tab;
+      } else {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'browse' || tabParam === 'admin') {
+          targetTab = tabParam;
         }
       }
-    } catch {
-      // Ignore URL parsing errors
-    }
-  };
+      setCurrentTab(targetTab);
 
-  // Handle phone back button / browser history navigation for sections and modals
-  useEffect(() => {
-    if (isDetailsOpen || isQualifierOpen || isConsultantOpen || currentTab !== 'home') {
-      try {
-        const url = isDetailsOpen && selectedVehicle
-          ? `/?vehicle=${getVehicleSlug(selectedVehicle)}`
-          : currentTab !== 'home'
-          ? `/?tab=${currentTab}`
-          : '/';
+      // Determine modal & vehicle parameters
+      const targetModal = state?.modal || null;
+      const targetVehicleSlugOrId = state?.vehicleSlug || state?.vehicleId || null;
 
-        window.history.pushState(
-          {
-            modal: isDetailsOpen ? 'details' : isQualifierOpen ? 'qualifier' : isConsultantOpen ? 'consultant' : null,
-            tab: currentTab,
-            vehicleId: selectedVehicle?.id,
-          },
-          '',
-          url
-        );
-      } catch {
-        // Ignore if sandbox limits history
-      }
-    }
-  }, [isDetailsOpen, isQualifierOpen, isConsultantOpen, currentTab, selectedVehicle]);
+      const searchParams = new URLSearchParams(window.location.search);
+      const vehicleParam = targetVehicleSlugOrId || searchParams.get('vehicle') || searchParams.get('v');
 
-  useEffect(() => {
-    const handlePopState = () => {
-      // Step-by-step back navigation when pressing phone back button
-      if (isConsultantOpen) {
+      const vList = getVehicles();
+
+      if (targetModal === 'details' && vehicleParam) {
+        const found = findVehicleBySlugOrId(vList, vehicleParam);
+        if (found) {
+          setSelectedVehicle(found);
+          setIsDetailsOpen(true);
+          setIsQualifierOpen(false);
+          setQualifierVehicle(null);
+          setIsConsultantOpen(false);
+          document.title = `${found.year} ${found.make} ${found.model} - ${formatCurrency(found.price)} | Jite Auto Deals`;
+        } else {
+          setIsDetailsOpen(false);
+          setSelectedVehicle(null);
+        }
+      } else if (targetModal === 'qualifier') {
+        const found = vehicleParam ? findVehicleBySlugOrId(vList, vehicleParam) : null;
+        setQualifierVehicle(found);
+        setIsQualifierOpen(true);
+        setIsDetailsOpen(false);
         setIsConsultantOpen(false);
-        return;
-      }
-      if (isQualifierOpen) {
+      } else if (targetModal === 'consultant') {
+        const found = vehicleParam ? findVehicleBySlugOrId(vList, vehicleParam) : null;
+        setConsultantContextVehicle(found);
+        setIsConsultantOpen(true);
+        setIsDetailsOpen(false);
         setIsQualifierOpen(false);
-        setQualifierVehicle(null);
-        return;
-      }
-      if (isDetailsOpen) {
+      } else {
+        // All modals closed — smoothly return to the section/page
         setIsDetailsOpen(false);
         setSelectedVehicle(null);
-        document.title = 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
-        return;
-      }
-      if (currentTab !== 'home') {
-        setCurrentTab('home');
-        return;
+        setIsQualifierOpen(false);
+        setQualifierVehicle(null);
+        setIsConsultantOpen(false);
+        document.title = targetTab === 'admin'
+          ? 'Partner Console | Jite Auto Deals'
+          : targetTab === 'browse'
+          ? 'Browse Verified Cars | Jite Auto Deals'
+          : 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
       }
     };
 
@@ -213,60 +418,7 @@ export default function App() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [isConsultantOpen, isQualifierOpen, isDetailsOpen, currentTab]);
-
-  // Sync state when tab changes or admin edits listings
-  const handleReloadVehicles = () => {
-    setVehicles(getVehicles());
-  };
-
-  // General Sourcing click
-  const handleGeneralConsultation = () => {
-    handleOpenConsultant(null, getGeneralConsultationMessage());
-  };
-
-  // Click card View details
-  const handleViewDetails = (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle);
-    setIsDetailsOpen(true);
-    document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
-    try {
-      const slug = getVehicleSlug(vehicle);
-      window.history.pushState(
-        { modal: 'details', vehicleId: vehicle.id, slug },
-        '',
-        `/?vehicle=${slug}`
-      );
-    } catch {}
-  };
-
-  const handleCloseDetails = () => {
-    setIsDetailsOpen(false);
-    setSelectedVehicle(null);
-    document.title = 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
-    try {
-      const tabQuery = currentTab !== 'home' ? `/?tab=${currentTab}` : '/';
-      window.history.pushState({ modal: null, tab: currentTab }, '', tabQuery);
-    } catch {}
-  };
-
-  // Click card "Get This Car"
-  const handleOpenQualifier = (vehicle: Vehicle) => {
-    setQualifierVehicle(vehicle);
-    setIsQualifierOpen(true);
-  };
-
-  // Reset Filters
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setSelectedBrand('All');
-    setSelectedBodyType('All');
-    setSelectedLocation('All');
-    setSelectedTransmission('All');
-    setSelectedFuelType('All');
-    setPriceRange(150000000);
-    setShowOnlyCustom(false);
-  };
+  }, []);
 
   // Filter calculations
   const filteredVehicles = vehicles.filter((v) => {
@@ -316,7 +468,7 @@ export default function App() {
       {/* Sticky Top Header */}
       <Header
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleTabChange}
         onOpenConsultation={handleGeneralConsultation}
       />
 
@@ -328,10 +480,7 @@ export default function App() {
           <div className="space-y-0">
             {/* 1. Hero */}
             <Hero
-              onBrowseClick={() => {
-                setCurrentTab('browse');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onBrowseClick={() => handleTabChange('browse')}
               onConsultantClick={handleGeneralConsultation}
               vehicles={vehicles}
             />
@@ -352,11 +501,8 @@ export default function App() {
                     </p>
                   </div>
                   <button
-                    onClick={() => {
-                      setCurrentTab('browse');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="shrink-0 text-sm font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1 group"
+                    onClick={() => handleTabChange('browse')}
+                    className="shrink-0 text-sm font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1 group cursor-pointer"
                   >
                     <span>View Sourcing Catalog</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
@@ -713,13 +859,13 @@ export default function App() {
                           if (element) {
                             element.scrollIntoView({ behavior: 'smooth' });
                           } else {
-                            setCurrentTab('home');
+                            handleTabChange('home');
                             setTimeout(() => {
                               document.getElementById('help_me_find_car')?.scrollIntoView({ behavior: 'smooth' });
                             }, 100);
                           }
                         }}
-                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl"
+                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl cursor-pointer"
                       >
                         Help Me Find a Car
                       </button>
@@ -748,7 +894,7 @@ export default function App() {
           <AdminPanel
             vehicles={vehicles}
             setVehicles={setVehicles}
-            onCancel={() => setCurrentTab('home')}
+            onCancel={() => handleTabChange('home')}
           />
         )}
       </main>
@@ -759,7 +905,7 @@ export default function App() {
           
           {/* Brand */}
           <div className="md:col-span-4 space-y-4">
-            <div className="flex items-center gap-2 cursor-pointer shrink-0 select-none" onClick={() => setCurrentTab('home')}>
+            <div className="flex items-center gap-2 cursor-pointer shrink-0 select-none" onClick={() => handleTabChange('home')}>
               <span className="font-display font-black text-2xl tracking-tight text-white hover:text-amber-400 transition-colors">
                 Jite Auto <span className="text-amber-500">Deals</span>
               </span>
@@ -774,19 +920,19 @@ export default function App() {
             <h4 className="font-bold text-white uppercase tracking-wider text-[10px]">Sourcing Channels</h4>
             <ul className="space-y-2 font-light">
               <li>
-                <button onClick={() => setCurrentTab('browse')} className="hover:text-amber-500 transition-colors">
+                <button onClick={() => handleTabChange('browse')} className="hover:text-amber-500 transition-colors cursor-pointer">
                   Browse Active Showroom
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => {
-                    setCurrentTab('home');
+                    handleTabChange('home');
                     setTimeout(() => {
                       document.getElementById('how_it_works')?.scrollIntoView({ behavior: 'smooth' });
                     }, 100);
                   }}
-                  className="hover:text-amber-500 transition-colors"
+                  className="hover:text-amber-500 transition-colors cursor-pointer"
                 >
                   Sourcing Mechanics
                 </button>
@@ -794,12 +940,12 @@ export default function App() {
               <li>
                 <button
                   onClick={() => {
-                    setCurrentTab('home');
+                    handleTabChange('home');
                     setTimeout(() => {
                       document.getElementById('help_me_find_car')?.scrollIntoView({ behavior: 'smooth' });
                     }, 100);
                   }}
-                  className="hover:text-amber-500 transition-colors"
+                  className="hover:text-amber-500 transition-colors cursor-pointer"
                 >
                   VIP Sourcing Finder Form
                 </button>
@@ -811,8 +957,8 @@ export default function App() {
           <div className="md:col-span-2 space-y-3">
             <h4 className="font-bold text-white uppercase tracking-wider text-[10px]">Console</h4>
             <button
-              onClick={() => setCurrentTab('admin')}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/30 text-amber-500 hover:text-white rounded-lg font-semibold transition-all w-full text-center"
+              onClick={() => handleTabChange('admin')}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/30 text-amber-500 hover:text-white rounded-lg font-semibold transition-all w-full text-center cursor-pointer"
             >
               Partner Console
             </button>
@@ -847,10 +993,7 @@ export default function App() {
         vehicle={selectedVehicle}
         isOpen={isDetailsOpen}
         onClose={handleCloseDetails}
-        onOpenQualifier={(v) => {
-          setQualifierVehicle(v);
-          setIsQualifierOpen(true);
-        }}
+        onOpenQualifier={(v) => handleOpenQualifier(v)}
         onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
       />
 
@@ -858,10 +1001,7 @@ export default function App() {
         <LeadQualifierModal
           vehicle={qualifierVehicle}
           isOpen={isQualifierOpen}
-          onClose={() => {
-            setIsQualifierOpen(false);
-            setQualifierVehicle(null);
-          }}
+          onClose={handleCloseQualifier}
           onOpenConsultantModal={(v, msg) => handleOpenConsultant(v, msg)}
         />
       )}
@@ -869,7 +1009,7 @@ export default function App() {
       {/* Consultant Profile Modal */}
       <ConsultantProfileModal
         isOpen={isConsultantOpen}
-        onClose={() => setIsConsultantOpen(false)}
+        onClose={handleCloseConsultant}
         customMessage={consultantCustomMessage}
         vehicleContext={
           consultantContextVehicle
@@ -890,7 +1030,7 @@ export default function App() {
         isAtHomePage={currentTab === 'home' && !isDetailsOpen && !isQualifierOpen && !isConsultantOpen}
         onContinueBrowsing={() => {
           if (currentTab !== 'browse') {
-            setCurrentTab('browse');
+            handleTabChange('browse');
           }
           const inventoryEl = document.getElementById('inventory');
           if (inventoryEl) {

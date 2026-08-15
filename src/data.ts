@@ -2,6 +2,32 @@ import { Vehicle } from "./types";
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    "id": "mercedes-benz-glk350-2013-black-used-suv",
+    "make": "Mercedes-Benz",
+    "model": "GLK350",
+    "year": 2013,
+    "price": 13500000,
+    "mileage": 78000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Luxury SUV",
+    "location": "Abuja",
+    "dealership": "Verified Private Sourcing",
+    "engine": "3.5L V6 Petrol Engine",
+    "color": "Black",
+    "condition": "Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/0VqT9pKR/IMG-20260815-WA0017.jpg",
+      "https://i.ibb.co/3ymxW3T2/IMG-20260815-WA0018.jpg",
+      "https://i.ibb.co/kVtf7SH8/IMG-20260815-WA0019.jpg",
+      "https://i.ibb.co/sdP63L67/IMG-20260815-WA0022.jpg",
+      "https://i.ibb.co/8V1x98J/IMG-20260815-WA0023.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2013 Mercedes-Benz GLK350\n\n📋 Vehicle Details & Information:\n• Make: Mercedes-Benz\n• Model: GLK350\n• Year: 2013\n• Condition: Used\n• Exterior Color: Black\n• Duty Status: Duty Paid\n• Body Type: Luxury SUV\n• Price: ₦13,500,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA clean and stylish 2013 Mercedes-Benz GLK350 finished in a sleek black exterior. This premium SUV combines Mercedes-Benz luxury, strong road presence and everyday practicality.\nWith its spacious SUV body, refined interior and comfortable driving experience, the GLK350 is a great option for buyers looking for a luxury SUV at an attractive price point.\n\n⚙️ Key Features & Specifications:\n⭐ Mercedes-Benz GLK350\n📅 2013 model\n🖤 Black exterior\n🚘 Luxury SUV\n📄 Duty paid\n🛞 Alloy wheels\n🔑 Keyless entry\n💡 Premium lighting\n🪑 Leather interior\n❄️ Automatic climate control\n🎵 Bluetooth / multimedia system\n📷 Reverse camera\n🅿️ Parking sensors\n⚡ Power-adjustable seats\n🪟 Power windows\n🔒 Central locking\n🛋️ Spacious & comfortable cabin\n🛡️ Multiple safety features"
+  },
+  {
     "id": "mercedes-benz-c400-2017-black-foreign-used",
     "make": "Mercedes-Benz",
     "model": "C400",

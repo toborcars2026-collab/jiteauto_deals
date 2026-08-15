@@ -395,6 +395,11 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'YBSPHCHm': 'https://i.ibb.co/B2Jc0p0b/IMG-20260814-WA0013.jpg',
   'ycnnJVfQ': 'https://i.ibb.co/q3MMwxyr/IMG-20260814-WA0015.jpg',
   'QvDFrSgf': 'https://i.ibb.co/TMWBmjfk/IMG-20260815-WA0013.jpg',
+  'yB0tkmpc': 'https://i.ibb.co/0VqT9pKR/IMG-20260815-WA0017.jpg',
+  'KpGLyCLn': 'https://i.ibb.co/sdP63L67/IMG-20260815-WA0022.jpg',
+  'gbxp2RjT': 'https://i.ibb.co/kVtf7SH8/IMG-20260815-WA0019.jpg',
+  'P8qWgCR': 'https://i.ibb.co/8V1x98J/IMG-20260815-WA0023.jpg',
+  'BV2hjpfb': 'https://i.ibb.co/3ymxW3T2/IMG-20260815-WA0018.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
