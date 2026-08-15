@@ -165,7 +165,7 @@ export default function App() {
     if (isDetailsOpen || isQualifierOpen || isConsultantOpen || currentTab !== 'home') {
       try {
         const url = isDetailsOpen && selectedVehicle
-          ? `/vehicles/${getVehicleSlug(selectedVehicle)}`
+          ? `/?vehicle=${getVehicleSlug(selectedVehicle)}`
           : currentTab !== 'home'
           ? `/?tab=${currentTab}`
           : '/';
@@ -235,7 +235,7 @@ export default function App() {
       window.history.pushState(
         { modal: 'details', vehicleId: vehicle.id, slug },
         '',
-        `/vehicles/${slug}`
+        `/?vehicle=${slug}`
       );
     } catch {}
   };
@@ -245,10 +245,8 @@ export default function App() {
     setSelectedVehicle(null);
     document.title = 'Jite Auto Deals - Verified Vehicle Sourcing & Consulting in Nigeria';
     try {
-      if (window.location.pathname.startsWith('/vehicles/')) {
-        const tabQuery = currentTab !== 'home' ? `/?tab=${currentTab}` : '/';
-        window.history.pushState({ modal: null, tab: currentTab }, '', tabQuery);
-      }
+      const tabQuery = currentTab !== 'home' ? `/?tab=${currentTab}` : '/';
+      window.history.pushState({ modal: null, tab: currentTab }, '', tabQuery);
     } catch {}
   };
 

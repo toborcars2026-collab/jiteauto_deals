@@ -43,9 +43,26 @@ export function getVehicleSlug(vehicle: Vehicle): string {
 
 /**
  * Gets the direct, permanent public URL for a vehicle.
- * e.g. https://domain.com/vehicles/2014-bmw-328i
+ * Uses query parameter `?vehicle=slug` on custom hosting (or path fallback)
+ * to ensure 100% reliability across Vercel, static CDNs, and custom domains without 404 errors.
  */
 export function getVehicleShareUrl(vehicle: Vehicle): string {
+  if (!vehicle) return '';
+  const slug = getVehicleSlug(vehicle);
+  
+  if (typeof window !== 'undefined' && window.location) {
+    const origin = window.location.origin;
+    // Query parameter is universally supported on static hosts without server rewrites
+    return `${origin}/?vehicle=${encodeURIComponent(slug)}`;
+  }
+  
+  return `https://jiteautodeals-sable.vercel.app/?vehicle=${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Gets the clean SEO path format for vehicle links (when server rewrite is configured)
+ */
+export function getVehiclePathUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
   const origin = typeof window !== 'undefined' && window.location.origin
