@@ -1,5 +1,31 @@
 [
   {
+    "id": "toyota-camry-le-2019-silver-foreign-used",
+    "make": "Toyota",
+    "model": "Camry LE",
+    "year": 2019,
+    "price": 20000000,
+    "mileage": 48000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Verified Direct Belgium Import",
+    "engine": "2.5L 4-Cylinder DOHC Engine",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/zhGQq3qr/IMG-20260815-WA0025.jpg",
+      "https://i.ibb.co/mCvbZVnX/IMG-20260815-WA0027.jpg",
+      "https://i.ibb.co/HpRYzY8x/IMG-20260815-WA0029.jpg",
+      "https://i.ibb.co/HpHKX4Y1/IMG-20260815-WA0031.jpg",
+      "https://i.ibb.co/MxSrQqVS/IMG-20260815-WA0033.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2019 Toyota Camry LE\nForeign Used 🇧🇪 | Duty Paid | Urgent Sale\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Camry\n• Trim: LE\n• Year: 2019\n• Condition: Foreign Used 🇧🇪\n• Colour: Silver\n• Transmission: Automatic\n• Drive Type: Front-Wheel Drive\n• Duty Status: Duty Paid\n• Price: ₦20,000,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA clean and stylish 2019 Toyota Camry LE offering the comfort, reliability and refined appearance the Camry is known for. This silver example has a modern exterior design, spacious cabin and a practical setup suitable for everyday driving, business use and long-distance trips.\nForeign used and duty paid, making it ready for its next owner.\n\n⚙️ Key Features & Specifications:\n✅ 2019 Toyota Camry LE\n✅ Foreign Used 🇧🇪\n✅ Duty Paid\n✅ Silver exterior\n✅ Automatic transmission\n✅ Spacious interior\n✅ Modern Camry body design\n✅ Alloy wheels\n✅ Tinted windows\n✅ LED-style rear lighting\n✅ Bluetooth / infotainment system\n✅ Steering-wheel controls\n✅ Air conditioning\n✅ Reverse camera\n✅ Keyless entry & power features"
+  },
+  {
     "id": "mercedes-benz-glk350-2013-black-used-suv",
     "make": "Mercedes-Benz",
     "model": "GLK350",
@@ -365,32 +391,6 @@
       "https://i.ibb.co/nN6TT680/IMG-20260805-WA0024.jpg"
     ],
     "description": "✨ 2014 Mercedes-Benz GLK 350 4MATIC ✨\n🇩🇪 Foreign Used | 2026 Duty Paid 🇳🇬\n🌅 Full Panoramic Roof | 🔑 Keyless Entry | ⚡ Full Option | 💙 Elegant Deep Blue Exterior\n\nExperience luxury, performance, and commanding road presence with this 2014 Mercedes-Benz GLK 350 4MATIC. This full-option luxury SUV combines Mercedes-Benz comfort with the confidence of 4MATIC all-wheel drive, a powerful V6 engine, and a premium interior.\n\n⭐ Features & Highlights\n✅ Full Panoramic Roof\n✅ Keyless Entry & Push Start Button\n✅ 4MATIC All-Wheel Drive\n✅ 3.5L V6 Engine\n✅ Premium Leather Interior & Power Seats\n✅ Reverse Camera & Parking Sensors\n✅ Bluetooth Connectivity & Touchscreen Interface\n✅ Multifunction Steering Wheel & Cruise Control\n✅ Automatic Climate Control\n✅ Alloy Wheels\n✅ Power Windows & Mirrors\n✅ LED Lighting\n✅ Multiple Airbags & Stability Control\n✅ Spacious Premium Cabin\n✅ Full Option Specification\n✅ Excellent Engine & Transmission\n✅ Ready to Drive"
-  },
-  {
-    "id": "toyota-corolla-s-2015-silver-few-months-used",
-    "make": "Toyota",
-    "model": "Corolla S",
-    "year": 2015,
-    "price": 12000000,
-    "mileage": 62000,
-    "transmission": "Automatic",
-    "fuelType": "Petrol",
-    "bodyType": "Sedan",
-    "location": "Abuja",
-    "dealership": "Verified Private Sourcing",
-    "engine": "1.8L Inline-4",
-    "color": "Silver",
-    "condition": "Few Months Used",
-    "isFeatured": true,
-    "status": "Active",
-    "images": [
-      "https://i.ibb.co/6LVPB7w/IMG-20260805-WA0004.jpg",
-      "https://i.ibb.co/zWKYzJQ4/IMG-20260805-WA0008.jpg",
-      "https://i.ibb.co/5WQ4qB4v/IMG-20260805-WA0006.jpg",
-      "https://i.ibb.co/gxqhPjp/IMG-20260805-WA0010.jpg",
-      "https://i.ibb.co/QjkPFyBr/IMG-20260805-WA0012.jpg"
-    ],
-    "description": "✨ 2015 Toyota Corolla S ✨\n🇳🇬 Few Months Used | Extremely Clean | 2026 Duty Paid\n🚘 Sporty Sedan | 🩶 Elegant Silver Exterior | 🔑 Keyless Entry\n\nGet behind the wheel of this extremely clean 2015 Toyota Corolla S, maintained in excellent condition and ready for immediate use. Combining Toyota's renowned reliability with sporty styling, excellent fuel economy, and a comfortable interior, this Corolla is an excellent choice for everyday driving.\n\n⭐ Key Features\n✅ Corolla S Sport Trim\n✅ Keyless Entry & Push Start Button\n✅ Reverse Camera\n✅ Bluetooth Connectivity & Touchscreen Multimedia System\n✅ Multifunction Steering Wheel & Cruise Control\n✅ Automatic Climate Control\n✅ Alloy Wheels & Sporty Exterior Styling\n✅ LED Daytime Running Lights\n✅ Power Windows & Power Mirrors\n✅ ABS & Multiple Airbags\n✅ Spacious Interior & Boot\n✅ Excellent Engine & Transmission\n✅ Extremely Clean Interior & Exterior\n✅ Ready to Drive"
   },
   {
     "id": "toyota-camry-xse-2020-blue-full-option",
