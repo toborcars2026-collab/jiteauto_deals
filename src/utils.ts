@@ -2,7 +2,7 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v2';
+const VEHICLES_KEY = 'jite_vehicles_v3';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
 
@@ -500,13 +500,24 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        const normalized = data.map(normalizeVehicleData);
-        localStorage.removeItem('jite_vehicles_v1');
-        localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
+        const normalizedServer = data.map(normalizeVehicleData);
+        const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
+        
+        // Merge any newly introduced INITIAL_VEHICLES that may not be in server response
+        const serverIds = new Set(normalizedServer.map(v => v.id));
+        const missingSeed = normalizedSeed.filter(v => !serverIds.has(v.id));
+        const finalMerged = missingSeed.length > 0 ? [...missingSeed, ...normalizedServer] : normalizedServer;
+
+        try {
+          localStorage.removeItem('jite_vehicles_v1');
+          localStorage.removeItem('jite_vehicles_v2');
+          localStorage.setItem(VEHICLES_KEY, JSON.stringify(finalMerged));
+        } catch {}
+
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
+          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: finalMerged }));
         }
-        return normalized;
+        return finalMerged;
       }
     }
   } catch (e) {
@@ -515,25 +526,41 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
   return getVehicles();
 }
 
-// Get loaded vehicles from localStorage or seed
+// Get loaded vehicles from localStorage or seed with automatic seed reconciliation
 export function getVehicles(): Vehicle[] {
   try {
     localStorage.removeItem('jite_vehicles_v1');
+    localStorage.removeItem('jite_vehicles_v2');
   } catch {
     // ignore
   }
+  const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
   const data = localStorage.getItem(VEHICLES_KEY);
   if (!data) {
-    const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
     localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
     return normalizedSeed;
   }
   try {
     const parsed = JSON.parse(data) as Vehicle[];
-    const normalized = Array.isArray(parsed) ? parsed.map(normalizeVehicleData) : INITIAL_VEHICLES.map(normalizeVehicleData);
-    return normalized;
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
+      return normalizedSeed;
+    }
+    const normalizedParsed = parsed.map(normalizeVehicleData);
+    
+    // Automatically merge any newly added seed vehicles from INITIAL_VEHICLES that are missing in localStorage
+    const existingIds = new Set(normalizedParsed.map(v => v.id));
+    const missingSeed = normalizedSeed.filter(v => !existingIds.has(v.id));
+    
+    if (missingSeed.length > 0) {
+      const merged = [...missingSeed, ...normalizedParsed];
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(merged));
+      return merged;
+    }
+    
+    return normalizedParsed;
   } catch (e) {
-    return INITIAL_VEHICLES.map(normalizeVehicleData);
+    return normalizedSeed;
   }
 }
 

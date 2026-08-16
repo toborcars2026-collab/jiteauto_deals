@@ -112,23 +112,30 @@ function normalizeVehicle(v: any): any {
 // Helper functions for reading and writing JSON storage
 function readVehiclesStore() {
   ensureDataDir();
+  const normalizedInitial = INITIAL_VEHICLES.map(normalizeVehicle);
   if (!fs.existsSync(VEHICLES_FILE)) {
-    const normalized = INITIAL_VEHICLES.map(normalizeVehicle);
-    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
-    return normalized;
+    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalizedInitial, null, 2), "utf-8");
+    return normalizedInitial;
   }
   try {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
-      return data.map(normalizeVehicle);
+      const normalizedData = data.map(normalizeVehicle);
+      const existingIds = new Set(normalizedData.map((v: any) => v.id));
+      const missingInitial = normalizedInitial.filter((v: any) => !existingIds.has(v.id));
+      if (missingInitial.length > 0) {
+        const merged = [...missingInitial, ...normalizedData];
+        fs.writeFileSync(VEHICLES_FILE, JSON.stringify(merged, null, 2), "utf-8");
+        return merged;
+      }
+      return normalizedData;
     }
   } catch (e) {
     console.error("Failed to parse vehicles.json, falling back to seed data", e);
   }
-  const normalized = INITIAL_VEHICLES.map(normalizeVehicle);
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
-  return normalized;
+  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalizedInitial, null, 2), "utf-8");
+  return normalizedInitial;
 }
 
 function saveVehiclesStore(vehicles: any[]) {

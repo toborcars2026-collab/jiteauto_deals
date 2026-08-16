@@ -70,6 +70,7 @@ export default function App() {
   const [priceRange, setPriceRange] = useState(150000000); // Max slider value
   const [showOnlyCustom, setShowOnlyCustom] = useState(false);
   const [homeActiveTab, setHomeActiveTab] = useState<'featured' | 'added'>('featured');
+  const [homeVisibleLimit, setHomeVisibleLimit] = useState(12);
 
   // Navigation: Change Tab with Clean History State (prevents duplicate pushes)
   const handleTabChange = (newTab: 'home' | 'browse' | 'admin', replace: boolean = false) => {
@@ -545,7 +546,7 @@ export default function App() {
                   ) : (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {homepageVehicles.slice(0, 8).map((vehicle) => (
+                        {homepageVehicles.slice(0, homeVisibleLimit).map((vehicle) => (
                           <VehicleCard
                             key={vehicle.id}
                             vehicle={vehicle}
@@ -555,6 +556,18 @@ export default function App() {
                           />
                         ))}
                       </div>
+
+                      {homepageVehicles.length > homeVisibleLimit && (
+                        <div className="flex justify-center mt-8">
+                          <button
+                            onClick={() => setHomeVisibleLimit(prev => Math.min(prev + 12, homepageVehicles.length))}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-sm border border-slate-200 shadow-sm transition-all hover:border-amber-500 cursor-pointer"
+                          >
+                            <span>Show More Vehicles ({homepageVehicles.length - homeVisibleLimit} more)</span>
+                            <span>↓</span>
+                          </button>
+                        </div>
+                      )}
                     </>
                   )
                 ) : (
@@ -567,10 +580,9 @@ export default function App() {
                       </p>
                       <button
                         onClick={() => {
-                          setCurrentTab('admin');
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          handleTabChange('admin');
                         }}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow cursor-pointer"
                       >
                         <span>Go to Partner Console</span>
                         <span>→</span>
@@ -581,7 +593,7 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {vehicles
                           .filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id))
-                          .slice(0, 8)
+                          .slice(0, homeVisibleLimit)
                           .map((vehicle) => (
                             <VehicleCard
                               key={vehicle.id}
@@ -596,17 +608,24 @@ export default function App() {
                   )
                 )}
 
-                <div className="flex flex-col items-center justify-center mt-10 gap-2">
+                <div className="flex flex-wrap items-center justify-center mt-10 gap-3">
+                  <button
+                    onClick={() => handleTabChange('browse')}
+                    className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl border border-amber-500/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
+                  >
+                    <span>Browse All ({activeVehicles.length}) Sourced Vehicles</span>
+                    <span className="text-amber-400 group-hover:translate-x-1 transition-transform">→</span>
+                  </button>
                   <button
                     onClick={() => {
                       const url = new URL(window.location.href);
                       url.searchParams.set('tab', 'browse');
                       window.open(url.toString(), '_blank');
                     }}
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-amber-500 font-extrabold rounded-2xl text-sm sm:text-base transition-all shadow-lg hover:shadow-xl border border-amber-500/10 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
+                    className="inline-flex items-center gap-2 px-5 py-4 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-2xl text-sm transition-all border border-slate-200 cursor-pointer group"
                   >
-                    <span>View All ({activeVehicles.length}) Vehicles in a New Tab</span>
-                    <span className="text-amber-500 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">↗</span>
+                    <span>Open in New Tab</span>
+                    <span className="text-slate-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
                   </button>
                 </div>
               </div>
