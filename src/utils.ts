@@ -2,9 +2,14 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v3';
+const VEHICLES_KEY = 'jite_vehicles_v4';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
+
+// Global tombstone blacklist of permanently removed vehicle IDs
+export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
+  'toyota-corolla-s-2015-silver-few-months-used'
+]);
 
 // Format Currency to Nigerian Naira (₦)
 export function formatCurrency(amount: number): string {
@@ -499,18 +504,23 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     const res = await fetch('/api/vehicles?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const normalizedServer = data.map(normalizeVehicleData);
-        const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
+      if (Array.isArray(data)) {
+        const normalizedServer = data
+          .map(normalizeVehicleData)
+          .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
+        const normalizedSeed = INITIAL_VEHICLES
+          .map(normalizeVehicleData)
+          .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
         
         // Merge any newly introduced INITIAL_VEHICLES that may not be in server response
         const serverIds = new Set(normalizedServer.map(v => v.id));
-        const missingSeed = normalizedSeed.filter(v => !serverIds.has(v.id));
+        const missingSeed = normalizedSeed.filter(v => !serverIds.has(v.id) && !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
         const finalMerged = missingSeed.length > 0 ? [...missingSeed, ...normalizedServer] : normalizedServer;
 
         try {
           localStorage.removeItem('jite_vehicles_v1');
           localStorage.removeItem('jite_vehicles_v2');
+          localStorage.removeItem('jite_vehicles_v3');
           localStorage.setItem(VEHICLES_KEY, JSON.stringify(finalMerged));
         } catch {}
 
@@ -531,10 +541,13 @@ export function getVehicles(): Vehicle[] {
   try {
     localStorage.removeItem('jite_vehicles_v1');
     localStorage.removeItem('jite_vehicles_v2');
+    localStorage.removeItem('jite_vehicles_v3');
   } catch {
     // ignore
   }
-  const normalizedSeed = INITIAL_VEHICLES.map(normalizeVehicleData);
+  const normalizedSeed = INITIAL_VEHICLES
+    .map(normalizeVehicleData)
+    .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
   const data = localStorage.getItem(VEHICLES_KEY);
   if (!data) {
     localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
@@ -546,11 +559,13 @@ export function getVehicles(): Vehicle[] {
       localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
       return normalizedSeed;
     }
-    const normalizedParsed = parsed.map(normalizeVehicleData);
+    const normalizedParsed = parsed
+      .map(normalizeVehicleData)
+      .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
     
     // Automatically merge any newly added seed vehicles from INITIAL_VEHICLES that are missing in localStorage
     const existingIds = new Set(normalizedParsed.map(v => v.id));
-    const missingSeed = normalizedSeed.filter(v => !existingIds.has(v.id));
+    const missingSeed = normalizedSeed.filter(v => !existingIds.has(v.id) && !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
     
     if (missingSeed.length > 0) {
       const merged = [...missingSeed, ...normalizedParsed];
@@ -566,7 +581,9 @@ export function getVehicles(): Vehicle[] {
 
 // Save vehicles to localStorage AND sync to backend server
 export function saveVehicles(vehicles: Vehicle[]): void {
-  const normalized = vehicles.map(normalizeVehicleData);
+  const normalized = vehicles
+    .map(normalizeVehicleData)
+    .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
   localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
@@ -579,6 +596,22 @@ export function saveVehicles(vehicles: Vehicle[]): void {
     body: JSON.stringify(normalized)
   }).catch(err => {
     console.error('Failed to sync vehicles to server:', err);
+  });
+}
+
+// Permanently delete a vehicle across browser and server storage
+export function deleteVehicle(id: string): void {
+  PERMANENTLY_DELETED_VEHICLE_IDS.add(id);
+  const current = getVehicles().filter(v => v.id !== id);
+  localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+  }
+
+  fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  }).catch(err => {
+    console.error('Failed to delete vehicle on server:', err);
   });
 }
 

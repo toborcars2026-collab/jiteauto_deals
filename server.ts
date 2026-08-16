@@ -14,13 +14,44 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // Directory & file paths for server persistence across devices
 const DATA_DIR = path.join(process.cwd(), "data_store");
 const VEHICLES_FILE = path.join(DATA_DIR, "vehicles.json");
+const DELETED_FILE = path.join(DATA_DIR, "deleted_ids.json");
 const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 const INQUIRIES_FILE = path.join(DATA_DIR, "inquiries.json");
+
+const KNOWN_DELETED_IDS = new Set<string>([
+  "toyota-corolla-s-2015-silver-few-months-used"
+]);
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
+}
+
+function readDeletedIdsStore(): Set<string> {
+  ensureDataDir();
+  const deletedSet = new Set<string>(KNOWN_DELETED_IDS);
+  if (!fs.existsSync(DELETED_FILE)) {
+    fs.writeFileSync(DELETED_FILE, JSON.stringify(Array.from(deletedSet), null, 2), "utf-8");
+    return deletedSet;
+  }
+  try {
+    const raw = fs.readFileSync(DELETED_FILE, "utf-8");
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) {
+      data.forEach((id: string) => deletedSet.add(id));
+    }
+  } catch (e) {
+    console.error("Failed to read deleted_ids.json", e);
+  }
+  return deletedSet;
+}
+
+function recordDeletedId(id: string) {
+  ensureDataDir();
+  const set = readDeletedIdsStore();
+  set.add(id);
+  fs.writeFileSync(DELETED_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
 }
 
 // Decode Unicode escape sequences (\uXXXX, \u{XXXXX}, \UXXXXXXXX, \xXX, &#x...;, &#...;)
@@ -112,7 +143,11 @@ function normalizeVehicle(v: any): any {
 // Helper functions for reading and writing JSON storage
 function readVehiclesStore() {
   ensureDataDir();
-  const normalizedInitial = INITIAL_VEHICLES.map(normalizeVehicle);
+  const deletedSet = readDeletedIdsStore();
+  const normalizedInitial = INITIAL_VEHICLES
+    .map(normalizeVehicle)
+    .filter(v => !deletedSet.has(v.id));
+
   if (!fs.existsSync(VEHICLES_FILE)) {
     fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalizedInitial, null, 2), "utf-8");
     return normalizedInitial;
@@ -121,15 +156,18 @@ function readVehiclesStore() {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
-      const normalizedData = data.map(normalizeVehicle);
+      const normalizedData = data
+        .map(normalizeVehicle)
+        .filter(v => !deletedSet.has(v.id));
       const existingIds = new Set(normalizedData.map((v: any) => v.id));
-      const missingInitial = normalizedInitial.filter((v: any) => !existingIds.has(v.id));
+      const missingInitial = normalizedInitial.filter((v: any) => !existingIds.has(v.id) && !deletedSet.has(v.id));
+      
+      let finalVehicles = normalizedData;
       if (missingInitial.length > 0) {
-        const merged = [...missingInitial, ...normalizedData];
-        fs.writeFileSync(VEHICLES_FILE, JSON.stringify(merged, null, 2), "utf-8");
-        return merged;
+        finalVehicles = [...missingInitial, ...normalizedData];
       }
-      return normalizedData;
+      fs.writeFileSync(VEHICLES_FILE, JSON.stringify(finalVehicles, null, 2), "utf-8");
+      return finalVehicles;
     }
   } catch (e) {
     console.error("Failed to parse vehicles.json, falling back to seed data", e);
@@ -140,8 +178,12 @@ function readVehiclesStore() {
 
 function saveVehiclesStore(vehicles: any[]) {
   ensureDataDir();
-  const normalized = vehicles.map(normalizeVehicle);
+  const deletedSet = readDeletedIdsStore();
+  const normalized = vehicles
+    .map(normalizeVehicle)
+    .filter(v => !deletedSet.has(v.id));
   fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+  return normalized;
 }
 
 function readLeadsStore() {
@@ -219,8 +261,32 @@ app.post("/api/vehicles", (req, res) => {
   if (!Array.isArray(newVehicles)) {
     return res.status(400).json({ error: "Expected array of vehicles" });
   }
-  saveVehiclesStore(newVehicles);
-  res.json({ success: true, count: newVehicles.length, vehicles: newVehicles });
+  const saved = saveVehiclesStore(newVehicles);
+  res.json({ success: true, count: saved.length, vehicles: saved });
+});
+
+app.delete("/api/vehicles/:id", (req, res) => {
+  const vehicleId = req.params.id;
+  if (!vehicleId) {
+    return res.status(400).json({ error: "Missing vehicle id" });
+  }
+  recordDeletedId(vehicleId);
+  const current = readVehiclesStore();
+  const filtered = current.filter(v => v.id !== vehicleId);
+  saveVehiclesStore(filtered);
+  res.json({ success: true, deletedId: vehicleId, remaining: filtered.length });
+});
+
+app.post("/api/vehicles/delete", (req, res) => {
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ error: "Missing vehicle id" });
+  }
+  recordDeletedId(id);
+  const current = readVehiclesStore();
+  const filtered = current.filter(v => v.id !== id);
+  saveVehiclesStore(filtered);
+  res.json({ success: true, deletedId: id, remaining: filtered.length });
 });
 
 app.post("/api/vehicles/reset", (req, res) => {

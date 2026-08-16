@@ -36,6 +36,7 @@ import ShareVehicleModal from './ShareVehicleModal';
 import {
   getVehicles,
   saveVehicles,
+  deleteVehicle,
   getLeads,
   fetchLeads,
   updateLead,
@@ -264,7 +265,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     if (!confirm('Are you sure you want to remove this vehicle from the available listing?')) return;
     const filtered = vehicles.filter(v => v.id !== id);
     setVehicles(filtered);
-    saveVehicles(filtered);
+    deleteVehicle(id);
     alert('Listing removed successfully.');
   };
 
