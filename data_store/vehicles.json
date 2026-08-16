@@ -1,5 +1,31 @@
 [
   {
+    "id": "toyota-highlander-xle-2017-brown-foreign-used",
+    "make": "Toyota",
+    "model": "Highlander XLE",
+    "year": 2017,
+    "price": 36500000,
+    "mileage": 54000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Verified Direct US Import",
+    "engine": "3.5L V6 DOHC 24-Valve Engine",
+    "color": "Brown",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/wrYM7sD3/IMG-20260815-WA0043.jpg",
+      "https://i.ibb.co/whwYmNsC/IMG-20260815-WA0045.jpg",
+      "https://i.ibb.co/hRQWcxC5/IMG-20260815-WA0044.jpg",
+      "https://i.ibb.co/tTS8Jq41/IMG-20260815-WA0047.jpg",
+      "https://i.ibb.co/XrCcSVNF/IMG-20260815-WA0049.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2017 Toyota Highlander XLE\nForeign Used 🇺🇸 | Original Duty | 2026 July Entry\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Highlander\n• Trim: XLE\n• Year: 2017\n• Condition: Foreign Used 🇺🇸\n• Colour: Brown\n• Transmission: Automatic\n• Drive Type: SUV / All-Wheel Drive\n• Duty Status: Original Duty – July 2026 Entry\n• Price: ₦36,500,000\n• Location: Abuja, Nigeria\n\n📝 Vehicle Description:\nA clean and stylish 2017 Toyota Highlander XLE finished in an attractive brown exterior. This spacious SUV combines Toyota's reputation for reliability with a premium, comfortable interior and practical SUV design.\nIt comes with keyless entry and has original duty for July 2026, making it a strong option for buyers looking for a modern, comfortable and commanding SUV.\n\n⭐ Key Features & Highlights:\n🔥 2017 Toyota Highlander XLE\n🇺🇸 Foreign Used\n📑 Original Duty – July 2026\n🔑 Keyless Entry & Push Start Button\n🛞 Premium Alloy Wheels\n🪟 Power Windows & Power Mirrors\n🔒 Central Locking & Smart Key\n❄️ Multi-Zone Air Conditioning\n🎵 Factory Infotainment System & Touchscreen\n🎛️ Steering-Wheel Mounted Controls\n🚙 Spacious SUV Cabin & Flexible Seating\n🛋️ Premium Comfortable Interior\n🏔️ Elevated SUV Driving Position\n🛡️ Toyota Safety & Driver-Assistance Features\n🪜 Side Steps / Running Boards\n🛞 Roof Rails\n🎨 Elegant Brown Exterior"
+  },
+  {
     "id": "toyota-camry-le-2019-silver-foreign-used",
     "make": "Toyota",
     "model": "Camry LE",
