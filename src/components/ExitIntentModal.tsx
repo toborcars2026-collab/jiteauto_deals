@@ -21,15 +21,6 @@ export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOp
 
     let isDisposed = false;
 
-    // Push dummy history state for mobile back button / exit trap when on home page
-    if (isAtHomePage) {
-      try {
-        window.history.pushState({ jite_exit_trap: true }, '');
-      } catch {
-        // Ignore if iframe history restrictions apply
-      }
-    }
-
     const triggerPopup = () => {
       const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
       if (!alreadyShown && !isDisposed && isAtHomePage) {
@@ -45,15 +36,7 @@ export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOp
       }
     };
 
-    // 2. Mobile back button navigation / back gesture intent when on home page
-    const handlePopState = () => {
-      const alreadyShown = sessionStorage.getItem('jite_exit_intent_shown');
-      if (!alreadyShown && isAtHomePage) {
-        triggerPopup();
-      }
-    };
-
-    // 3. Mobile touch swipe down intent at top of page
+    // 2. Mobile touch swipe down intent at top of page
     let lastTouchY = 0;
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length > 0) {
@@ -70,7 +53,7 @@ export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOp
       }
     };
 
-    // 4. Mobile fallback idle timer on home page
+    // 3. Mobile fallback idle timer on home page
     let idleTimer: NodeJS.Timeout;
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
@@ -84,7 +67,6 @@ export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOp
     };
 
     document.addEventListener('mouseleave', handleMouseLeave);
-    window.addEventListener('popstate', handlePopState);
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
     window.addEventListener('mousemove', resetIdleTimer);
@@ -94,7 +76,6 @@ export default function ExitIntentModal({ isAtHomePage, onContinueBrowsing, onOp
     return () => {
       isDisposed = true;
       document.removeEventListener('mouseleave', handleMouseLeave);
-      window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('mousemove', resetIdleTimer);

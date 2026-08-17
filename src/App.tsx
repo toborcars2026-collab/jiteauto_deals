@@ -167,6 +167,7 @@ export default function App() {
       window.history.pushState(newState, '', newUrl);
     } catch {}
 
+    setIsDetailsOpen(false);
     setQualifierVehicle(vehicle);
     setIsQualifierOpen(true);
   };

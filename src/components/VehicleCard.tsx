@@ -55,20 +55,14 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (onOpenConsultantModal) {
-      onOpenConsultantModal(vehicle, 'whatsapp');
-    } else {
-      window.open(waLink, '_blank', 'noopener,noreferrer');
-    }
+    e.stopPropagation();
+    window.open(waLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleCall = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (onOpenConsultantModal) {
-      onOpenConsultantModal(vehicle, 'call');
-    } else {
-      window.location.href = 'tel:08180823197';
-    }
+    e.stopPropagation();
+    window.location.href = 'tel:08180823197';
   };
 
   return (
@@ -203,8 +197,13 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
         <div className="mt-5 space-y-2 pt-1">
           {/* Main Action - View details */}
           <button
-            onClick={() => onViewDetails(vehicle)}
-            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-amber-500 text-white hover:text-slate-950 text-xs font-bold rounded-xl transition-all duration-300 border border-transparent hover:shadow-lg shadow-sm"
+            type="button"
+            id={`card_btn_view_specs_${vehicle.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails(vehicle);
+            }}
+            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-amber-500 active:scale-[0.99] text-white hover:text-slate-950 text-xs font-bold rounded-xl transition-all duration-300 border border-transparent hover:shadow-lg shadow-sm cursor-pointer select-none"
           >
             <span>View Specifications</span>
             <ArrowUpRight size={14} />
@@ -212,8 +211,13 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
 
           {/* Sourcing funnel CTA */}
           <button
-            onClick={() => onGetThisCar(vehicle)}
-            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl transition-all duration-300 shadow-sm"
+            type="button"
+            id={`card_btn_get_car_${vehicle.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onGetThisCar(vehicle);
+            }}
+            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-slate-950 text-xs font-extrabold rounded-xl transition-all duration-300 shadow-sm cursor-pointer select-none"
           >
             <span>Get This Car</span>
           </button>
@@ -221,15 +225,19 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
           {/* Multi Callouts */}
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button
+              type="button"
+              id={`card_btn_whatsapp_${vehicle.id}`}
               onClick={handleWhatsApp}
-              className="flex items-center justify-center gap-1.5 px-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-500/20 transition-all duration-200"
+              className="flex items-center justify-center gap-1.5 px-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-500/20 transition-all duration-200 cursor-pointer select-none"
             >
               <MessageCircle size={12} className="stroke-[2.5]" />
               <span>Ask WhatsApp</span>
             </button>
             <button
+              type="button"
+              id={`card_btn_call_${vehicle.id}`}
               onClick={handleCall}
-              className="flex items-center justify-center gap-1.5 px-2 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-bold rounded-lg transition-all duration-200"
+              className="flex items-center justify-center gap-1.5 px-2 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 active:scale-[0.98] text-slate-700 text-[10px] font-bold rounded-lg transition-all duration-200 cursor-pointer select-none"
             >
               <Phone size={12} />
               <span>Call Hotline</span>

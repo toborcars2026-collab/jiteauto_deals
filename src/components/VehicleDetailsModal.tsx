@@ -292,40 +292,36 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
             {/* Multi-tier CTAs */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 relative z-10 pt-2">
               <button
+                type="button"
+                id="vehicle_modal_get_car_btn"
                 onClick={() => {
-                  onClose();
                   onOpenQualifier(vehicle);
                 }}
-                className="md:col-span-1 bg-amber-500 hover:bg-amber-600 text-slate-950 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg shadow-amber-500/10 transition-all text-center cursor-pointer"
+                className="md:col-span-1 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg shadow-amber-500/10 transition-all text-center cursor-pointer select-none"
               >
                 Get This Car
               </button>
 
               <button
+                type="button"
+                id="vehicle_modal_whatsapp_btn"
                 onClick={() => {
-                  onClose();
-                  if (onOpenConsultantModal) {
-                    onOpenConsultantModal(vehicle, 'whatsapp');
-                  } else {
-                    window.open(waInquiryLink, '_blank', 'noopener,noreferrer');
-                  }
+                  const link = getWhatsAppLink(getVehicleInquiryMessage(vehicle));
+                  window.open(link, '_blank', 'noopener,noreferrer');
                 }}
-                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 px-6 rounded-xl text-sm font-bold transition-all text-center cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white py-3.5 px-6 rounded-xl text-sm font-bold transition-all text-center cursor-pointer select-none"
               >
                 <MessageSquare size={16} />
                 <span>Chat on WhatsApp</span>
               </button>
 
               <button
+                type="button"
+                id="vehicle_modal_call_btn"
                 onClick={() => {
-                  onClose();
-                  if (onOpenConsultantModal) {
-                    onOpenConsultantModal(vehicle, 'call');
-                  } else {
-                    window.location.href = 'tel:08180823197';
-                  }
+                  window.location.href = 'tel:08180823197';
                 }}
-                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 border border-slate-700 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer select-none"
               >
                 <Phone size={16} className="text-amber-500" />
                 <span>Call 08180823197</span>
