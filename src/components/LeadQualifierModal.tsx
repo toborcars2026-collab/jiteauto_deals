@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Send, Phone, MessageSquare, Sparkles, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, Send, Phone, MessageSquare, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { Vehicle } from '../types';
 import { formatCurrency, getWhatsAppLink, getLeadQualificationMessage, saveInquiry } from '../utils';
 
@@ -50,6 +50,8 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
   const handlePrevStep = () => {
     if (step > 1) {
       setStep(step - 1);
+    } else {
+      onClose();
     }
   };
 
@@ -106,18 +108,46 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
   };
 
   return (
-    <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-xl rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl overflow-hidden">
+    <div
+      id="lead_qualifier_modal_backdrop"
+      className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        id="lead_qualifier_modal_card"
+        className="relative w-full max-w-xl rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl overflow-hidden"
+      >
         {/* Header decoration */}
         <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
+        {/* Top Header Navigation Bar */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-slate-800/50">
+          <button
+            type="button"
+            id="qualifier_back_to_specs_top_btn"
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-amber-400 font-semibold px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800/80 transition-all cursor-pointer select-none"
+            title="Cancel & Return to Vehicle Profile Sheet"
+          >
+            <ArrowLeft size={14} className="text-amber-400" />
+            <span>Back to {vehicle.make} {vehicle.model} Profile</span>
+          </button>
+
+          {/* Close Button */}
+          <button
+            type="button"
+            id="qualifier_modal_close_btn"
+            onClick={onClose}
+            title="Cancel and return to Vehicle Profile"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer select-none"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
         {isDone ? (
           <div className="p-8 text-center space-y-6 animate-scaleIn">
@@ -151,23 +181,25 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
                 <span>Open WhatsApp manually</span>
               </a>
               <button
+                type="button"
+                id="qualifier_done_return_btn"
                 onClick={onClose}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-sm font-semibold transition-colors"
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
               >
-                Close Window
+                Back to Vehicle Profile
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-6 sm:p-8">
+          <div className="p-6 sm:p-8 pt-5">
             {/* Step indicator */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-5">
               <div className="space-y-1">
                 <span className="text-[10px] uppercase tracking-widest text-amber-500 font-bold font-mono">
                   Sourcing Lead Funnel
                 </span>
                 <h3 className="text-lg font-bold font-display">
-                  Get The {vehicle.make} {vehicle.model}
+                  Get The {vehicle.year} {vehicle.make} {vehicle.model}
                 </h3>
               </div>
               <div className="text-right text-xs text-slate-400 font-mono">
@@ -176,7 +208,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
             </div>
 
             {/* Progress Bar */}
-            <div className="h-1 bg-slate-800 rounded-full mb-8 overflow-hidden">
+            <div className="h-1 bg-slate-800 rounded-full mb-6 overflow-hidden">
               <div
                 className="h-full bg-amber-500 transition-all duration-300"
                 style={{ width: `${(step / totalSteps) * 100}%` }}
@@ -188,7 +220,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
               {/* Step 1: Name and Phone */}
               {step === 1 && (
                 <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
+                  <div className="text-center pb-1">
                     <p className="text-sm text-slate-300">Let Jite Auto Deals qualify you to avoid tedious dealer bargaining.</p>
                   </div>
                   <div className="space-y-1.5">
@@ -223,7 +255,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
               {/* Step 2: Budget verification */}
               {step === 2 && (
                 <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
+                  <div className="text-center pb-1">
                     <p className="text-sm text-slate-300">Enter your target budget in digits for this vehicle:</p>
                   </div>
                   <div className="space-y-3">
@@ -279,7 +311,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
               {/* Step 3: Payment strategy */}
               {step === 3 && (
                 <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
+                  <div className="text-center pb-1">
                     <p className="text-sm text-slate-300">What is your preferred payment methodology?</p>
                   </div>
                   <div className="grid grid-cols-1 gap-3">
@@ -291,7 +323,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
                         key={item.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, paymentMethod: item.id as any })}
-                        className={`flex items-start text-left gap-4 p-4 rounded-xl border transition-all ${
+                        className={`flex items-start text-left gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
                           formData.paymentMethod === item.id
                             ? 'bg-amber-500/10 border-amber-500 text-amber-400'
                             : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-850'
@@ -317,7 +349,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
               {/* Step 4: Purchase timeline */}
               {step === 4 && (
                 <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
+                  <div className="text-center pb-1">
                     <p className="text-sm text-slate-300">How soon do you intend to conclude this vehicle acquisition?</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -331,7 +363,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
                         key={item.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, readyToBuy: item.id as any })}
-                        className={`flex flex-col text-left p-4 rounded-xl border transition-all ${
+                        className={`flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer ${
                           formData.readyToBuy === item.id
                             ? 'bg-amber-500/10 border-amber-500 text-amber-400'
                             : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-850'
@@ -349,37 +381,64 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-800/60">
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                disabled={step === 1}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  step === 1 ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Back
-              </button>
-
-              <div className="flex gap-2">
-                {step === totalSteps && (
+            <div className="flex flex-col gap-3 mt-6 pt-5 border-t border-slate-800/60">
+              <div className="flex justify-between items-center gap-3">
+                {step === 1 ? (
                   <button
                     type="button"
-                    onClick={handleCallOption}
-                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-lg transition-colors"
+                    id="qualifier_cancel_btn_step1"
+                    onClick={onClose}
+                    className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-amber-400 bg-slate-950 hover:bg-slate-850 border border-slate-800 rounded-xl transition-all cursor-pointer select-none"
                   >
-                    <Phone size={14} className="text-amber-500" />
-                    <span>Call Hotline</span>
+                    <ArrowLeft size={14} className="text-amber-400" />
+                    <span>Back to Vehicle</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    id="qualifier_prev_step_btn"
+                    onClick={handlePrevStep}
+                    className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-slate-300 hover:text-white bg-slate-950 hover:bg-slate-850 border border-slate-800 rounded-xl transition-all cursor-pointer select-none"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>Previous Step</span>
                   </button>
                 )}
 
+                <div className="flex gap-2">
+                  {step === totalSteps && (
+                    <button
+                      type="button"
+                      id="qualifier_call_hotline_btn"
+                      onClick={handleCallOption}
+                      className="flex items-center gap-1.5 px-4 py-2.5 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer select-none"
+                    >
+                      <Phone size={14} className="text-amber-500" />
+                      <span>Call Hotline</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    id="qualifier_next_submit_btn"
+                    onClick={handleNextStep}
+                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md shadow-amber-500/10 transition-all cursor-pointer select-none"
+                  >
+                    <span>{step === totalSteps ? 'Qualify & Sourced' : 'Next Step'}</span>
+                    <Send size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Explicit Back to Profile Link */}
+              <div className="text-center pt-1">
                 <button
                   type="button"
-                  onClick={handleNextStep}
-                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 px-6 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-amber-500/5 transition-colors"
+                  id="qualifier_cancel_bottom_link"
+                  onClick={onClose}
+                  className="text-[11px] text-slate-500 hover:text-slate-300 underline underline-offset-4 transition-colors cursor-pointer"
                 >
-                  <span>{step === totalSteps ? 'Qualify & Sourced' : 'Next Step'}</span>
-                  <Send size={14} />
+                  Cancel and return to {vehicle.year} {vehicle.make} {vehicle.model} profile sheet
                 </button>
               </div>
             </div>
@@ -395,3 +454,4 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
     </div>
   );
 }
+
