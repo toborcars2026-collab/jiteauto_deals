@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MessageCircle,
   Phone,
@@ -59,25 +59,6 @@ export default function App() {
   const [consultantContextVehicle, setConsultantContextVehicle] = useState<Vehicle | null>(null);
   const [consultantCustomMessage, setConsultantCustomMessage] = useState<string | undefined>(undefined);
   const [consultantChannel, setConsultantChannel] = useState<'whatsapp' | 'call' | 'email'>('whatsapp');
-
-  // Ref to accurately track the active modal and vehicle for mobile phone navigation back interception
-  const activeModalRef = useRef<{
-    modal: 'details' | 'qualifier' | 'consultant' | null;
-    vehicle: Vehicle | null;
-    tab: 'home' | 'browse' | 'admin';
-  }>({
-    modal: null,
-    vehicle: null,
-    tab: 'home',
-  });
-
-  useEffect(() => {
-    activeModalRef.current = {
-      modal: isQualifierOpen ? 'qualifier' : isConsultantOpen ? 'consultant' : isDetailsOpen ? 'details' : null,
-      vehicle: qualifierVehicle || consultantContextVehicle || selectedVehicle,
-      tab: currentTab,
-    };
-  }, [isQualifierOpen, isConsultantOpen, isDetailsOpen, qualifierVehicle, consultantContextVehicle, selectedVehicle, currentTab]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,8 +128,6 @@ export default function App() {
 
     setSelectedVehicle(vehicle);
     setIsDetailsOpen(true);
-    setIsQualifierOpen(false);
-    setIsConsultantOpen(false);
     document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
   };
 
@@ -156,7 +135,7 @@ export default function App() {
   const handleCloseDetails = () => {
     try {
       const histState = window.history.state as AppHistoryState | null;
-      if (histState && (histState.modal === 'details' || histState.modal === 'qualifier' || histState.modal === 'consultant')) {
+      if (histState && histState.modal === 'details') {
         window.history.back();
         return;
       }
@@ -164,9 +143,6 @@ export default function App() {
 
     setIsDetailsOpen(false);
     setSelectedVehicle(null);
-    setIsQualifierOpen(false);
-    setQualifierVehicle(null);
-    setIsConsultantOpen(false);
     const targetTab = currentTab || 'home';
     const newUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
     try {
@@ -180,24 +156,7 @@ export default function App() {
   // Navigation: Open Qualifier Modal ("Get This Car")
   const handleOpenQualifier = (vehicle: Vehicle) => {
     const slug = getVehicleSlug(vehicle);
-    setSelectedVehicle(vehicle);
-    setQualifierVehicle(vehicle);
-
-    const histState = window.history.state as AppHistoryState | null;
-    // Ensure vehicle details state is explicitly present in history before the qualifier
-    if (!histState || histState.modal !== 'details' || histState.vehicleSlug !== slug) {
-      try {
-        const detailsState: AppHistoryState = {
-          tab: currentTab,
-          modal: 'details',
-          vehicleId: vehicle.id,
-          vehicleSlug: slug,
-        };
-        window.history.pushState(detailsState, '', `/?vehicle=${encodeURIComponent(slug)}`);
-      } catch {}
-    }
-
-    const qualifierState: AppHistoryState = {
+    const newState: AppHistoryState = {
       tab: currentTab,
       modal: 'qualifier',
       vehicleId: vehicle.id,
@@ -205,25 +164,25 @@ export default function App() {
     };
     const newUrl = `/?vehicle=${encodeURIComponent(slug)}&qualify=1`;
     try {
-      window.history.pushState(qualifierState, '', newUrl);
+      window.history.pushState(newState, '', newUrl);
     } catch {}
 
     setIsDetailsOpen(false);
+    setQualifierVehicle(vehicle);
     setIsQualifierOpen(true);
-    setIsConsultantOpen(false);
   };
 
-  // Navigation: Close Qualifier Modal (Always returns back to the vehicle profile sheet)
-  const handleCloseQualifier = (returnToVehicle = true) => {
-    const v = qualifierVehicle || selectedVehicle || activeModalRef.current.vehicle;
+  // Navigation: Close Qualifier Modal
+  const handleCloseQualifier = () => {
+    try {
+      const histState = window.history.state as AppHistoryState | null;
+      if (histState && histState.modal === 'qualifier') {
+        window.history.back();
+        return;
+      }
+    } catch {}
     setIsQualifierOpen(false);
     setQualifierVehicle(null);
-
-    if (returnToVehicle && v) {
-      handleViewDetails(v);
-    } else {
-      handleCloseDetails();
-    }
   };
 
   // Navigation: Open Consultant Modal ("Talk to Consultant" / WhatsApp / Call)
@@ -233,22 +192,6 @@ export default function App() {
     channel: 'whatsapp' | 'call' | 'email' = 'whatsapp'
   ) => {
     const slug = vehicle ? getVehicleSlug(vehicle) : null;
-    if (vehicle && slug) {
-      setSelectedVehicle(vehicle);
-      const histState = window.history.state as AppHistoryState | null;
-      if (!histState || histState.modal !== 'details' || histState.vehicleSlug !== slug) {
-        try {
-          const detailsState: AppHistoryState = {
-            tab: currentTab,
-            modal: 'details',
-            vehicleId: vehicle.id,
-            vehicleSlug: slug,
-          };
-          window.history.pushState(detailsState, '', `/?vehicle=${encodeURIComponent(slug)}`);
-        } catch {}
-      }
-    }
-
     const newState: AppHistoryState = {
       tab: currentTab,
       modal: 'consultant',
@@ -268,17 +211,11 @@ export default function App() {
     setConsultantContextVehicle(vehicle || null);
     setConsultantCustomMessage(customMsg);
     setConsultantChannel(channel);
-    setIsDetailsOpen(false);
-    setIsQualifierOpen(false);
     setIsConsultantOpen(true);
   };
 
   // Navigation: Close Consultant Modal
   const handleCloseConsultant = () => {
-    const v = consultantContextVehicle || selectedVehicle;
-    setIsConsultantOpen(false);
-    setConsultantContextVehicle(null);
-
     try {
       const histState = window.history.state as AppHistoryState | null;
       if (histState && histState.modal === 'consultant') {
@@ -286,10 +223,7 @@ export default function App() {
         return;
       }
     } catch {}
-
-    if (v) {
-      handleViewDetails(v);
-    }
+    setIsConsultantOpen(false);
   };
 
   // General Sourcing click
@@ -341,25 +275,12 @@ export default function App() {
 
     // Root the initial history entry with replaceState (so no duplicate forward/back entries are created on initial load)
     try {
-      if (initialModal === 'qualifier' && initialVehicleSlugOrId) {
-        window.history.replaceState(
-          { tab: initialTab, modal: 'details', vehicleSlug: initialVehicleSlugOrId },
-          '',
-          `/?vehicle=${encodeURIComponent(initialVehicleSlugOrId)}`
-        );
-        window.history.pushState(
-          { tab: initialTab, modal: 'qualifier', vehicleSlug: initialVehicleSlugOrId },
-          '',
-          window.location.href
-        );
-      } else {
-        const initialNavState: AppHistoryState = {
-          tab: initialTab,
-          modal: initialModal,
-          vehicleSlug: initialVehicleSlugOrId,
-        };
-        window.history.replaceState(initialNavState, '', window.location.href);
-      }
+      const initialNavState: AppHistoryState = {
+        tab: initialTab,
+        modal: initialModal,
+        vehicleSlug: initialVehicleSlugOrId,
+      };
+      window.history.replaceState(initialNavState, '', window.location.href);
     } catch {}
 
     const handleSync = () => {
@@ -432,8 +353,6 @@ export default function App() {
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       const state = event.state as AppHistoryState | null;
-      const previousModal = activeModalRef.current.modal;
-      const previousVehicle = activeModalRef.current.vehicle;
 
       // Determine target tab
       let targetTab: 'home' | 'browse' | 'admin' = 'home';
@@ -449,55 +368,16 @@ export default function App() {
       setCurrentTab(targetTab);
 
       // Determine modal & vehicle parameters
+      const targetModal = state?.modal || null;
+      const targetVehicleSlugOrId = state?.vehicleSlug || state?.vehicleId || null;
+
       const searchParams = new URLSearchParams(window.location.search);
-      const urlVehicleSlug = searchParams.get('vehicle') || searchParams.get('v');
-      const isQualifyUrl = searchParams.get('qualify') === '1' || searchParams.get('qualify') === 'true';
-      const isConsultUrl = searchParams.get('consult') === '1' || searchParams.get('consult') === 'true';
+      const vehicleParam = targetVehicleSlugOrId || searchParams.get('vehicle') || searchParams.get('v');
 
-      let targetModal = state?.modal || null;
-      if (!targetModal) {
-        if (isQualifyUrl) {
-          targetModal = 'qualifier';
-        } else if (isConsultUrl) {
-          targetModal = 'consultant';
-        } else if (urlVehicleSlug) {
-          targetModal = 'details';
-        }
-      }
-
-      const targetVehicleSlugOrId = state?.vehicleSlug || state?.vehicleId || urlVehicleSlug;
       const vList = getVehicles();
 
-      // KEY FIX FOR PHONE NAVIGATION BACK BUTTON:
-      // When the user was inside the Qualifier ("Get This Car") modal and presses the phone's back button / gesture,
-      // it should return directly to the vehicle profile sheet rather than dropping the user onto the home page.
-      if (previousModal === 'qualifier' && targetModal !== 'qualifier') {
-        const vehicleToProfile =
-          (targetVehicleSlugOrId ? findVehicleBySlugOrId(vList, targetVehicleSlugOrId) : null) ||
-          previousVehicle;
-
-        if (vehicleToProfile) {
-          const slug = getVehicleSlug(vehicleToProfile);
-          setSelectedVehicle(vehicleToProfile);
-          setIsDetailsOpen(true);
-          setIsQualifierOpen(false);
-          setQualifierVehicle(null);
-          setIsConsultantOpen(false);
-          document.title = `${vehicleToProfile.year} ${vehicleToProfile.make} ${vehicleToProfile.model} - ${formatCurrency(vehicleToProfile.price)} | Jite Auto Deals`;
-
-          try {
-            window.history.replaceState(
-              { tab: targetTab, modal: 'details', vehicleSlug: slug, vehicleId: vehicleToProfile.id },
-              '',
-              `/?vehicle=${encodeURIComponent(slug)}`
-            );
-          } catch {}
-          return;
-        }
-      }
-
-      if (targetModal === 'details' && targetVehicleSlugOrId) {
-        const found = findVehicleBySlugOrId(vList, targetVehicleSlugOrId) || previousVehicle;
+      if (targetModal === 'details' && vehicleParam) {
+        const found = findVehicleBySlugOrId(vList, vehicleParam);
         if (found) {
           setSelectedVehicle(found);
           setIsDetailsOpen(true);
@@ -510,14 +390,13 @@ export default function App() {
           setSelectedVehicle(null);
         }
       } else if (targetModal === 'qualifier') {
-        const found = targetVehicleSlugOrId ? findVehicleBySlugOrId(vList, targetVehicleSlugOrId) : previousVehicle;
+        const found = vehicleParam ? findVehicleBySlugOrId(vList, vehicleParam) : null;
         setQualifierVehicle(found);
-        setSelectedVehicle(found);
         setIsQualifierOpen(true);
         setIsDetailsOpen(false);
         setIsConsultantOpen(false);
       } else if (targetModal === 'consultant') {
-        const found = targetVehicleSlugOrId ? findVehicleBySlugOrId(vList, targetVehicleSlugOrId) : previousVehicle;
+        const found = vehicleParam ? findVehicleBySlugOrId(vList, vehicleParam) : null;
         setConsultantContextVehicle(found);
         setIsConsultantOpen(true);
         setIsDetailsOpen(false);
