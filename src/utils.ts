@@ -2,13 +2,14 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v4';
+const VEHICLES_KEY = 'jite_vehicles_v5';
 const LEADS_KEY = 'jite_leads_v1';
 const INQUIRIES_KEY = 'jite_inquiries_v1';
 
 // Global tombstone blacklist of permanently removed vehicle IDs
 export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
-  'toyota-corolla-s-2015-silver-few-months-used'
+  'toyota-corolla-s-2015-silver-few-months-used',
+  'lexus-rx350-2015-silver-duty-paid'
 ]);
 
 // Format Currency to Nigerian Naira (₦)
@@ -541,6 +542,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
           localStorage.removeItem('jite_vehicles_v1');
           localStorage.removeItem('jite_vehicles_v2');
           localStorage.removeItem('jite_vehicles_v3');
+          localStorage.removeItem('jite_vehicles_v4');
           localStorage.setItem(VEHICLES_KEY, JSON.stringify(finalMerged));
         } catch {}
 
@@ -562,6 +564,7 @@ export function getVehicles(): Vehicle[] {
     localStorage.removeItem('jite_vehicles_v1');
     localStorage.removeItem('jite_vehicles_v2');
     localStorage.removeItem('jite_vehicles_v3');
+    localStorage.removeItem('jite_vehicles_v4');
   } catch {
     // ignore
   }

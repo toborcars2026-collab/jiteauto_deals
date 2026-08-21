@@ -52,32 +52,6 @@
     "description": "🚘 VEHICLE PROFILE SHEET\n2015 Toyota Corolla LE\nDirect Belgium 🇧🇪 | Duty Paid | Clean Condition\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Corolla\n• Year: 2015\n• Trim: LE\n• Body Type: Sedan\n• Condition: Clean (Foreign Used)\n• Colour: Silver\n• Transmission: Automatic\n• Engine: 1.8L 4-Cylinder Dual VVT-i\n• Drive Type: Front-Wheel Drive (FWD)\n• Origin: Direct Belgium 🇧🇪\n• Duty Status: Duty Paid 📑\n• Location: Abuja, Nigeria\n• Price: ₦14,500,000\n\n✨ Vehicle Description:\nA 2015 Toyota Corolla LE finished in a clean silver exterior, offering Toyota's reputation for reliability, fuel efficiency and easy maintenance. This unit presents a neat exterior with the refined styling of the 11th-generation Corolla and is advertised as direct Belgium with duty paid.\nA practical choice for daily commuting, business use and personal transportation, combining comfort, durability and economical running costs.\n\n⭐ Key Features & Specifications:\n🔥 2015 Toyota Corolla LE\n🇧🇪 Direct Belgium\n📑 Duty Paid\n🩶 Silver Exterior\n⚙️ Automatic Transmission\n⛽ 1.8L 4-Cylinder Engine\n🚘 Front-Wheel Drive\n🛞 Alloy Wheels\n💡 LED/Projector-style Headlamps\n🌫️ Front Fog Lamps\n🪟 Power Windows\n🔒 Central Door Locking\n❄️ Air Conditioning\n🎵 Factory Audio/Infotainment System\n🎛️ Steering-Wheel Controls\n📷 Reverse Camera\n🔑 Keyless Entry\n🛋️ Comfortable Interior\n🧳 Spacious Boot\n⛽ Fuel-Efficient Engine\n🔧 Easy-to-Maintain Toyota Platform"
   },
   {
-    "id": "lexus-rx350-2015-silver-duty-paid",
-    "make": "Lexus",
-    "model": "RX 350",
-    "year": 2015,
-    "price": 17000000,
-    "mileage": 72000,
-    "transmission": "Automatic",
-    "fuelType": "Petrol",
-    "bodyType": "SUV",
-    "location": "Abuja",
-    "dealership": "Verified Direct US Import",
-    "engine": "3.5L V6 Engine",
-    "color": "Silver",
-    "condition": "Foreign Used",
-    "isFeatured": true,
-    "status": "Active",
-    "images": [
-      "https://i.ibb.co/8nYph62k/IMG-20260819-WA0002.jpg",
-      "https://i.ibb.co/mPrDvPw/IMG-20260819-WA0004.jpg",
-      "https://i.ibb.co/4RMV2kx9/IMG-20260819-WA0008.jpg",
-      "https://i.ibb.co/mFbswGX8/IMG-20260819-WA0006.jpg",
-      "https://i.ibb.co/JWZzvSCn/IMG-20260819-WA0010.jpg"
-    ],
-    "description": "🚘 VEHICLE PROFILE SHEET\n2015 Lexus RX 350\nExtremely Clean | Duty Paid | Silver\n\n📋 Vehicle Details & Information:\n• Make: Lexus\n• Model: RX 350\n• Year: 2015\n• Trim: RX 350\n• Body Type: Luxury SUV\n• Condition: Foreign Used (Extremely Clean)\n• Colour: Silver\n• Transmission: Automatic\n• Engine: 3.5L V6\n• Duty Status: Duty Paid 📑\n• Location: Abuja, Nigeria\n• Price: ₦17,000,000\n\n✨ Vehicle Description:\nA 2015 Lexus RX 350 finished in an elegant silver exterior, combining Lexus luxury, comfort and practicality in one refined SUV. With its powerful V6 engine, spacious cabin and premium styling, the RX 350 delivers a smooth and enjoyable driving experience.\nThis extremely clean, duty-paid unit is an excellent choice for anyone looking for a reliable and luxurious SUV at an attractive price of ₦17M.\n\n⭐ Key Features & Specifications:\n🔥 2015 Lexus RX 350\n🌍 Foreign Used 🇺🇸\n✨ Extremely Clean\n📑 Duty Paid\n🩶 Silver Exterior\n🛞 Alloy Wheels\n🔑 Keyless Entry / Smart Access\n☀️ Power Moonroof\n💡 Projector Headlamps\n🌫️ Front Fog Lamps\n🪟 Power Windows\n🔒 Central Locking\n❄️ Automatic Climate Control\n🎵 Lexus Infotainment System\n🎛️ Steering-Wheel Controls\n📷 Reverse Camera\n🛋️ Premium Interior\n🚙 Spacious SUV Cabin\n⚙️ Smooth 3.5L V6 Performance"
-  },
-  {
     "id": "honda-accord-coupe-2013-black-foreign-used",
     "make": "Honda",
     "model": "Accord Coupe",
