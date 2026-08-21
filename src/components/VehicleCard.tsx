@@ -111,7 +111,7 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
               ? 'bg-emerald-500 text-white border-emerald-400'
               : vehicle.condition === 'Foreign Used' || vehicle.condition === 'Direct Belgium'
               ? 'bg-amber-500 text-slate-950 border-amber-400'
-              : vehicle.condition.includes('Clean') || vehicle.condition.includes('Like New')
+              : vehicle.condition.includes('Clean') || vehicle.condition.includes('Like New') || vehicle.condition.includes('Slightly')
               ? 'bg-emerald-600 text-white border-emerald-500'
               : 'bg-slate-700 text-white border-slate-600'
           }`}>
