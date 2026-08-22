@@ -3,7 +3,7 @@ import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, Chevr
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
 import ShareVehicleModal from './ShareVehicleModal';
-import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes } from '../utils';
+import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -319,7 +319,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 type="button"
                 id="vehicle_modal_call_btn"
                 onClick={() => {
-                  window.location.href = 'tel:08180823197';
+                  window.location.href = OFFICIAL_PHONE_CALL_URL;
                 }}
                 className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 border border-slate-700 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer select-none"
               >

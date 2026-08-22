@@ -994,13 +994,37 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
 }
 
 // ============================================================================
-// WHATSAPP & MESSAGING UTILITIES
+// OFFICIAL CONTACT CONFIGURATION
 // ============================================================================
 
-const CONSULTANT_PHONE = '2348180823197';
+export const CONTACT_CONFIG = {
+  phoneDisplay: '08180823197',
+  phoneCallUrl: 'tel:+2348180823197',
+  whatsAppNumber: '2348180823197',
+  whatsAppBaseUrl: 'https://wa.me/2348180823197',
+};
 
-export function getWhatsAppLink(message: string): string {
-  return `https://wa.me/${CONSULTANT_PHONE}?text=${encodeURIComponent(message)}`;
+export const OFFICIAL_PHONE = '+2348180823197';
+export const OFFICIAL_PHONE_DISPLAY = '08180823197';
+export const OFFICIAL_PHONE_CALL_URL = 'tel:+2348180823197';
+export const OFFICIAL_WHATSAPP_NUMBER = '2348180823197';
+export const OFFICIAL_WHATSAPP_URL = 'https://wa.me/2348180823197';
+
+const CONSULTANT_PHONE = OFFICIAL_WHATSAPP_NUMBER;
+
+export function getWhatsAppLink(message?: string): string {
+  if (!message || !message.trim()) {
+    return OFFICIAL_WHATSAPP_URL;
+  }
+  return `https://wa.me/${OFFICIAL_WHATSAPP_NUMBER}?text=${encodeURIComponent(message.trim())}`;
+}
+
+export function getPhoneCallUrl(): string {
+  return OFFICIAL_PHONE_CALL_URL;
+}
+
+export function handlePhoneCall(): void {
+  window.location.href = OFFICIAL_PHONE_CALL_URL;
 }
 
 export function getGeneralConsultationMessage(): string {

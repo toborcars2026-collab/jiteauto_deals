@@ -32,7 +32,8 @@ import {
   getGeneralConsultationMessage,
   isVehicleActive,
   findVehicleBySlugOrId,
-  getVehicleSlug
+  getVehicleSlug,
+  OFFICIAL_PHONE_CALL_URL
 } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
@@ -184,7 +185,7 @@ export default function App() {
     channel: 'whatsapp' | 'call' | 'email' = 'whatsapp'
   ) => {
     if (channel === 'call') {
-      window.location.href = 'tel:08180823197';
+      window.location.href = OFFICIAL_PHONE_CALL_URL;
       return;
     }
     const defaultMsg = customMsg || (vehicle

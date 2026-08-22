@@ -78,13 +78,13 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation }
 
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center gap-3">
-            <button
-              onClick={onOpenConsultation}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-mono transition-all duration-200"
+            <a
+              href="tel:+2348180823197"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-mono transition-all duration-200 cursor-pointer"
             >
               <Phone size={14} className="text-amber-500" />
               <span>08180823197</span>
-            </button>
+            </a>
             <button
               onClick={onOpenConsultation}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-lg text-sm font-semibold shadow-md shadow-amber-500/10 hover:shadow-lg transition-all duration-200"
@@ -141,22 +141,20 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation }
           </button>
 
           <div className="pt-4 pb-2 border-t border-slate-800 mt-4 px-4 flex flex-col gap-3">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onOpenConsultation();
-              }}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-mono text-sm"
+            <a
+              href="tel:+2348180823197"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-mono text-sm cursor-pointer"
             >
               <Phone size={16} className="text-amber-500" />
               <span>08180823197</span>
-            </button>
+            </a>
             <button
               onClick={() => {
                 setIsOpen(false);
                 onOpenConsultation();
               }}
-              className="flex items-center justify-center gap-2 w-full bg-amber-500 hover:bg-amber-600 text-slate-950 py-2.5 rounded-lg text-sm font-semibold"
+              className="flex items-center justify-center gap-2 w-full bg-amber-500 hover:bg-amber-600 text-slate-950 py-2.5 rounded-lg text-sm font-semibold cursor-pointer"
             >
               <MessageSquare size={16} />
               <span>Talk to Consultant</span>

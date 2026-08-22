@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { MapPin, Calendar, MessageCircle, Phone, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { formatCurrency, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl } from '../utils';
+import { formatCurrency, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface VehicleCardProps {
   key?: React.Key;
@@ -62,7 +62,7 @@ export default function VehicleCard({ vehicle, onViewDetails, onGetThisCar, onOp
   const handleCall = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    window.location.href = 'tel:08180823197';
+    window.location.href = OFFICIAL_PHONE_CALL_URL;
   };
 
   return (

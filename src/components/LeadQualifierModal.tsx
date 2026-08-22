@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, Phone, MessageSquare, Sparkles, CheckCircle, ShieldCheck } from 'lucide-react';
 import { Vehicle } from '../types';
-import { formatCurrency, getWhatsAppLink, getLeadQualificationMessage, saveInquiry } from '../utils';
+import { formatCurrency, getWhatsAppLink, getLeadQualificationMessage, saveInquiry, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface LeadQualifierModalProps {
   vehicle: Vehicle;
@@ -96,7 +96,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
       preferredContact: 'Call',
     });
     
-    window.location.href = 'tel:08180823197';
+    window.location.href = OFFICIAL_PHONE_CALL_URL;
   };
 
   return (
