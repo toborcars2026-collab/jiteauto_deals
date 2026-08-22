@@ -689,60 +689,101 @@ export function getVehicles(): Vehicle[] {
 // ============================================================================
 
 /**
- * Client-side canvas image optimizer: shrinks huge camera uploads to web-optimal 1080p-1440p JPG
- * while maintaining 100% crisp visual resolution and minimal upload bandwidth.
+ * Client-side fast image optimizer:
+ * Uses fast asynchronous decoding (createImageBitmap or ObjectURL) and canvas downscaling (max 2048px, JPEG 0.86)
+ * to convert multi-megabyte camera photos into crisp, lightweight web images in milliseconds without quality degradation.
  */
-export async function compressImageFile(file: File, maxWidth = 1920, maxHeight = 1920, quality = 0.88): Promise<Blob | File> {
-  // If small already (< 750KB) and JPEG/PNG, keep original
-  if (file.size <= 750 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/png')) {
+export async function compressImageFile(file: File, maxWidth = 2048, maxHeight = 2048, quality = 0.86): Promise<Blob | File> {
+  // If already small (< 600KB) and standard web format, skip canvas re-encoding to save CPU cycles
+  if (file.size <= 600 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp')) {
     return file;
   }
 
+  // Fast path: createImageBitmap (runs asynchronously off main UI thread)
+  if (typeof createImageBitmap !== 'undefined') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      let { width, height } = bitmap;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        bitmap.close();
+        return file;
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
+      return blob && blob.size < file.size ? blob : file;
+    } catch {
+      // fallback to Image element below if createImageBitmap encounters unsupported format
+    }
+  }
+
+  // Fallback path: URL.createObjectURL (avoids heavy readAsDataURL memory allocations)
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
 
-        if (width > maxWidth || height > maxHeight) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            resolve(blob);
           } else {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
+            resolve(file);
           }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(file);
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (blob && blob.size < file.size) {
-              resolve(blob);
-            } else {
-              resolve(file);
-            }
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-      img.onerror = () => resolve(file);
-      img.src = e.target?.result as string;
+        },
+        'image/jpeg',
+        quality
+      );
     };
-    reader.onerror = () => resolve(file);
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
   });
 }
 

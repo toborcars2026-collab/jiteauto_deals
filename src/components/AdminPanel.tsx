@@ -263,35 +263,75 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       const cleanModel = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const targetVehicleId = editingCarId || `${year}-${cleanMake}-${cleanModel}-${Date.now().toString(36)}`;
 
-      // 1. Process and upload images to Firebase Storage
-      const resolvedImages: string[] = [];
+      // 1. Prepare and filter image slot upload tasks
       const totalCount = Math.max(totalSlots, (newCar.images || []).length);
+      
+      interface SlotTask {
+        idx: number;
+        type: 'file' | 'data_url' | 'existing_url';
+        file?: File;
+        rawUrl?: string;
+      }
 
+      const tasks: SlotTask[] = [];
       for (let idx = 0; idx < totalCount; idx++) {
         const pendingFile = imageFiles[idx];
         const rawUrl = (newCar.images?.[idx] || '').trim();
 
         if (pendingFile) {
-          setPublishStatusText(`Uploading photo ${idx + 1} to Firebase Storage...`);
-          const downloadUrl = await uploadVehicleImageFile(pendingFile, targetVehicleId, idx);
-          resolvedImages.push(downloadUrl);
+          tasks.push({ idx, type: 'file', file: pendingFile });
         } else if (rawUrl.startsWith('data:image/')) {
-          setPublishStatusText(`Uploading photo ${idx + 1} to Firebase Storage...`);
-          const downloadUrl = await uploadVehicleImageDataUrl(rawUrl, targetVehicleId, idx);
-          resolvedImages.push(downloadUrl);
+          tasks.push({ idx, type: 'data_url', rawUrl });
         } else if (rawUrl.startsWith('blob:')) {
-          // If blob URL exists without file (edge case), skip
+          // Stale blob without active File instance - ignore
         } else if (rawUrl) {
-          resolvedImages.push(normalizeImageInput(rawUrl));
+          tasks.push({ idx, type: 'existing_url', rawUrl: normalizeImageInput(rawUrl) });
         }
       }
 
-      const finalImages = resolvedImages.filter(Boolean);
+      const uploadsRequired = tasks.filter(t => t.type === 'file' || t.type === 'data_url');
+      const totalUploadCount = uploadsRequired.length;
+      let completedUploadCount = 0;
+
+      if (totalUploadCount > 0) {
+        setPublishStatusText(`Uploading vehicle images (0/${totalUploadCount})...`);
+      } else {
+        setPublishStatusText('Preparing vehicle listing...');
+      }
+
+      // 2. Upload all images concurrently via Promise.all
+      const uploadPromises = tasks.map(async (task): Promise<{ idx: number; url: string }> => {
+        if (task.type === 'existing_url' && task.rawUrl) {
+          return { idx: task.idx, url: task.rawUrl };
+        }
+
+        try {
+          let downloadUrl = '';
+          if (task.type === 'file' && task.file) {
+            downloadUrl = await uploadVehicleImageFile(task.file, targetVehicleId, task.idx);
+          } else if (task.type === 'data_url' && task.rawUrl) {
+            downloadUrl = await uploadVehicleImageDataUrl(task.rawUrl, targetVehicleId, task.idx);
+          }
+
+          completedUploadCount++;
+          setPublishStatusText(`Uploading vehicle images (${completedUploadCount}/${totalUploadCount})...`);
+          return { idx: task.idx, url: downloadUrl };
+        } catch (uploadErr) {
+          console.error(`[Upload Error] Spot ${task.idx + 1}:`, uploadErr);
+          throw new Error(`Photo ${task.idx + 1} failed to upload. Please try again.`);
+        }
+      });
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      uploadedResults.sort((a, b) => a.idx - b.idx);
+      const finalImages = uploadedResults.map(r => r.url).filter(Boolean);
+
       if (finalImages.length === 0) {
         finalImages.push('https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000');
       }
 
-      // 2. Build the normalized vehicle object
+      // 3. Build normalized vehicle object
+      setPublishStatusText('Saving vehicle to Firestore central inventory...');
       const vehiclePayload: Vehicle = normalizeVehicleData({
         id: targetVehicleId,
         make,
@@ -314,11 +354,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         updatedAt: new Date().toISOString(),
       });
 
-      // 3. Write directly to Firestore and confirm write
-      setPublishStatusText('Writing to central vehicle inventory on Firestore...');
+      // 4. Write directly to Firestore and confirm write
       await saveVehicleToFirestore(vehiclePayload);
 
-      // 4. Update UI upon verified confirmation
+      // 5. Update UI upon verified confirmation
       setPublishStatusText('Vehicle published successfully.');
       setImageFiles({});
       setEditingCarId(null);
@@ -341,11 +380,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         status: 'Active',
       });
 
-      alert(editingCarId ? 'Vehicle listing updated successfully.' : 'Vehicle published successfully.');
+      alert(editingCarId ? 'Vehicle listing updated successfully in Firestore!' : 'Vehicle published successfully to Firestore and live on the website!');
       setActiveTab('inventory');
     } catch (err) {
       console.error('[Publish Vehicle Error]:', err);
-      alert('Vehicle could not be published. Please check your connection and try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Vehicle could not be published. Please check your connection and try again.';
+      alert(errorMessage);
     } finally {
       setIsPublishing(false);
       setPublishStatusText('');
