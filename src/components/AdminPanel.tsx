@@ -28,7 +28,8 @@ import {
   Share2,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { Vehicle, Lead, Inquiry } from '../types';
 import logoImg from '../assets/images/jite_auto_deals_logo_1785026063050.jpg';
@@ -38,8 +39,14 @@ import {
   saveVehicles,
   deleteVehicle,
   saveVehicleToFirestore,
+  createVehicle,
+  updateVehicle,
+  publishVehicle,
+  unpublishVehicle,
   deleteVehicleFromFirestore,
   resetFirestoreVehiclesToDefault,
+  uploadVehicleImageFile,
+  uploadVehicleImageDataUrl,
   getLeads,
   fetchLeads,
   updateLead,
@@ -79,6 +86,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [showKpiStats, setShowKpiStats] = useState(false);
   const [leads, setLeads] = useState<Lead[]>(getLeads());
   const [inquiries, setInquiries] = useState<Inquiry[]>(getInquiries());
+
+  // Publishing & Uploading States
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [publishStatusText, setPublishStatusText] = useState<string>('');
+  const [imageFiles, setImageFiles] = useState<Record<number, File>>({});
+  const [togglingCarId, setTogglingCarId] = useState<string | null>(null);
 
   // Password submission handler
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -129,7 +142,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     model: '',
     year: 2020,
     price: 15000000,
-    mileage: 50000,
     transmission: 'Automatic',
     fuelType: 'Petrol',
     bodyType: 'SUV',
@@ -140,7 +152,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     engine: '2.5L 4-Cylinder',
     color: 'Silver',
     condition: 'Foreign Used',
-    isFeatured: true
+    isFeatured: true,
+    status: 'Active'
   });
 
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
@@ -209,59 +222,111 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const totalInventoryCount = vehicles.length;
   const potentialRevenue = vehicles.reduce((sum, v) => sum + v.price, 0);
 
-  // Add or Update Car Listing directly in Cloud Firestore
+  // Clear a specific image slot
+  const handleClearSlot = (idx: number) => {
+    setImageFiles(prev => {
+      const copy = { ...prev };
+      delete copy[idx];
+      return copy;
+    });
+    const imgs = [...(newCar.images || [])];
+    imgs[idx] = '';
+    setNewCar({ ...newCar, images: imgs });
+  };
+
+  // Add or Update Car Listing directly in Firebase (Storage + Firestore)
   const handleAddCar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCar.make || !newCar.model || !newCar.images?.[0]) {
-      alert('Please fill out Make, Model, and provide at least 1 image URL.');
+    if (isPublishing) return;
+
+    const make = (newCar.make || '').trim();
+    const model = (newCar.model || '').trim();
+    const year = Number(newCar.year) || 2020;
+
+    if (!make || !model) {
+      alert('Please provide the Vehicle Brand/Make and Model Name.');
       return;
     }
 
-    const imageArray = (newCar.images || []).filter(img => img && img.trim() !== '');
+    const hasAtLeastOneImage = Boolean(imageFiles[0] || (newCar.images?.[0] && newCar.images[0].trim()));
+    if (!hasAtLeastOneImage) {
+      alert('Please provide at least one photo (Upload a File or paste an Image URL for Spot 1).');
+      return;
+    }
 
-    const addedCar: Vehicle = normalizeVehicleData({
-      id: editingCarId || 'car_' + Math.random().toString(36).substr(2, 9),
-      make: newCar.make,
-      model: newCar.model,
-      year: Number(newCar.year) || 2020,
-      price: Number(newCar.price) || 10000000,
-      mileage: Number(newCar.mileage) || 45000,
-      transmission: newCar.transmission as 'Automatic' | 'Manual',
-      fuelType: newCar.fuelType as any,
-      bodyType: newCar.bodyType as any,
-      location: newCar.location || 'Lagos',
-      dealership: newCar.dealership || 'Jite Sourcing',
-      images: imageArray.length > 0 ? imageArray : ['https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'],
-      description: newCar.description || 'Pristine and clean condition guaranteed.',
-      engine: newCar.engine || '2.0L 4-Cylinder',
-      color: newCar.color || 'Black',
-      condition: newCar.condition as any,
-      isFeatured: newCar.isFeatured ?? false
-    });
+    setIsPublishing(true);
+    setPublishStatusText('Publishing vehicle...');
 
     try {
-      await saveVehicleToFirestore(addedCar);
-      
-      let updatedVehicles: Vehicle[];
-      if (editingCarId) {
-        updatedVehicles = vehicles.map(v => v.id === editingCarId ? addedCar : v);
-        setEditingCarId(null);
-        alert('Car details saved and updated live in Cloud Firestore!');
-      } else {
-        updatedVehicles = [addedCar, ...vehicles];
-        alert('New vehicle listing published live to Cloud Firestore!');
+      // Clean ID format
+      const cleanMake = make.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const cleanModel = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const targetVehicleId = editingCarId || `${year}-${cleanMake}-${cleanModel}-${Date.now().toString(36)}`;
+
+      // 1. Process and upload images to Firebase Storage
+      const resolvedImages: string[] = [];
+      const totalCount = Math.max(totalSlots, (newCar.images || []).length);
+
+      for (let idx = 0; idx < totalCount; idx++) {
+        const pendingFile = imageFiles[idx];
+        const rawUrl = (newCar.images?.[idx] || '').trim();
+
+        if (pendingFile) {
+          setPublishStatusText(`Uploading photo ${idx + 1} to Firebase Storage...`);
+          const downloadUrl = await uploadVehicleImageFile(pendingFile, targetVehicleId, idx);
+          resolvedImages.push(downloadUrl);
+        } else if (rawUrl.startsWith('data:image/')) {
+          setPublishStatusText(`Uploading photo ${idx + 1} to Firebase Storage...`);
+          const downloadUrl = await uploadVehicleImageDataUrl(rawUrl, targetVehicleId, idx);
+          resolvedImages.push(downloadUrl);
+        } else if (rawUrl.startsWith('blob:')) {
+          // If blob URL exists without file (edge case), skip
+        } else if (rawUrl) {
+          resolvedImages.push(normalizeImageInput(rawUrl));
+        }
       }
 
-      setVehicles(updatedVehicles);
-      saveVehicles(updatedVehicles);
+      const finalImages = resolvedImages.filter(Boolean);
+      if (finalImages.length === 0) {
+        finalImages.push('https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000');
+      }
 
-      // Reset Form
+      // 2. Build the normalized vehicle object
+      const vehiclePayload: Vehicle = normalizeVehicleData({
+        id: targetVehicleId,
+        make,
+        model,
+        year,
+        price: Number(newCar.price) || 10000000,
+        transmission: (newCar.transmission as 'Automatic' | 'Manual') || 'Automatic',
+        fuelType: newCar.fuelType || 'Petrol',
+        bodyType: newCar.bodyType || 'SUV',
+        location: newCar.location || 'Lagos',
+        dealership: newCar.dealership || 'Jite Premium Sourcing',
+        images: finalImages,
+        description: newCar.description || 'Verified pristine condition guaranteed.',
+        engine: newCar.engine || '2.0L 4-Cylinder',
+        color: newCar.color || 'Black',
+        condition: (newCar.condition as any) || 'Foreign Used',
+        isFeatured: newCar.isFeatured ?? true,
+        status: (newCar.status as any) || 'Active',
+        createdAt: editingCarId ? (newCar.createdAt || new Date().toISOString()) : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // 3. Write directly to Firestore and confirm write
+      setPublishStatusText('Writing to central vehicle inventory on Firestore...');
+      await saveVehicleToFirestore(vehiclePayload);
+
+      // 4. Update UI upon verified confirmation
+      setPublishStatusText('Vehicle published successfully.');
+      setImageFiles({});
+      setEditingCarId(null);
       setNewCar({
         make: '',
         model: '',
         year: 2020,
         price: 15000000,
-        mileage: 50000,
         transmission: 'Automatic',
         fuelType: 'Petrol',
         bodyType: 'SUV',
@@ -272,25 +337,53 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         engine: '2.5L 4-Cylinder',
         color: 'Silver',
         condition: 'Foreign Used',
-        isFeatured: false
+        isFeatured: true,
+        status: 'Active',
       });
+
+      alert(editingCarId ? 'Vehicle listing updated successfully.' : 'Vehicle published successfully.');
       setActiveTab('inventory');
     } catch (err) {
-      console.error('Failed to save vehicle:', err);
-      alert('Vehicle saved locally. Cloud synchronization in progress.');
+      console.error('[Publish Vehicle Error]:', err);
+      alert('Vehicle could not be published. Please check your connection and try again.');
+    } finally {
+      setIsPublishing(false);
+      setPublishStatusText('');
     }
   };
 
   // Edit Car Selector
   const handleStartEdit = (car: Vehicle) => {
     setEditingCarId(car.id);
+    setImageFiles({});
     setNewCar(car);
+    if (car.images && car.images.length > totalSlots) {
+      setTotalSlots(Math.min(10, car.images.length));
+    }
     setActiveTab('add-car');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Toggle Publish / Unpublish directly in Cloud Firestore
+  const handleTogglePublish = async (car: Vehicle) => {
+    setTogglingCarId(car.id);
+    try {
+      if (isVehicleActive(car)) {
+        await unpublishVehicle(car.id);
+      } else {
+        await publishVehicle(car.id);
+      }
+    } catch (err) {
+      console.error('Failed to toggle publish status:', err);
+      alert('Failed to update vehicle status on Firebase. Please check your connection.');
+    } finally {
+      setTogglingCarId(null);
+    }
   };
 
   // Delete Car directly in Cloud Firestore
   const handleDeleteCar = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this vehicle from the available listing?')) return;
+    if (!confirm('Are you sure you want to remove this vehicle listing from Cloud Firestore?')) return;
     try {
       await deleteVehicleFromFirestore(id);
       const filtered = vehicles.filter(v => v.id !== id);
@@ -299,9 +392,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       alert('Listing removed successfully from Cloud Firestore and all public pages.');
     } catch (err) {
       console.error('Failed to delete vehicle:', err);
-      deleteVehicle(id);
-      const filtered = vehicles.filter(v => v.id !== id);
-      setVehicles(filtered);
+      alert('Failed to delete vehicle. Please check your connection and try again.');
     }
   };
 
@@ -827,85 +918,116 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {vehicles.map((car) => (
-                    <div key={car.id} className="flex gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-amber-200 transition-all">
-                      <img
-                        src={car.images[0]}
-                        alt={car.model}
-                        className="h-20 w-28 object-cover rounded-xl shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="flex-1 space-y-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-sm text-slate-900 truncate">
-                            {car.year} {car.make} {car.model}
-                          </h4>
-                          <span className="text-[10px] font-mono uppercase bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded shrink-0">
-                            {car.condition}
-                          </span>
-                        </div>
-                        <p className="text-xs font-mono font-extrabold text-slate-700">
-                          {formatCurrency(car.price)}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          {car.transmission} | {car.location}
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100/70 mt-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              id={`share_car_btn_${car.id}`}
-                              onClick={() => handleShareVehicle(car)}
-                              className="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100/90 border border-amber-200/90 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
-                              title="Share vehicle link via WhatsApp, Facebook, Copy Link or Phone Share"
-                            >
-                              <Share2 size={12} className="text-amber-600" />
-                              <span>Share Vehicle</span>
-                            </button>
+                  {vehicles.map((car) => {
+                    const isActive = isVehicleActive(car);
+                    const isToggling = togglingCarId === car.id;
 
-                            <button
-                              id={`quick_copy_btn_${car.id}`}
-                              onClick={(e) => handleQuickCopy(car, e)}
-                              className={`text-xs font-medium px-2 py-1 rounded-lg border flex items-center gap-1 transition-all ${
-                                copiedCarId === car.id
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
-                                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-                              }`}
-                              title="Copy Direct Public Link"
-                            >
-                              {copiedCarId === car.id ? (
-                                <>
-                                  <Check size={11} className="text-emerald-600" />
-                                  <span>Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy size={11} />
-                                  <span>Link</span>
-                                </>
-                              )}
-                            </button>
+                    return (
+                      <div key={car.id} className="flex gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-amber-200 transition-all">
+                        <img
+                          src={car.images[0]}
+                          alt={car.model}
+                          className="h-20 w-28 object-cover rounded-xl shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <div className="flex justify-between items-start gap-1">
+                            <h4 className="font-bold text-sm text-slate-900 truncate">
+                              {car.year} {car.make} {car.model}
+                            </h4>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`text-[10px] font-mono uppercase font-extrabold px-1.5 py-0.5 rounded ${
+                                isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                              }`}>
+                                {isActive ? 'Live' : 'Unpublished'}
+                              </span>
+                              <span className="text-[10px] font-mono uppercase bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded">
+                                {car.condition}
+                              </span>
+                            </div>
                           </div>
+                          <p className="text-xs font-mono font-extrabold text-slate-700">
+                            {formatCurrency(car.price)}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            {car.transmission} | {car.location}
+                          </p>
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100/70 mt-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                id={`share_car_btn_${car.id}`}
+                                onClick={() => handleShareVehicle(car)}
+                                className="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100/90 border border-amber-200/90 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+                                title="Share vehicle link via WhatsApp, Facebook, Copy Link or Phone Share"
+                              >
+                                <Share2 size={12} className="text-amber-600" />
+                                <span>Share Vehicle</span>
+                              </button>
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleStartEdit(car)}
-                              className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100/80 hover:bg-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
-                            >
-                              <PenTool size={11} />
-                              <span>Modify</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCar(car.id)}
-                              className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1 hover:bg-rose-50 rounded-md transition-colors"
-                              title="Delete Listing"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                              <button
+                                id={`quick_copy_btn_${car.id}`}
+                                onClick={(e) => handleQuickCopy(car, e)}
+                                className={`text-xs font-medium px-2 py-1 rounded-lg border flex items-center gap-1 transition-all ${
+                                  copiedCarId === car.id
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
+                                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                                }`}
+                                title="Copy Direct Public Link"
+                              >
+                                {copiedCarId === car.id ? (
+                                  <>
+                                    <Check size={11} className="text-emerald-600" />
+                                    <span>Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={11} />
+                                    <span>Link</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleTogglePublish(car)}
+                                disabled={isToggling}
+                                className={`text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors ${
+                                  isActive
+                                    ? 'text-slate-600 hover:text-slate-900 bg-slate-100/80 hover:bg-slate-200'
+                                    : 'text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                                }`}
+                                title={isActive ? 'Unpublish vehicle from public catalog' : 'Publish vehicle to live catalog'}
+                              >
+                                {isToggling ? (
+                                  <Loader2 size={11} className="animate-spin" />
+                                ) : isActive ? (
+                                  <EyeOff size={11} />
+                                ) : (
+                                  <Eye size={11} />
+                                )}
+                                <span>{isActive ? 'Unpublish' : 'Publish'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleStartEdit(car)}
+                                className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100/80 hover:bg-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                              >
+                                <PenTool size={11} />
+                                <span>Modify</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCar(car.id)}
+                                className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1 hover:bg-rose-50 rounded-md transition-colors"
+                                title="Delete Listing from Firebase"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -948,7 +1070,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Year Model *</label>
                       <input
@@ -957,17 +1079,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                         placeholder="e.g. 2021"
                         value={newCar.year || ''}
                         onChange={(e) => setNewCar({ ...newCar, year: Number(e.target.value) })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Mileage (km) *</label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="e.g. 45000"
-                        value={newCar.mileage || ''}
-                        onChange={(e) => setNewCar({ ...newCar, mileage: Number(e.target.value) })}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500"
                       />
                     </div>
@@ -1125,6 +1236,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     {/* Image Slots List */}
                     {Array.from({ length: totalSlots }).map((_, idx) => {
                       const rawUrl = newCar.images?.[idx] || '';
+                      const hasPendingFile = Boolean(imageFiles[idx]);
                       const displayUrl = getImageUrl(rawUrl);
                       const isPrimary = idx === 0;
 
@@ -1133,16 +1245,16 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                           <div className="flex items-center justify-between">
                             <label className="text-xs uppercase tracking-wider font-extrabold flex items-center gap-1.5 text-slate-700">
                               <span>Spot {idx + 1} {isPrimary ? '(Primary Cover) *' : ''}</span>
-                              {rawUrl && <span className="text-[10px] text-emerald-600 font-mono font-bold">✓ Loaded</span>}
+                              {hasPendingFile ? (
+                                <span className="text-[10px] text-amber-600 font-mono font-bold">✓ Ready for Storage Upload</span>
+                              ) : rawUrl ? (
+                                <span className="text-[10px] text-emerald-600 font-mono font-bold">✓ Loaded</span>
+                              ) : null}
                             </label>
                             {rawUrl && (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const imgs = [...(newCar.images || [])];
-                                  imgs[idx] = '';
-                                  setNewCar({ ...newCar, images: imgs });
-                                }}
+                                onClick={() => handleClearSlot(idx)}
                                 className="text-[10px] text-rose-600 hover:text-rose-800 font-bold hover:underline"
                               >
                                 Clear Spot {idx + 1}
@@ -1165,11 +1277,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    const imgs = [...(newCar.images || [])];
-                                    imgs[idx] = '';
-                                    setNewCar({ ...newCar, images: imgs });
-                                  }}
+                                  onClick={() => handleClearSlot(idx)}
                                   className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-md shadow-md transition-all flex items-center justify-center opacity-80 hover:opacity-100"
                                   title={`Remove picture from Spot ${idx + 1}`}
                                 >
@@ -1185,16 +1293,22 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
                             <input
                               type="text"
-                              required={isPrimary}
+                              required={isPrimary && !hasPendingFile}
                               placeholder={`Paste image URL (e.g. https://ibb.co/...) for Spot ${idx + 1}`}
-                              value={rawUrl}
+                              value={hasPendingFile ? `[Selected local file: ${imageFiles[idx].name}]` : rawUrl}
+                              readOnly={hasPendingFile}
                               onChange={(e) => {
+                                if (hasPendingFile) return;
                                 const formatted = normalizeImageInput(e.target.value);
                                 const imgs = [...(newCar.images || [])];
                                 imgs[idx] = formatted;
                                 setNewCar({ ...newCar, images: imgs });
                               }}
-                              className="flex-1 bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-mono w-full"
+                              className={`flex-1 border rounded-lg px-3.5 py-2.5 text-xs font-mono w-full ${
+                                hasPendingFile
+                                  ? 'bg-amber-50/70 border-amber-300 text-amber-900 font-semibold'
+                                  : 'bg-white border-slate-200 text-slate-800 focus:outline-none focus:border-amber-500'
+                              }`}
                             />
 
                             <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center whitespace-nowrap border border-slate-800 transition-colors shrink-0 w-full sm:w-auto">
@@ -1206,15 +1320,11 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = (evt) => {
-                                      if (evt.target?.result) {
-                                        const imgs = [...(newCar.images || [])];
-                                        imgs[idx] = evt.target.result as string;
-                                        setNewCar({ ...newCar, images: imgs });
-                                      }
-                                    };
-                                    reader.readAsDataURL(file);
+                                    setImageFiles(prev => ({ ...prev, [idx]: file }));
+                                    const previewUrl = URL.createObjectURL(file);
+                                    const imgs = [...(newCar.images || [])];
+                                    imgs[idx] = previewUrl;
+                                    setNewCar({ ...newCar, images: imgs });
                                   }
                                 }}
                               />
@@ -1226,8 +1336,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
                     <div className="p-3 rounded-xl bg-slate-100/80 border border-slate-200 text-[11px] text-slate-600 space-y-1 font-mono">
                       <p className="font-bold text-slate-800">💡 Image Tips for Maximum Resolution:</p>
-                      <p>• Paste any ImgBB link (e.g., <code className="bg-slate-200 px-1 rounded text-slate-900">https://ibb.co/xyz</code>) and it will automatically convert into a direct high-res CDN link.</p>
-                      <p>• Uploading image files from your computer or phone preserves 100% original full pixel quality.</p>
+                      <p>• Uploading directly from your phone or computer uploads straight to <strong>Firebase Storage CDN</strong> preserving full crisp quality.</p>
+                      <p>• Paste any ImgBB link (e.g., <code className="bg-slate-200 px-1 rounded text-slate-900">https://ibb.co/xyz</code>) and it will automatically resolve to its original high-res format.</p>
                       <p>• Click <strong>Add Slot</strong> to add up to 10 photos for any car listing.</p>
                     </div>
                   </div>
@@ -1244,13 +1354,39 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     />
                   </div>
 
-                  <div className="flex gap-4 pt-4 border-t border-slate-100">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                    {isPublishing ? (
+                      <div className="flex items-center gap-2 text-xs font-mono text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg w-full sm:w-auto">
+                        <Loader2 size={14} className="animate-spin text-amber-600" />
+                        <span>{publishStatusText || 'Publishing to Firebase...'}</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 font-mono">
+                        Published vehicles immediately sync to Cloud Firestore.
+                      </div>
+                    )}
+
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-colors ml-auto"
+                      disabled={isPublishing}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all w-full sm:w-auto justify-center ${
+                        isPublishing
+                          ? 'bg-slate-600 text-slate-300 cursor-not-allowed opacity-80'
+                          : 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer shadow-md active:scale-95'
+                      }`}
                     >
-                      <Save size={16} className="text-amber-400" />
-                      <span>{editingCarId ? 'Update Listing Specs' : 'Publish Vehicle listing'}</span>
+                      {isPublishing ? (
+                        <Loader2 size={16} className="animate-spin text-amber-400" />
+                      ) : (
+                        <Save size={16} className="text-amber-400" />
+                      )}
+                      <span>
+                        {isPublishing
+                          ? 'Publishing...'
+                          : editingCarId
+                          ? 'Update Listing Specs'
+                          : 'Publish Vehicle Listing'}
+                      </span>
                     </button>
                   </div>
                 </form>

@@ -1,5 +1,6 @@
-import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, writeBatch } from 'firebase/firestore';
-import { db, OperationType, handleFirestoreError } from './firebase';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
+import { db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
@@ -233,20 +234,25 @@ export function decodeUnicodeEscapes(str: string | undefined | null): string {
 }
 
 /**
- * Normalizes vehicle data by decoding all text fields and descriptions.
+ * Normalizes vehicle data by decoding all text fields and ensuring required defaults.
  */
 export function normalizeVehicleData(vehicle: Vehicle): Vehicle {
   if (!vehicle) return vehicle;
   return {
     ...vehicle,
-    make: decodeUnicodeEscapes(vehicle.make),
-    model: decodeUnicodeEscapes(vehicle.model),
-    dealership: decodeUnicodeEscapes(vehicle.dealership),
-    engine: decodeUnicodeEscapes(vehicle.engine),
-    color: decodeUnicodeEscapes(vehicle.color),
-    condition: decodeUnicodeEscapes(vehicle.condition) as any,
-    location: decodeUnicodeEscapes(vehicle.location),
-    description: decodeUnicodeEscapes(vehicle.description),
+    make: decodeUnicodeEscapes(vehicle.make || ''),
+    model: decodeUnicodeEscapes(vehicle.model || ''),
+    dealership: decodeUnicodeEscapes(vehicle.dealership || 'Jite Premium Sourcing'),
+    engine: decodeUnicodeEscapes(vehicle.engine || ''),
+    color: decodeUnicodeEscapes(vehicle.color || ''),
+    condition: decodeUnicodeEscapes(vehicle.condition || 'Foreign Used') as any,
+    location: decodeUnicodeEscapes(vehicle.location || 'Lagos'),
+    description: decodeUnicodeEscapes(vehicle.description || ''),
+    status: vehicle.status || 'Active',
+    isFeatured: vehicle.isFeatured ?? true,
+    images: Array.isArray(vehicle.images) ? vehicle.images.filter(Boolean) : [],
+    createdAt: vehicle.createdAt || new Date().toISOString(),
+    updatedAt: vehicle.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -678,17 +684,208 @@ export function getVehicles(): Vehicle[] {
   }
 }
 
+// ============================================================================
+// FIREBASE STORAGE IMAGE UPLOADS
+// ============================================================================
+
 /**
- * Saves a single vehicle directly into Cloud Firestore.
+ * Client-side canvas image optimizer: shrinks huge camera uploads to web-optimal 1080p-1440p JPG
+ * while maintaining 100% crisp visual resolution and minimal upload bandwidth.
  */
-export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<void> {
+export async function compressImageFile(file: File, maxWidth = 1920, maxHeight = 1920, quality = 0.88): Promise<Blob | File> {
+  // If small already (< 750KB) and JPEG/PNG, keep original
+  if (file.size <= 750 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/png')) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              resolve(blob);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Uploads a local File or Blob directly to Firebase Storage and returns its permanent CDN download URL.
+ */
+export async function uploadVehicleImageFile(file: File | Blob, vehicleId: string, index: number): Promise<string> {
+  try {
+    const optimized = file instanceof File ? await compressImageFile(file) : file;
+    const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `vehicles/${cleanId}/img_${index + 1}_${Date.now()}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    const snapshot = await uploadBytes(storageRef, optimized, {
+      contentType: 'image/jpeg',
+      cacheControl: 'public, max-age=31536000',
+    });
+
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+    return downloadUrl;
+  } catch (error) {
+    console.error('[Firebase Storage] Image upload error:', error);
+    throw new Error(`Failed to upload image ${index + 1} to Firebase Storage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Uploads a base64 Data URL string to Firebase Storage and returns its permanent CDN download URL.
+ */
+export async function uploadVehicleImageDataUrl(dataUrl: string, vehicleId: string, index: number): Promise<string> {
+  try {
+    const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `vehicles/${cleanId}/img_${index + 1}_${Date.now()}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    const snapshot = await uploadString(storageRef, dataUrl, 'data_url', {
+      contentType: 'image/jpeg',
+      cacheControl: 'public, max-age=31536000',
+    });
+
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+    return downloadUrl;
+  } catch (error) {
+    console.error('[Firebase Storage] DataURL upload error:', error);
+    throw new Error(`Failed to upload image ${index + 1} to Firebase Storage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Universal vehicle image processor: converts local files or data URLs to permanent Firebase Storage URLs,
+ * or normalizes remote CDN links.
+ */
+export async function uploadVehicleImage(source: File | Blob | string, vehicleId: string, index: number): Promise<string> {
+  if (!source) return '';
+
+  if (source instanceof File || source instanceof Blob) {
+    return uploadVehicleImageFile(source, vehicleId, index);
+  }
+
+  if (typeof source === 'string') {
+    if (source.startsWith('data:image/')) {
+      return uploadVehicleImageDataUrl(source, vehicleId, index);
+    }
+    return normalizeImageInput(source);
+  }
+
+  return '';
+}
+
+/**
+ * Saves a single vehicle directly into Cloud Firestore and verifies the write on the server.
+ * Returns the confirmed Vehicle object.
+ */
+export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle> {
   const normalized = normalizeVehicleData(vehicle);
   try {
     const docRef = doc(db, 'vehicles', normalized.id);
     await setDoc(docRef, normalized);
+
+    // Verify document write directly on Firestore
+    const verifySnap = await getDoc(docRef);
+    if (!verifySnap.exists()) {
+      throw new Error(`Firestore document write verification failed for vehicle ${normalized.id}`);
+    }
+
+    const confirmedData = normalizeVehicleData({
+      ...verifySnap.data() as Vehicle,
+      id: verifySnap.id
+    });
+
+    // Update local cache immediately
+    const current = getVehicles().filter(v => v.id !== confirmedData.id);
+    current.unshift(confirmedData);
+    try {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+    }
+
+    return confirmedData;
   } catch (error) {
+    console.error('[Firestore] Save Vehicle Error:', error);
     handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
   }
+}
+
+/**
+ * Creates a brand-new vehicle in Cloud Firestore.
+ */
+export async function createVehicle(vehicle: Vehicle): Promise<Vehicle> {
+  return saveVehicleToFirestore(vehicle);
+}
+
+/**
+ * Updates an existing vehicle in Cloud Firestore.
+ */
+export async function updateVehicle(vehicleId: string, updates: Partial<Vehicle>): Promise<Vehicle> {
+  const currentVehicles = getVehicles();
+  const existing = currentVehicles.find(v => v.id === vehicleId);
+  const merged: Vehicle = normalizeVehicleData({
+    ...(existing || { id: vehicleId, make: '', model: '', year: 2020, price: 0, mileage: 0, transmission: 'Automatic', fuelType: 'Petrol', bodyType: 'SUV', location: 'Lagos', dealership: 'Jite Premium Sourcing', images: [], description: '', engine: '', color: '', condition: 'Foreign Used', isFeatured: true }),
+    ...updates,
+    id: vehicleId,
+    updatedAt: new Date().toISOString()
+  });
+
+  return saveVehicleToFirestore(merged);
+}
+
+/**
+ * Publishes a vehicle (sets status: 'Active' in Firestore).
+ */
+export async function publishVehicle(vehicleId: string): Promise<Vehicle> {
+  return updateVehicle(vehicleId, { status: 'Active' });
+}
+
+/**
+ * Unpublishes a vehicle (sets status: 'Inactive' in Firestore).
+ */
+export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
+  return updateVehicle(vehicleId, { status: 'Inactive' });
 }
 
 /**
@@ -699,6 +896,15 @@ export async function deleteVehicleFromFirestore(id: string): Promise<void> {
   try {
     const docRef = doc(db, 'vehicles', id);
     await deleteDoc(docRef);
+
+    const current = getVehicles().filter(v => v.id !== id);
+    try {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
   }

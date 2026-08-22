@@ -22,7 +22,9 @@
         "color": { "type": "string" },
         "condition": { "type": "string" },
         "isFeatured": { "type": "boolean" },
-        "status": { "type": "string" }
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
       "required": ["make", "model", "year", "price"]
     },

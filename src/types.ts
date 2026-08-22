@@ -4,9 +4,9 @@ export interface Vehicle {
   model: string;
   year: number;
   price: number; // in NGN
-  mileage: number; // in km
+  mileage?: number; // in km (optional)
   transmission: 'Automatic' | 'Manual';
-  fuelType: 'Petrol' | 'Diesel' | 'Hybrid' | 'Electric';
+  fuelType: 'Petrol' | 'Diesel' | 'Hybrid' | 'Electric' | string;
   bodyType: 'Sedan' | 'SUV' | 'Coupe' | 'Hatchback' | 'Truck' | 'Crossover' | 'Minivan' | 'Luxury SUV' | string;
   location: string;
   dealership: string;
@@ -17,6 +17,8 @@ export interface Vehicle {
   condition: 'Foreign Used' | 'Nigerian Used' | 'Brand New' | 'Direct Belgium' | 'Clean Used' | 'Extremely Clean' | 'Extremely Clean Used' | 'Extremely Clean Nigerian Used' | 'Slightly Used' | 'Like New' | 'Few Months Used' | 'Used' | string;
   isFeatured: boolean;
   status?: 'Active' | 'Sold' | 'Inactive';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Lead {
