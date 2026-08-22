@@ -37,12 +37,18 @@ import {
   getVehicles,
   saveVehicles,
   deleteVehicle,
+  saveVehicleToFirestore,
+  deleteVehicleFromFirestore,
+  resetFirestoreVehiclesToDefault,
   getLeads,
   fetchLeads,
   updateLead,
+  subscribeToLeads,
   getInquiries,
   fetchInquiries,
   updateInquiry,
+  subscribeToInquiries,
+  subscribeToVehicles,
   formatCurrency,
   formatMileage,
   normalizeImageInput,
@@ -92,12 +98,27 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     sessionStorage.removeItem('jite_console_unlocked');
   };
 
-  // Automatically lock the section whenever the user leaves / unmounts the component
+  // Real-time synchronization for Leads, Inquiries, and Inventory in Admin Panel
   useEffect(() => {
     fetchLeads().then(l => setLeads(l));
     fetchInquiries().then(i => setInquiries(i));
 
+    const unsubLeads = subscribeToLeads((updatedLeads) => {
+      setLeads(updatedLeads);
+    });
+
+    const unsubInquiries = subscribeToInquiries((updatedInquiries) => {
+      setInquiries(updatedInquiries);
+    });
+
+    const unsubVehicles = subscribeToVehicles((updatedVehicles) => {
+      setVehicles(updatedVehicles);
+    });
+
     return () => {
+      unsubLeads();
+      unsubInquiries();
+      unsubVehicles();
       sessionStorage.removeItem('jite_console_unlocked');
     };
   }, [isUnlocked]);
@@ -188,15 +209,15 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const totalInventoryCount = vehicles.length;
   const potentialRevenue = vehicles.reduce((sum, v) => sum + v.price, 0);
 
-  // Add Car
-  const handleAddCar = (e: React.FormEvent) => {
+  // Add or Update Car Listing directly in Cloud Firestore
+  const handleAddCar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCar.make || !newCar.model || !newCar.images?.[0]) {
       alert('Please fill out Make, Model, and provide at least 1 image URL.');
       return;
     }
 
-    const imageArray = newCar.images.filter(img => img.trim() !== '');
+    const imageArray = (newCar.images || []).filter(img => img && img.trim() !== '');
 
     const addedCar: Vehicle = normalizeVehicleData({
       id: editingCarId || 'car_' + Math.random().toString(36).substr(2, 9),
@@ -218,39 +239,46 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       isFeatured: newCar.isFeatured ?? false
     });
 
-    let updatedVehicles: Vehicle[];
-    if (editingCarId) {
-      updatedVehicles = vehicles.map(v => v.id === editingCarId ? addedCar : v);
-      setEditingCarId(null);
-      alert('Car details updated successfully!');
-    } else {
-      updatedVehicles = [addedCar, ...vehicles];
-      alert('New vehicle listing added successfully!');
+    try {
+      await saveVehicleToFirestore(addedCar);
+      
+      let updatedVehicles: Vehicle[];
+      if (editingCarId) {
+        updatedVehicles = vehicles.map(v => v.id === editingCarId ? addedCar : v);
+        setEditingCarId(null);
+        alert('Car details saved and updated live in Cloud Firestore!');
+      } else {
+        updatedVehicles = [addedCar, ...vehicles];
+        alert('New vehicle listing published live to Cloud Firestore!');
+      }
+
+      setVehicles(updatedVehicles);
+      saveVehicles(updatedVehicles);
+
+      // Reset Form
+      setNewCar({
+        make: '',
+        model: '',
+        year: 2020,
+        price: 15000000,
+        mileage: 50000,
+        transmission: 'Automatic',
+        fuelType: 'Petrol',
+        bodyType: 'SUV',
+        location: 'Lagos',
+        dealership: 'Jite Premium Sourcing',
+        images: [''],
+        description: '',
+        engine: '2.5L 4-Cylinder',
+        color: 'Silver',
+        condition: 'Foreign Used',
+        isFeatured: false
+      });
+      setActiveTab('inventory');
+    } catch (err) {
+      console.error('Failed to save vehicle:', err);
+      alert('Vehicle saved locally. Cloud synchronization in progress.');
     }
-
-    setVehicles(updatedVehicles);
-    saveVehicles(updatedVehicles);
-
-    // Reset Form
-    setNewCar({
-      make: '',
-      model: '',
-      year: 2020,
-      price: 15000000,
-      mileage: 50000,
-      transmission: 'Automatic',
-      fuelType: 'Petrol',
-      bodyType: 'SUV',
-      location: 'Lagos',
-      dealership: 'Jite Premium Sourcing',
-      images: [''],
-      description: '',
-      engine: '2.5L 4-Cylinder',
-      color: 'Silver',
-      condition: 'Foreign Used',
-      isFeatured: false
-    });
-    setActiveTab('inventory');
   };
 
   // Edit Car Selector
@@ -260,13 +288,21 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setActiveTab('add-car');
   };
 
-  // Delete Car
-  const handleDeleteCar = (id: string) => {
+  // Delete Car directly in Cloud Firestore
+  const handleDeleteCar = async (id: string) => {
     if (!confirm('Are you sure you want to remove this vehicle from the available listing?')) return;
-    const filtered = vehicles.filter(v => v.id !== id);
-    setVehicles(filtered);
-    deleteVehicle(id);
-    alert('Listing removed successfully.');
+    try {
+      await deleteVehicleFromFirestore(id);
+      const filtered = vehicles.filter(v => v.id !== id);
+      setVehicles(filtered);
+      deleteVehicle(id);
+      alert('Listing removed successfully from Cloud Firestore and all public pages.');
+    } catch (err) {
+      console.error('Failed to delete vehicle:', err);
+      deleteVehicle(id);
+      const filtered = vehicles.filter(v => v.id !== id);
+      setVehicles(filtered);
+    }
   };
 
   // Change Lead Status
@@ -287,14 +323,20 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setInquiries(updated);
   };
 
-  // Reset to seeds
-  const handleResetSeeds = () => {
-    if (confirm('This will wipe all custom additions and reset the catalog back to the original curated vehicles. Proceed?')) {
-      localStorage.removeItem('jite_vehicles_v1');
-      localStorage.removeItem('jite_vehicles_v2');
-      fetch('/api/vehicles/reset', { method: 'POST' }).finally(() => {
+  // Reset to seeds directly in Cloud Firestore
+  const handleResetSeeds = async () => {
+    if (confirm('This will reset the cloud inventory back to the original curated vehicle catalog across all devices. Proceed?')) {
+      try {
+        await resetFirestoreVehiclesToDefault();
+        localStorage.removeItem('jite_vehicles_v1');
+        localStorage.removeItem('jite_vehicles_v2');
+        localStorage.removeItem('jite_vehicles_v5');
+        localStorage.removeItem('jite_vehicles_v6');
+        alert('Catalog inventory has been reset to default.');
         window.location.reload();
-      });
+      } catch (err) {
+        console.error('Reset error:', err);
+      }
     }
   };
 

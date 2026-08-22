@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "A vehicle listing in the inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "make": { "type": "string" },
+        "model": { "type": "string" },
+        "year": { "type": "number" },
+        "price": { "type": "number" },
+        "mileage": { "type": "number" },
+        "transmission": { "type": "string" },
+        "fuelType": { "type": "string" },
+        "bodyType": { "type": "string" },
+        "location": { "type": "string" },
+        "dealership": { "type": "string" },
+        "images": { "type": "array" },
+        "description": { "type": "string" },
+        "engine": { "type": "string" },
+        "color": { "type": "string" },
+        "condition": { "type": "string" },
+        "isFeatured": { "type": "boolean" },
+        "status": { "type": "string" }
+      },
+      "required": ["make", "model", "year", "price"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "General consultation or Help Me Find a Car lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "budget": { "type": "number" },
+        "brand": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["name", "phone", "vehicleType", "budget", "brand", "paymentMethod"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Direct vehicle acquisition inquiry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "vehicleName": { "type": "string" },
+        "budget": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "readyToBuy": { "type": "string" },
+        "preferredContact": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["name", "phone", "vehicleId", "vehicleName", "budget"]
+    }
+  },
+  "firestore": {
+    "/vehicles/{vehicleId}": {
+      "schema": { "$ref": "#/entities/Vehicle" },
+      "description": "Public vehicle listings catalog for Jite Auto Deals"
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Submitted consultation leads from prospective buyers"
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/Inquiry" },
+      "description": "Direct vehicle acquisition inquiries from prospective buyers"
+    }
+  }
+}

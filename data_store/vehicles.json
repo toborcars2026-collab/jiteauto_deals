@@ -1,5 +1,31 @@
 [
   {
+    "id": "cadillac-escalade-2019-black-foreign-used",
+    "make": "Cadillac",
+    "model": "Escalade",
+    "year": 2019,
+    "price": 82000000,
+    "mileage": 45000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Direct Belgium Import / Foreign Spec",
+    "engine": "6.2L V8 Engine",
+    "color": "Black",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/fY5BWcTT/IMG-20260821-WA0006.jpg",
+      "https://i.ibb.co/WvH3NQHb/IMG-20260821-WA0012.jpg",
+      "https://i.ibb.co/x8J2Fh3R/IMG-20260821-WA0016.jpg",
+      "https://i.ibb.co/B5vtg1Jy/IMG-20260821-WA0014.jpg",
+      "https://i.ibb.co/DgfcLCCN/IMG-20260821-WA0018.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2019 Cadillac Escalade\nForeign Used | Original Duty | Sunroof\n\n📋 Vehicle Details & Information:\n• Make: Cadillac\n• Model: Escalade\n• Year: 2019\n• Body Type: Luxury Full-Size SUV\n• Condition: Foreign Used 🇧🇪\n• Colour: Black\n• Transmission: Automatic\n• Engine: 6.2L V8 Engine\n• Drive Type: 4WD / AWD\n• Duty Status: Original Duty Paid 📑\n• Sunroof: Yes ☀️\n• Location: Abuja, Nigeria\n• Price: ₦82,000,000\n\n✨ Vehicle Description:\nA 2019 Cadillac Escalade in black, advertised as foreign used and from Belgium, with original duty and a sunroof. The vehicle has a premium-looking interior with leather seating, wood-style interior trim and a central infotainment display, as visibly shown in the supplied photos.\n\n⭐ Key Features & Specifications:\n🔥 2019 Cadillac Escalade\n🌍 Foreign Used (Belgium Spec)\n🖤 Black Exterior\n📑 Original Duty Paid\n☀️ Power Sunroof\n🛋️ Premium Leather Interior\n🌳 Wood-Style Interior Trim\n📺 Central Touchscreen Infotainment Screen\n🎛️ Multifunction Steering Wheel\n✨ Premium Interior Finish\n🛞 High-End Cadillac Alloy Wheels\n💡 Full LED Projector Headlights\n❄️ Multi-Zone Climate Control\n🔒 Smart Keyless Entry & Push-Button Start"
+  },
+  {
     "id": "mercedes-benz-g63-amg-2011-yellow-brabus-upgrade",
     "make": "Mercedes-Benz",
     "model": "G-Class G63 AMG (Brabus Upgrade)",

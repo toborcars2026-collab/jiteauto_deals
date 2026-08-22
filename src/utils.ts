@@ -1,10 +1,12 @@
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, writeBatch } from 'firebase/firestore';
+import { db, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
-// LocalStorage Keys
-const VEHICLES_KEY = 'jite_vehicles_v5';
-const LEADS_KEY = 'jite_leads_v1';
-const INQUIRIES_KEY = 'jite_inquiries_v1';
+// LocalStorage Keys (used as fast instant local cache / offline fallback)
+const VEHICLES_KEY = 'jite_vehicles_v6';
+const LEADS_KEY = 'jite_leads_v2';
+const INQUIRIES_KEY = 'jite_inquiries_v2';
 
 // Global tombstone blacklist of permanently removed vehicle IDs
 export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
@@ -49,8 +51,6 @@ export function getVehicleSlug(vehicle: Vehicle): string {
 
 /**
  * Gets the direct, permanent public URL for a vehicle.
- * Uses query parameter `?vehicle=slug` on custom hosting (or path fallback)
- * to ensure 100% reliability across Vercel, static CDNs, and custom domains without 404 errors.
  */
 export function getVehicleShareUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
@@ -58,7 +58,6 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
   
   if (typeof window !== 'undefined' && window.location) {
     const origin = window.location.origin;
-    // Query parameter is universally supported on static hosts without server rewrites
     return `${origin}/?vehicle=${encodeURIComponent(slug)}`;
   }
   
@@ -66,7 +65,7 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
 }
 
 /**
- * Gets the clean SEO path format for vehicle links (when server rewrite is configured)
+ * Gets the clean SEO path format for vehicle links
  */
 export function getVehiclePathUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
@@ -134,7 +133,7 @@ export function getVehicleSocialShareLinks(vehicle: Vehicle) {
   };
 }
 
-// Intelligently format large NGN portfolio value (e.g. ₦850M+, ₦1.5B+, ₦2.3T+)
+// Intelligently format large NGN portfolio value
 export function formatPortfolioValue(totalNGN: number): string {
   if (!totalNGN || isNaN(totalNGN) || totalNGN <= 0) return '₦0';
   if (totalNGN >= 1_000_000_000_000) {
@@ -146,7 +145,7 @@ export function formatPortfolioValue(totalNGN: number): string {
     return `₦${val}B+`;
   }
   if (totalNGN >= 1_000_000) {
-    const val = (Math.floor((totalNGN / 1_000_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
+    const val = (Math.floor((totalNGN / 1_000_000_000) * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return `₦${val}M+`;
   }
   if (totalNGN >= 1_000) {
@@ -157,9 +156,7 @@ export function formatPortfolioValue(totalNGN: number): string {
 }
 
 /**
- * Decodes all forms of Unicode escape sequences (\uXXXX, \u{XXXXX}, \UXXXXXXXX, \xXX, &#x...;, &#...;)
- * into real, properly rendered Unicode emoji and text characters.
- * Preserves original line breaks, bullet points, and existing UTF-8 characters without double-decoding.
+ * Decodes all forms of Unicode escape sequences into real, properly rendered Unicode text/emojis.
  */
 export function decodeUnicodeEscapes(str: string | undefined | null): string {
   if (!str || typeof str !== 'string') return '';
@@ -195,7 +192,7 @@ export function decodeUnicodeEscapes(str: string | undefined | null): string {
     }
   });
 
-  // 4. Hex escape \xB0 (degree symbol, etc.)
+  // 4. Hex escape \xB0
   res = res.replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => {
     try {
       const code = parseInt(hex, 16);
@@ -229,7 +226,7 @@ export function decodeUnicodeEscapes(str: string | undefined | null): string {
   res = res.replace(/^2728\s+/g, '✨ ');
   res = res.replace(/\s+2728$/g, ' ✨');
 
-  // 8. Convert literal \n or \r\n to real newlines if present as escaped character sequences
+  // 8. Convert literal \n or \r\n to real newlines if present
   res = res.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
 
   return res;
@@ -255,6 +252,11 @@ export function normalizeVehicleData(vehicle: Vehicle): Vehicle {
 
 // Map of known ImgBB page codes to 100% full original resolution direct CDN URLs
 const KNOWN_IMGBB_MAP: Record<string, string> = {
+  'FbMN1Pdd': 'https://i.ibb.co/fY5BWcTT/IMG-20260821-WA0006.jpg',
+  'RTgSG1gx': 'https://i.ibb.co/WvH3NQHb/IMG-20260821-WA0012.jpg',
+  '4gPF1WJ5': 'https://i.ibb.co/x8J2Fh3R/IMG-20260821-WA0016.jpg',
+  'G4G0VhDW': 'https://i.ibb.co/B5vtg1Jy/IMG-20260821-WA0014.jpg',
+  '6J09NPP2': 'https://i.ibb.co/DgfcLCCN/IMG-20260821-WA0018.jpg',
   'vvQrXdRk': 'https://i.ibb.co/93VfZ4SW/IMG-20260821-WA0000.jpg',
   'PZ38L9XG': 'https://i.ibb.co/gMHC2PqZ/IMG-20260821-WA0001.jpg',
   'prPMnkmw': 'https://i.ibb.co/wrLPY2vg/IMG-20260821-WA0004.jpg',
@@ -494,7 +496,7 @@ export function normalizeImageInput(url: string | undefined | null): string {
   return trimmed;
 }
 
-// Async helper to resolve ImgBB og:image direct CDN links dynamically via server API
+// Async helper to resolve ImgBB og:image direct CDN links dynamically
 export async function resolveImageLink(url: string): Promise<string> {
   const syncNormalized = normalizeImageInput(url);
   if (syncNormalized.includes('ibb.co/') && !syncNormalized.includes('i.ibb.co/')) {
@@ -519,263 +521,487 @@ export function getImageUrl(url: string | undefined | null): string {
   return normalizeImageInput(url);
 }
 
-// Async fetch vehicles from server with fallback to localStorage
-export async function fetchVehicles(): Promise<Vehicle[]> {
-  try {
-    const res = await fetch('/api/vehicles?t=' + Date.now(), { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const normalizedServer = data
-          .map(normalizeVehicleData)
-          .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-        const normalizedSeed = INITIAL_VEHICLES
-          .map(normalizeVehicleData)
-          .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-        
-        // Merge any newly introduced INITIAL_VEHICLES that may not be in server response
-        const serverIds = new Set(normalizedServer.map(v => v.id));
-        const missingSeed = normalizedSeed.filter(v => !serverIds.has(v.id) && !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-        const finalMerged = missingSeed.length > 0 ? [...missingSeed, ...normalizedServer] : normalizedServer;
+// ============================================================================
+// CLOUD FIRESTORE INTEGRATION & REAL-TIME SYNC
+// ============================================================================
 
+let hasSeededFirestore = false;
+
+/**
+ * Seeds initial vehicles into Cloud Firestore if the collection is empty.
+ */
+async function seedInitialVehiclesIfEmpty(existingVehiclesCount: number): Promise<void> {
+  if (hasSeededFirestore || existingVehiclesCount > 0) return;
+  hasSeededFirestore = true;
+
+  try {
+    const batch = writeBatch(db);
+    const normalizedSeed = INITIAL_VEHICLES
+      .map(normalizeVehicleData)
+      .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
+
+    normalizedSeed.forEach((vehicle) => {
+      const docRef = doc(db, 'vehicles', vehicle.id);
+      batch.set(docRef, vehicle);
+    });
+
+    await batch.commit();
+    console.log(`[Firestore] Successfully seeded ${normalizedSeed.length} initial vehicles to Cloud Firestore.`);
+  } catch (error) {
+    console.warn('[Firestore] Seed check skipped or failed:', error);
+  }
+}
+
+/**
+ * Subscribes in real-time to the Cloud Firestore `vehicles` collection.
+ * Any update (add, edit, delete) anywhere immediately updates all connected devices.
+ */
+export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): () => void {
+  try {
+    const vehiclesCol = collection(db, 'vehicles');
+    
+    const unsubscribe = onSnapshot(
+      vehiclesCol,
+      (snapshot) => {
+        if (snapshot.empty) {
+          // If Firestore is empty, seed it with default inventory
+          seedInitialVehiclesIfEmpty(0).then(() => {
+            const seed = INITIAL_VEHICLES.map(normalizeVehicleData).filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
+            localStorage.setItem(VEHICLES_KEY, JSON.stringify(seed));
+            onUpdate(seed);
+          });
+          return;
+        }
+
+        const list: Vehicle[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as Vehicle;
+          const normalized = normalizeVehicleData({
+            ...data,
+            id: docSnap.id || data.id,
+          });
+          if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
+            list.push(normalized);
+          }
+        });
+
+        // Save fresh data into fast local storage cache
         try {
-          localStorage.removeItem('jite_vehicles_v1');
-          localStorage.removeItem('jite_vehicles_v2');
-          localStorage.removeItem('jite_vehicles_v3');
-          localStorage.removeItem('jite_vehicles_v4');
-          localStorage.setItem(VEHICLES_KEY, JSON.stringify(finalMerged));
+          localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
         } catch {}
 
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: finalMerged }));
+          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
         }
-        return finalMerged;
+
+        onUpdate(list);
+      },
+      (error) => {
+        console.error('[Firestore] Vehicles onSnapshot error:', error);
+        // Fallback to local cache if network is temporarily disconnected
+        onUpdate(getVehicles());
       }
-    }
+    );
+
+    return unsubscribe;
   } catch (e) {
-    console.warn('Could not fetch vehicles from server, using local storage cache:', e);
+    console.warn('[Firestore] Real-time vehicles subscription setup fallback:', e);
+    onUpdate(getVehicles());
+    return () => {};
   }
-  return getVehicles();
 }
 
-// Get loaded vehicles from localStorage or seed with automatic seed reconciliation
-export function getVehicles(): Vehicle[] {
+/**
+ * Fetches all vehicles from Cloud Firestore (with fallback to local storage cache).
+ */
+export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
-    localStorage.removeItem('jite_vehicles_v1');
-    localStorage.removeItem('jite_vehicles_v2');
-    localStorage.removeItem('jite_vehicles_v3');
-    localStorage.removeItem('jite_vehicles_v4');
-  } catch {
-    // ignore
+    const vehiclesCol = collection(db, 'vehicles');
+    const snapshot = await getDocs(vehiclesCol);
+
+    if (snapshot.empty) {
+      await seedInitialVehiclesIfEmpty(0);
+      return getVehicles();
+    }
+
+    const list: Vehicle[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Vehicle;
+      const normalized = normalizeVehicleData({
+        ...data,
+        id: docSnap.id || data.id,
+      });
+      if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
+        list.push(normalized);
+      }
+    });
+
+    try {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
+    }
+
+    return list;
+  } catch (error) {
+    console.warn('[Firestore] Error fetching vehicles, using local cache:', error);
+    return getVehicles();
   }
+}
+
+/**
+ * Gets cached vehicles from localStorage or fallback seed data.
+ */
+export function getVehicles(): Vehicle[] {
   const normalizedSeed = INITIAL_VEHICLES
     .map(normalizeVehicleData)
     .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-  const data = localStorage.getItem(VEHICLES_KEY);
-  if (!data) {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
-    return normalizedSeed;
-  }
+
   try {
+    const data = localStorage.getItem(VEHICLES_KEY);
+    if (!data) {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
+      return normalizedSeed;
+    }
     const parsed = JSON.parse(data) as Vehicle[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
       localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
       return normalizedSeed;
     }
-    const normalizedParsed = parsed
+    return parsed
       .map(normalizeVehicleData)
       .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-    
-    // Automatically merge any newly added seed vehicles from INITIAL_VEHICLES that are missing in localStorage
-    const existingIds = new Set(normalizedParsed.map(v => v.id));
-    const missingSeed = normalizedSeed.filter(v => !existingIds.has(v.id) && !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-    
-    if (missingSeed.length > 0) {
-      const merged = [...missingSeed, ...normalizedParsed];
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(merged));
-      return merged;
-    }
-    
-    return normalizedParsed;
   } catch (e) {
     return normalizedSeed;
   }
 }
 
-// Save vehicles to localStorage AND sync to backend server
+/**
+ * Saves a single vehicle directly into Cloud Firestore.
+ */
+export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<void> {
+  const normalized = normalizeVehicleData(vehicle);
+  try {
+    const docRef = doc(db, 'vehicles', normalized.id);
+    await setDoc(docRef, normalized);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
+  }
+}
+
+/**
+ * Deletes a single vehicle directly from Cloud Firestore.
+ */
+export async function deleteVehicleFromFirestore(id: string): Promise<void> {
+  PERMANENTLY_DELETED_VEHICLE_IDS.add(id);
+  try {
+    const docRef = doc(db, 'vehicles', id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+  }
+}
+
+/**
+ * Resets all vehicles in Cloud Firestore back to default curated inventory.
+ */
+export async function resetFirestoreVehiclesToDefault(): Promise<void> {
+  try {
+    // 1. Delete all existing documents in vehicles collection
+    const snapshot = await getDocs(collection(db, 'vehicles'));
+    const deleteBatch = writeBatch(db);
+    snapshot.forEach((d) => {
+      deleteBatch.delete(d.ref);
+    });
+    await deleteBatch.commit();
+
+    // 2. Repopulate with initial vehicles
+    const addBatch = writeBatch(db);
+    INITIAL_VEHICLES.map(normalizeVehicleData).forEach((v) => {
+      const docRef = doc(db, 'vehicles', v.id);
+      addBatch.set(docRef, v);
+    });
+    await addBatch.commit();
+
+    localStorage.removeItem(VEHICLES_KEY);
+  } catch (error) {
+    console.error('[Firestore] Failed to reset default vehicles:', error);
+  }
+}
+
+/**
+ * Synchronizes an array of vehicles to Firestore and LocalStorage (backward compatible).
+ */
 export function saveVehicles(vehicles: Vehicle[]): void {
   const normalized = vehicles
     .map(normalizeVehicleData)
     .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-  localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
+
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
+  } catch {}
+
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
   }
 
-  // Sync to server asynchronously so all devices see the changes
-  fetch('/api/vehicles', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(normalized)
-  }).catch(err => {
-    console.error('Failed to sync vehicles to server:', err);
-  });
+  // Batch save to Firestore
+  try {
+    const batch = writeBatch(db);
+    normalized.forEach((v) => {
+      const docRef = doc(db, 'vehicles', v.id);
+      batch.set(docRef, v);
+    });
+    batch.commit().catch((err) => {
+      console.warn('[Firestore] Batch save background error:', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore] Error initiating batch save:', err);
+  }
 }
 
-// Permanently delete a vehicle across browser and server storage
+/**
+ * Permanently deletes a vehicle (backward compatible).
+ */
 export function deleteVehicle(id: string): void {
-  PERMANENTLY_DELETED_VEHICLE_IDS.add(id);
+  deleteVehicleFromFirestore(id).catch(() => {});
   const current = getVehicles().filter(v => v.id !== id);
-  localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+  } catch {}
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
   }
-
-  fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
-    method: 'DELETE'
-  }).catch(err => {
-    console.error('Failed to delete vehicle on server:', err);
-  });
 }
 
-// Fetch leads from server
+// ============================================================================
+// LEADS & INQUIRIES FIRESTORE INTEGRATION
+// ============================================================================
+
+/**
+ * Subscribes in real-time to the Cloud Firestore `leads` collection.
+ */
+export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void {
+  try {
+    const leadsCol = collection(db, 'leads');
+    const unsubscribe = onSnapshot(
+      leadsCol,
+      (snapshot) => {
+        const list: Lead[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as Lead);
+        });
+        // Sort newest first
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        try {
+          localStorage.setItem(LEADS_KEY, JSON.stringify(list));
+        } catch {}
+        onUpdate(list);
+      },
+      (error) => {
+        console.error('[Firestore] Leads onSnapshot error:', error);
+        onUpdate(getLeads());
+      }
+    );
+    return unsubscribe;
+  } catch (e) {
+    onUpdate(getLeads());
+    return () => {};
+  }
+}
+
+/**
+ * Fetches all leads from Cloud Firestore.
+ */
 export async function fetchLeads(): Promise<Lead[]> {
   try {
-    const res = await fetch('/api/leads?t=' + Date.now(), { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        localStorage.setItem(LEADS_KEY, JSON.stringify(data));
-        return data;
-      }
-    }
-  } catch (e) {
-    // fallback
+    const snapshot = await getDocs(collection(db, 'leads'));
+    const list: Lead[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as Lead);
+    });
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    try {
+      localStorage.setItem(LEADS_KEY, JSON.stringify(list));
+    } catch {}
+    return list;
+  } catch (error) {
+    return getLeads();
   }
-  return getLeads();
 }
 
-// Get leads from localStorage
+/**
+ * Gets leads from localStorage cache.
+ */
 export function getLeads(): Lead[] {
-  const data = localStorage.getItem(LEADS_KEY);
-  if (!data) return [];
   try {
-    return JSON.parse(data);
-  } catch (e) {
+    const data = localStorage.getItem(LEADS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
     return [];
   }
 }
 
-// Save new lead
+/**
+ * Saves a new lead to Cloud Firestore.
+ */
 export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead {
-  const leads = getLeads();
   const newLead: Lead = {
     ...lead,
     id: 'lead_' + Math.random().toString(36).substr(2, 9),
     createdAt: new Date().toISOString(),
     status: 'New'
   };
-  leads.unshift(newLead);
-  localStorage.setItem(LEADS_KEY, JSON.stringify(leads));
 
-  fetch('/api/leads', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(leads)
-  }).catch(() => {});
+  const current = getLeads();
+  current.unshift(newLead);
+  try {
+    localStorage.setItem(LEADS_KEY, JSON.stringify(current));
+  } catch {}
+
+  // Write to Cloud Firestore
+  setDoc(doc(db, 'leads', newLead.id), newLead).catch((err) => {
+    console.warn('[Firestore] Error saving lead to Firestore:', err);
+  });
 
   return newLead;
 }
 
-// Update lead status/notes
+/**
+ * Updates a lead in Cloud Firestore.
+ */
 export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
-  const leads = getLeads();
-  const updatedLeads = leads.map(l => l.id === leadId ? { ...l, ...updates } : l);
-  localStorage.setItem(LEADS_KEY, JSON.stringify(updatedLeads));
+  const current = getLeads();
+  const updated = current.map(l => l.id === leadId ? { ...l, ...updates } : l);
+  try {
+    localStorage.setItem(LEADS_KEY, JSON.stringify(updated));
+  } catch {}
 
-  fetch('/api/leads', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updatedLeads)
-  }).catch(() => {});
+  // Update in Cloud Firestore
+  updateDoc(doc(db, 'leads', leadId), updates).catch((err) => {
+    console.warn('[Firestore] Error updating lead in Firestore:', err);
+  });
 
-  return updatedLeads;
+  return updated;
 }
 
-// Fetch inquiries from server
+/**
+ * Subscribes in real-time to the Cloud Firestore `inquiries` collection.
+ */
+export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): () => void {
+  try {
+    const inqCol = collection(db, 'inquiries');
+    const unsubscribe = onSnapshot(
+      inqCol,
+      (snapshot) => {
+        const list: Inquiry[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as Inquiry);
+        });
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        try {
+          localStorage.setItem(INQUIRIES_KEY, JSON.stringify(list));
+        } catch {}
+        onUpdate(list);
+      },
+      (error) => {
+        console.error('[Firestore] Inquiries onSnapshot error:', error);
+        onUpdate(getInquiries());
+      }
+    );
+    return unsubscribe;
+  } catch (e) {
+    onUpdate(getInquiries());
+    return () => {};
+  }
+}
+
+/**
+ * Fetches inquiries from Cloud Firestore.
+ */
 export async function fetchInquiries(): Promise<Inquiry[]> {
   try {
-    const res = await fetch('/api/inquiries?t=' + Date.now(), { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        localStorage.setItem(INQUIRIES_KEY, JSON.stringify(data));
-        return data;
-      }
-    }
-  } catch (e) {
-    // fallback
+    const snapshot = await getDocs(collection(db, 'inquiries'));
+    const list: Inquiry[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as Inquiry);
+    });
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    try {
+      localStorage.setItem(INQUIRIES_KEY, JSON.stringify(list));
+    } catch {}
+    return list;
+  } catch (error) {
+    return getInquiries();
   }
-  return getInquiries();
 }
 
-// Get inquiries from localStorage
+/**
+ * Gets inquiries from localStorage cache.
+ */
 export function getInquiries(): Inquiry[] {
-  const data = localStorage.getItem(INQUIRIES_KEY);
-  if (!data) return [];
   try {
-    return JSON.parse(data);
-  } catch (e) {
+    const data = localStorage.getItem(INQUIRIES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
     return [];
   }
 }
 
-// Save new inquiry
+/**
+ * Saves a new inquiry to Cloud Firestore.
+ */
 export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'>): Inquiry {
-  const inquiries = getInquiries();
   const newInquiry: Inquiry = {
     ...inquiry,
     id: 'inq_' + Math.random().toString(36).substr(2, 9),
     createdAt: new Date().toISOString(),
     status: 'New'
   };
-  inquiries.unshift(newInquiry);
-  localStorage.setItem(INQUIRIES_KEY, JSON.stringify(inquiries));
 
-  fetch('/api/inquiries', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(inquiries)
-  }).catch(() => {});
+  const current = getInquiries();
+  current.unshift(newInquiry);
+  try {
+    localStorage.setItem(INQUIRIES_KEY, JSON.stringify(current));
+  } catch {}
+
+  // Write to Cloud Firestore
+  setDoc(doc(db, 'inquiries', newInquiry.id), newInquiry).catch((err) => {
+    console.warn('[Firestore] Error saving inquiry to Firestore:', err);
+  });
 
   return newInquiry;
 }
 
-// Update inquiry status
+/**
+ * Updates an inquiry in Cloud Firestore.
+ */
 export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inquiry[] {
-  const inquiries = getInquiries();
-  const updated = inquiries.map(i => i.id === inquiryId ? { ...i, ...updates } : i);
-  localStorage.setItem(INQUIRIES_KEY, JSON.stringify(updated));
+  const current = getInquiries();
+  const updated = current.map(i => i.id === inquiryId ? { ...i, ...updates } : i);
+  try {
+    localStorage.setItem(INQUIRIES_KEY, JSON.stringify(updated));
+  } catch {}
 
-  fetch('/api/inquiries', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updated)
-  }).catch(() => {});
+  // Update in Cloud Firestore
+  updateDoc(doc(db, 'inquiries', inquiryId), updates).catch((err) => {
+    console.warn('[Firestore] Error updating inquiry in Firestore:', err);
+  });
 
   return updated;
 }
 
-// Export prefilled WhatsApp link generator
-// Phone Number: 08180823197
-// International Format: 2348180823197
+// ============================================================================
+// WHATSAPP & MESSAGING UTILITIES
+// ============================================================================
+
 const CONSULTANT_PHONE = '2348180823197';
 
 export function getWhatsAppLink(message: string): string {
   return `https://wa.me/${CONSULTANT_PHONE}?text=${encodeURIComponent(message)}`;
 }
-
-// Predefined WhatsApp Messages
 
 export function getGeneralConsultationMessage(): string {
   return `Hello Jite Auto Deals! I'm interested in finding a quality vehicle. I'd love to consult with a vehicle specialist to compare my options based on my budget.`;

@@ -28,6 +28,7 @@ import { Vehicle } from './types';
 import {
   getVehicles,
   fetchVehicles,
+  subscribeToVehicles,
   formatCurrency,
   getWhatsAppLink,
   getGeneralConsultationMessage,
@@ -283,11 +284,11 @@ export default function App() {
       window.history.replaceState(initialNavState, '', window.location.href);
     } catch {}
 
-    const handleSync = () => {
-      const vList = getVehicles();
-      setVehicles(vList);
+    const handleSync = (vList?: Vehicle[]) => {
+      const currentList = Array.isArray(vList) ? vList : getVehicles();
+      setVehicles(currentList);
       if (initialVehicleSlugOrId) {
-        const found = findVehicleBySlugOrId(vList, initialVehicleSlugOrId);
+        const found = findVehicleBySlugOrId(currentList, initialVehicleSlugOrId);
         if (found && isVehicleActive(found)) {
           if (initialModal === 'qualifier') {
             setQualifierVehicle(found);
@@ -302,50 +303,22 @@ export default function App() {
     };
 
     handleSync();
-    fetchVehicles().then(v => {
-      if (Array.isArray(v) && v.length > 0) {
-        setVehicles(v);
-        if (initialVehicleSlugOrId) {
-          const found = findVehicleBySlugOrId(v, initialVehicleSlugOrId);
-          if (found && isVehicleActive(found)) {
-            if (initialModal === 'qualifier') {
-              setQualifierVehicle(found);
-              setIsQualifierOpen(true);
-            } else {
-              setSelectedVehicle(found);
-              setIsDetailsOpen(true);
-              document.title = `${found.year} ${found.make} ${found.model} - ${formatCurrency(found.price)} | Jite Auto Deals`;
-            }
-          }
-        }
-      }
+
+    // Real-time Cloud Firestore subscription
+    const unsubscribeFirestore = subscribeToVehicles((updatedList) => {
+      handleSync(updatedList);
     });
 
-    window.addEventListener('vehiclesUpdated', handleSync);
-    window.addEventListener('storage', handleSync);
-
-    const interval = setInterval(() => {
-      fetchVehicles().then(v => {
-        if (Array.isArray(v) && v.length > 0) {
-          setVehicles(v);
-        }
-      });
-    }, 5000);
-
-    const handleFocus = () => {
-      fetchVehicles().then(v => {
-        if (Array.isArray(v) && v.length > 0) {
-          setVehicles(v);
-        }
-      });
-    };
-    window.addEventListener('focus', handleFocus);
+    const handleWindowSync = () => handleSync();
+    window.addEventListener('vehiclesUpdated', handleWindowSync);
+    window.addEventListener('storage', handleWindowSync);
+    window.addEventListener('focus', handleWindowSync);
 
     return () => {
-      window.removeEventListener('vehiclesUpdated', handleSync);
-      window.removeEventListener('storage', handleSync);
-      window.removeEventListener('focus', handleFocus);
-      clearInterval(interval);
+      unsubscribeFirestore();
+      window.removeEventListener('vehiclesUpdated', handleWindowSync);
+      window.removeEventListener('storage', handleWindowSync);
+      window.removeEventListener('focus', handleWindowSync);
     };
   }, []);
 
