@@ -78,15 +78,9 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
       formData.phone
     );
 
-    if (onOpenConsultantModal) {
-      onClose();
-      onOpenConsultantModal(vehicle, waText);
-    } else {
-      const waLink = getWhatsAppLink(waText);
-      setTimeout(() => {
-        window.open(waLink, '_blank', 'noopener,noreferrer');
-      }, 1000);
-    }
+    const waLink = getWhatsAppLink(waText);
+    window.open(waLink, '_blank', 'noopener,noreferrer');
+    onClose();
   };
 
   const handleCallOption = () => {

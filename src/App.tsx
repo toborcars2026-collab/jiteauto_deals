@@ -21,8 +21,6 @@ import HelpMeFindCar from './components/HelpMeFindCar';
 import VehicleCard from './components/VehicleCard';
 import VehicleDetailsModal from './components/VehicleDetailsModal';
 import LeadQualifierModal from './components/LeadQualifierModal';
-import ConsultantProfileModal from './components/ConsultantProfileModal';
-import ExitIntentModal from './components/ExitIntentModal';
 import AdminPanel from './components/AdminPanel';
 import { Vehicle } from './types';
 import {
@@ -40,7 +38,7 @@ import { INITIAL_VEHICLES } from './data';
 
 interface AppHistoryState {
   tab: 'home' | 'browse' | 'admin';
-  modal?: 'details' | 'qualifier' | 'consultant' | null;
+  modal?: 'details' | 'qualifier' | null;
   vehicleId?: string | null;
   vehicleSlug?: string | null;
 }
@@ -54,12 +52,6 @@ export default function App() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isQualifierOpen, setIsQualifierOpen] = useState(false);
   const [qualifierVehicle, setQualifierVehicle] = useState<Vehicle | null>(null);
-
-  // Consultant Modal State
-  const [isConsultantOpen, setIsConsultantOpen] = useState(false);
-  const [consultantContextVehicle, setConsultantContextVehicle] = useState<Vehicle | null>(null);
-  const [consultantCustomMessage, setConsultantCustomMessage] = useState<string | undefined>(undefined);
-  const [consultantChannel, setConsultantChannel] = useState<'whatsapp' | 'call' | 'email'>('whatsapp');
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,7 +68,7 @@ export default function App() {
   // Navigation: Change Tab with Clean History State (prevents duplicate pushes)
   const handleTabChange = (newTab: 'home' | 'browse' | 'admin', replace: boolean = false) => {
     // If already on the same tab and no modal is open, just smooth scroll to top
-    if (currentTab === newTab && !isDetailsOpen && !isQualifierOpen && !isConsultantOpen) {
+    if (currentTab === newTab && !isDetailsOpen && !isQualifierOpen) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -103,7 +95,6 @@ export default function App() {
     setSelectedVehicle(null);
     setIsQualifierOpen(false);
     setQualifierVehicle(null);
-    setIsConsultantOpen(false);
     document.title = newTab === 'admin'
       ? 'Partner Console | Jite Auto Deals'
       : newTab === 'browse'
@@ -186,50 +177,28 @@ export default function App() {
     setQualifierVehicle(null);
   };
 
-  // Navigation: Open Consultant Modal ("Talk to Consultant" / WhatsApp / Call)
+  // Direct Consultant Action (WhatsApp / Call) with no intermediate modal
   const handleOpenConsultant = (
     vehicle?: Vehicle | null,
     customMsg?: string,
     channel: 'whatsapp' | 'call' | 'email' = 'whatsapp'
   ) => {
-    const slug = vehicle ? getVehicleSlug(vehicle) : null;
-    const newState: AppHistoryState = {
-      tab: currentTab,
-      modal: 'consultant',
-      vehicleId: vehicle?.id || null,
-      vehicleSlug: slug,
-    };
-    const newUrl = vehicle
-      ? `/?vehicle=${encodeURIComponent(slug!)}&consult=1`
-      : currentTab === 'home'
-      ? '/?consult=1'
-      : `/?tab=${currentTab}&consult=1`;
-
-    try {
-      window.history.pushState(newState, '', newUrl);
-    } catch {}
-
-    setConsultantContextVehicle(vehicle || null);
-    setConsultantCustomMessage(customMsg);
-    setConsultantChannel(channel);
-    setIsConsultantOpen(true);
-  };
-
-  // Navigation: Close Consultant Modal
-  const handleCloseConsultant = () => {
-    try {
-      const histState = window.history.state as AppHistoryState | null;
-      if (histState && histState.modal === 'consultant') {
-        window.history.back();
-        return;
-      }
-    } catch {}
-    setIsConsultantOpen(false);
+    if (channel === 'call') {
+      window.location.href = 'tel:08180823197';
+      return;
+    }
+    const defaultMsg = customMsg || (vehicle
+      ? `Hello Tobor Jite, I am interested in inquiring about the ${vehicle.year} ${vehicle.make} ${vehicle.model} (${formatCurrency(vehicle.price)}). I would like your guidance as my vehicle consultant.`
+      : getGeneralConsultationMessage());
+    
+    const waUrl = getWhatsAppLink(defaultMsg);
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
   // General Sourcing click
   const handleGeneralConsultation = () => {
-    handleOpenConsultant(null, getGeneralConsultationMessage());
+    const link = getWhatsAppLink(getGeneralConsultationMessage());
+    window.open(link, '_blank', 'noopener,noreferrer');
   };
 
   // Reset Filters
@@ -267,11 +236,9 @@ export default function App() {
       initialVehicleSlugOrId = hash.replace(/^#\/vehicles\/?/, '');
     }
 
-    let initialModal: 'details' | 'qualifier' | 'consultant' | null = null;
+    let initialModal: 'details' | 'qualifier' | null = null;
     if (initialVehicleSlugOrId) {
       initialModal = searchParams.get('qualify') ? 'qualifier' : 'details';
-    } else if (searchParams.get('consult')) {
-      initialModal = 'consultant';
     }
 
     // Root the initial history entry with replaceState (so no duplicate forward/back entries are created on initial load)
@@ -356,7 +323,6 @@ export default function App() {
           setIsDetailsOpen(true);
           setIsQualifierOpen(false);
           setQualifierVehicle(null);
-          setIsConsultantOpen(false);
           document.title = `${found.year} ${found.make} ${found.model} - ${formatCurrency(found.price)} | Jite Auto Deals`;
         } else {
           setIsDetailsOpen(false);
@@ -367,20 +333,12 @@ export default function App() {
         setQualifierVehicle(found);
         setIsQualifierOpen(true);
         setIsDetailsOpen(false);
-        setIsConsultantOpen(false);
-      } else if (targetModal === 'consultant') {
-        const found = vehicleParam ? findVehicleBySlugOrId(vList, vehicleParam) : null;
-        setConsultantContextVehicle(found);
-        setIsConsultantOpen(true);
-        setIsDetailsOpen(false);
-        setIsQualifierOpen(false);
       } else {
         // All modals closed — smoothly return to the section/page
         setIsDetailsOpen(false);
         setSelectedVehicle(null);
         setIsQualifierOpen(false);
         setQualifierVehicle(null);
-        setIsConsultantOpen(false);
         document.title = targetTab === 'admin'
           ? 'Partner Console | Jite Auto Deals'
           : targetTab === 'browse'
@@ -998,40 +956,6 @@ export default function App() {
           onOpenConsultantModal={(v, msg) => handleOpenConsultant(v, msg)}
         />
       )}
-
-      {/* Consultant Profile Modal */}
-      <ConsultantProfileModal
-        isOpen={isConsultantOpen}
-        onClose={handleCloseConsultant}
-        customMessage={consultantCustomMessage}
-        vehicleContext={
-          consultantContextVehicle
-            ? {
-                make: consultantContextVehicle.make,
-                model: consultantContextVehicle.model,
-                year: consultantContextVehicle.year,
-                price: consultantContextVehicle.price,
-                image: consultantContextVehicle.images[0],
-              }
-            : undefined
-        }
-        initialChannel={consultantChannel}
-      />
-
-      {/* Exit Intent Popup */}
-      <ExitIntentModal
-        isAtHomePage={currentTab === 'home' && !isDetailsOpen && !isQualifierOpen && !isConsultantOpen}
-        onContinueBrowsing={() => {
-          if (currentTab !== 'browse') {
-            handleTabChange('browse');
-          }
-          const inventoryEl = document.getElementById('inventory');
-          if (inventoryEl) {
-            inventoryEl.scrollIntoView({ behavior: 'smooth' });
-          }
-        }}
-        onOpenConsultantModal={() => handleGeneralConsultation()}
-      />
     </div>
   );
 }
