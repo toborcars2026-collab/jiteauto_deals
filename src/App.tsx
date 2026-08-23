@@ -63,7 +63,6 @@ export default function App() {
   const [selectedFuelType, setSelectedFuelType] = useState('All');
   const [priceRange, setPriceRange] = useState(150000000); // Max slider value
   const [showOnlyCustom, setShowOnlyCustom] = useState(false);
-  const [homeActiveTab, setHomeActiveTab] = useState<'featured' | 'added'>('featured');
   const [homeVisibleLimit, setHomeVisibleLimit] = useState(12);
 
   // Navigation: Change Tab with Clean History State (prevents duplicate pushes)
@@ -443,102 +442,37 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Sleek Tab Selector */}
-                <div className="flex gap-2.5 mb-8 border-b border-slate-200/60 pb-3">
-                  <button
-                    onClick={() => setHomeActiveTab('featured')}
-                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                      homeActiveTab === 'featured'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                    }`}
-                  >
-                    All Curated Picks ({activeVehicles.length})
-                  </button>
-                  <button
-                    onClick={() => setHomeActiveTab('added')}
-                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 ${
-                      homeActiveTab === 'added'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                    }`}
-                  >
-                    <span>My Added Listings</span>
-                    <span className="bg-amber-100 text-amber-800 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full">
-                      {vehicles.filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id)).length}
-                    </span>
-                  </button>
-                </div>
-
-                {homeActiveTab === 'featured' ? (
-                  homepageVehicles.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
-                      <Car size={36} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-slate-500 text-sm">No vehicles added to featured catalog yet.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {homepageVehicles.slice(0, homeVisibleLimit).map((vehicle) => (
-                          <VehicleCard
-                            key={vehicle.id}
-                            vehicle={vehicle}
-                            onViewDetails={handleViewDetails}
-                            onGetThisCar={handleOpenQualifier}
-                            onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
-                          />
-                        ))}
-                      </div>
-
-                      {homepageVehicles.length > homeVisibleLimit && (
-                        <div className="flex justify-center mt-8">
-                          <button
-                            onClick={() => setHomeVisibleLimit(prev => Math.min(prev + 12, homepageVehicles.length))}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-sm border border-slate-200 shadow-sm transition-all hover:border-amber-500 cursor-pointer"
-                          >
-                            <span>Show More Vehicles ({homepageVehicles.length - homeVisibleLimit} more)</span>
-                            <span>↓</span>
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )
+                {homepageVehicles.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
+                    <Car size={36} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-slate-500 text-sm">No vehicles added to featured catalog yet.</p>
+                  </div>
                 ) : (
-                  vehicles.filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id)).length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200 p-8 max-w-md mx-auto">
-                      <Car size={40} className="mx-auto text-slate-300 mb-3 animate-pulse" />
-                      <h4 className="font-bold text-slate-900 text-base">No Custom Cars Sourced Yet</h4>
-                      <p className="text-slate-500 text-xs mt-1 mb-5">
-                        Any vehicle lists you enter in our command center will be tracked and displayed instantly right here.
-                      </p>
-                      <button
-                        onClick={() => {
-                          handleTabChange('admin');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow cursor-pointer"
-                      >
-                        <span>Go to Partner Console</span>
-                        <span>→</span>
-                      </button>
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {homepageVehicles.slice(0, homeVisibleLimit).map((vehicle) => (
+                        <VehicleCard
+                          key={vehicle.id}
+                          vehicle={vehicle}
+                          onViewDetails={handleViewDetails}
+                          onGetThisCar={handleOpenQualifier}
+                          onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
+                        />
+                      ))}
                     </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {vehicles
-                          .filter(v => !INITIAL_VEHICLES.some(initial => initial.id === v.id))
-                          .slice(0, homeVisibleLimit)
-                          .map((vehicle) => (
-                            <VehicleCard
-                              key={vehicle.id}
-                              vehicle={vehicle}
-                              onViewDetails={handleViewDetails}
-                              onGetThisCar={handleOpenQualifier}
-                              onOpenConsultantModal={(v, ch) => handleOpenConsultant(v, undefined, ch)}
-                            />
-                          ))}
+
+                    {homepageVehicles.length > homeVisibleLimit && (
+                      <div className="flex justify-center mt-8">
+                        <button
+                          onClick={() => setHomeVisibleLimit(prev => Math.min(prev + 12, homepageVehicles.length))}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-sm border border-slate-200 shadow-sm transition-all hover:border-amber-500 cursor-pointer"
+                        >
+                          <span>Show More Vehicles ({homepageVehicles.length - homeVisibleLimit} more)</span>
+                          <span>↓</span>
+                        </button>
                       </div>
-                    </>
-                  )
+                    )}
+                  </>
                 )}
 
                 <div className="flex flex-wrap items-center justify-center mt-10 gap-3">
