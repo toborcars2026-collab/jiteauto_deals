@@ -5,7 +5,7 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
-const VEHICLES_KEY = 'jite_vehicles_v9';
+const VEHICLES_KEY = 'jite_vehicles_v11';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 
@@ -456,6 +456,17 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'wFgz95nS': 'https://i.ibb.co/ycPQwHz6/IMG-20260822-WA0027.jpg',
   'ns2zckZW': 'https://i.ibb.co/rGP46yTW/IMG-20260821-WA0008.jpg',
   '93mdrM57': 'https://i.ibb.co/Qj7xK5w4/IMG-20260822-WA0026.jpg',
+  'Ld7GkJzh': 'https://i.ibb.co/4RrQmYZg/IMG-20260822-WA0015.jpg',
+  'ZRNz6TGh': 'https://i.ibb.co/Kcmxjyb9/IMG-20260822-WA0019.jpg',
+  'xtbSs7Jy': 'https://i.ibb.co/7dDJz12H/IMG-20260822-WA0021.jpg',
+  'qF52Cz0N': 'https://i.ibb.co/M56Jfb8c/IMG-20260822-WA0020.jpg',
+  '8448X6Fq': 'https://i.ibb.co/cXXTxDz0/IMG-20260822-WA0013.jpg',
+  'VYD3wzNj': 'https://i.ibb.co/DfkLrvbV/IMG-20260822-WA0018.jpg',
+  'XkvcW0vF': 'https://i.ibb.co/qFPTDqPm/IMG-20260822-WA0001-1.jpg',
+  'q4Mp2yK': 'https://i.ibb.co/G1vRrxy/IMG-20260822-WA0007-1.jpg',
+  'tMsfP0Qd': 'https://i.ibb.co/pvzDrHbm/IMG-20260822-WA0006-1.jpg',
+  'BVWRkWS1': 'https://i.ibb.co/1fyxcywS/IMG-20260822-WA0008-1.jpg',
+  'XZVLLfBC': 'https://i.ibb.co/Fbn33kvD/IMG-20260822-WA0009-1.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -606,6 +617,17 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
           }
         });
 
+        // Ensure the new 2022 Dodge Challenger is synchronized
+        const hasDodgeChallenger = list.some(v => v.id === 'dodge-challenger-2022-white-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0015')));
+        if (!hasDodgeChallenger) {
+          const dodge = INITIAL_VEHICLES.find(v => v.id === 'dodge-challenger-2022-white-direct-belgium');
+          if (dodge) {
+            const norm = normalizeVehicleData(dodge);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
+
         // Ensure the new 2017 BMW X-Drive is synchronized
         const hasBmwXDrive = list.some(v => v.id === 'bmw-xdrive-2017-dark-blue-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0023')));
         if (!hasBmwXDrive) {
@@ -617,12 +639,18 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
           }
         }
 
-        // Ensure the new 2017 Blue Highlander is synchronized
-        const hasBlueHighlander = list.some(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used' || v.images.some(img => img.includes('IMG-20260822-WA0001')));
-        if (!hasBlueHighlander) {
-          const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
-          if (highlander) {
-            const norm = normalizeVehicleData(highlander);
+        // Ensure the 2017 Blue Highlander is synchronized with latest images
+        const existingHighlanderIdx = list.findIndex(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
+        const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
+        if (highlander) {
+          const norm = normalizeVehicleData(highlander);
+          if (existingHighlanderIdx >= 0) {
+            // If existing images don't match the new WA0001-1 images, update it
+            if (!list[existingHighlanderIdx].images[0]?.includes('WA0001-1')) {
+              list[existingHighlanderIdx] = norm;
+              saveVehicleToFirestore(norm).catch(console.warn);
+            }
+          } else {
             list.unshift(norm);
             saveVehicleToFirestore(norm).catch(console.warn);
           }

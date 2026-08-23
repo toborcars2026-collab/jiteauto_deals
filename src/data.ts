@@ -2,6 +2,31 @@ import { Vehicle } from "./types";
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    "id": "dodge-challenger-2022-white-direct-belgium",
+    "make": "Dodge",
+    "model": "Challenger",
+    "year": 2022,
+    "price": 38000000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Coupe",
+    "location": "Abuja",
+    "dealership": "Direct Belgium Import 🇧🇪",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/cXXTxDz0/IMG-20260822-WA0013.jpg",
+      "https://i.ibb.co/4RrQmYZg/IMG-20260822-WA0015.jpg",
+      "https://i.ibb.co/DfkLrvbV/IMG-20260822-WA0018.jpg",
+      "https://i.ibb.co/Kcmxjyb9/IMG-20260822-WA0019.jpg",
+      "https://i.ibb.co/M56Jfb8c/IMG-20260822-WA0020.jpg",
+      "https://i.ibb.co/7dDJz12H/IMG-20260822-WA0021.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2022 Dodge Challenger\nDirect Belgium 🇧🇪 | Duty Paid\n\n📋 Vehicle Details & Information:\n• Make: Dodge\n• Model: Challenger\n• Year: 2022\n• Condition: Foreign Used (Direct Belgium 🇧🇪)\n• Duty Status: Duty Paid 📑\n• Colour: White 🤍\n• Location: Abuja\n• Price: ₦38,000,000\n\n✨ Vehicle Description:\nA 2022 Dodge Challenger in a clean white exterior, direct from Belgium and available with duty paid. The vehicle is located in Abuja and is priced at ₦38,000,000.\n\n⭐ Key Features:\n🇧🇪 2022 Direct Belgium\n🚘 Dodge Challenger\n📑 Duty Paid\n🤍 White Exterior\n📍 Abuja\n💰 ₦38M"
+  },
+  {
     "id": "bmw-xdrive-2017-dark-blue-direct-belgium",
     "make": "BMW",
     "model": "X-Drive",
@@ -115,19 +140,18 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     "bodyType": "SUV",
     "location": "Abuja",
     "dealership": "Verified Direct US Import",
-    "engine": "3.5L V6 Engine",
     "color": "Blue",
     "condition": "Foreign Used",
     "isFeatured": true,
     "status": "Active",
     "images": [
-      "https://i.ibb.co/jkwkGs9Y/IMG-20260822-WA0001.jpg",
-      "https://i.ibb.co/ymQcTbkd/IMG-20260822-WA0007.jpg",
-      "https://i.ibb.co/M5DyzC02/IMG-20260822-WA0008.jpg",
-      "https://i.ibb.co/qYtT07Zh/IMG-20260822-WA0006.jpg",
-      "https://i.ibb.co/q8d8mkX/IMG-20260822-WA0009.jpg"
+      "https://i.ibb.co/qFPTDqPm/IMG-20260822-WA0001-1.jpg",
+      "https://i.ibb.co/G1vRrxy/IMG-20260822-WA0007-1.jpg",
+      "https://i.ibb.co/pvzDrHbm/IMG-20260822-WA0006-1.jpg",
+      "https://i.ibb.co/1fyxcywS/IMG-20260822-WA0008-1.jpg",
+      "https://i.ibb.co/Fbn33kvD/IMG-20260822-WA0009-1.jpg"
     ],
-    "description": "🚘 VEHICLE PROFILE SHEET\n2017 Toyota Highlander XLE\nForeign Used | Original Duty\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Highlander\n• Year: 2017\n• Trim: XLE\n• Condition: Foreign Used\n• Colour: Blue\n• Duty Status: Original Duty — July 2026\n• Key Feature: Keyless Entry\n• Seating: 3-Seater / 3 Rows\n• Location: Abuja\n• Price: ₦35,000,000\n\n✨ Vehicle Description:\nA 2017 Toyota Highlander XLE in a blue exterior, offered as a foreign-used vehicle with original duty from July 2026. The vehicle comes with keyless entry and is listed as a 3-seater / 3 rows, according to the information provided.\n\n⭐ Key Features:\n🔥 2017 Toyota Highlander XLE\n🌍 Foreign Used\n🔑 Keyless Entry\n📑 Original Duty — July 2026\n🩵 Blue Exterior\n💺 3-Seater\n📍 Abuja"
+    "description": "🚘 VEHICLE PROFILE SHEET\n2017 Toyota Highlander XLE\nForeign Used | Original Duty\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Highlander\n• Year: 2017\n• Trim: XLE\n• Condition: Foreign Used\n• Colour: Blue 🩵\n• Duty Status: Original Duty — July 2026 📑\n• Key Feature: Keyless Entry 🔑\n• Seating: 3-Seater 💺\n• Location: Abuja\n• Price: ₦35,000,000\n\n✨ Vehicle Description:\nA 2017 Toyota Highlander XLE in a blue exterior, offered as a foreign-used vehicle with original duty from July 2026. The vehicle comes with keyless entry and is listed as a 3-seater, according to the information provided.\n📍 Located in Abuja and available for ₦35,000,000.\n\n⭐ Key Features:\n🔥 2017 Toyota Highlander XLE\n🌍 Foreign Used\n🔑 Keyless Entry\n📑 Original Duty — July 2026\n🩵 Blue Exterior\n💺 3-Seater\n📍 Abuja\n💰 ₦35M"
   },
   {
     "id": "toyota-camry-le-2019-silver-foreign-used",
