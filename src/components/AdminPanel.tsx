@@ -149,7 +149,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     dealership: 'Jite Premium Sourcing',
     images: [''],
     description: '',
-    engine: '2.5L 4-Cylinder',
     color: 'Silver',
     condition: 'Foreign Used',
     isFeatured: true,
@@ -345,7 +344,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         dealership: newCar.dealership || 'Jite Premium Sourcing',
         images: finalImages,
         description: newCar.description || 'Verified pristine condition guaranteed.',
-        engine: newCar.engine || '2.0L 4-Cylinder',
         color: newCar.color || 'Black',
         condition: (newCar.condition as any) || 'Foreign Used',
         isFeatured: newCar.isFeatured ?? true,
@@ -373,7 +371,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         dealership: 'Jite Premium Sourcing',
         images: [''],
         description: '',
-        engine: '2.5L 4-Cylinder',
         color: 'Silver',
         condition: 'Foreign Used',
         isFeatured: true,
@@ -943,7 +940,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                         dealership: 'Jite Premium Sourcing',
                         images: [''],
                         description: '',
-                        engine: '2.5L 4-Cylinder',
                         color: 'Silver',
                         condition: 'Foreign Used',
                         isFeatured: true
@@ -1177,17 +1173,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Engine Details</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 2.0L Turbo Inline-4"
-                        value={newCar.engine || ''}
-                        onChange={(e) => setNewCar({ ...newCar, engine: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs uppercase tracking-wider text-slate-400 font-bold">Exterior Color</label>
                       <input

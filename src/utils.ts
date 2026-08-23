@@ -5,14 +5,16 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
-const VEHICLES_KEY = 'jite_vehicles_v6';
+const VEHICLES_KEY = 'jite_vehicles_v9';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 
 // Global tombstone blacklist of permanently removed vehicle IDs
 export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
   'toyota-corolla-s-2015-silver-few-months-used',
-  'lexus-rx350-2015-silver-duty-paid'
+  'lexus-rx350-2015-silver-duty-paid',
+  'toyota-highlander-xle-2017-brown-foreign-used',
+  'toyota-corolla-le-2015-silver-direct-belgium'
 ]);
 
 // Format Currency to Nigerian Naira (₦)
@@ -444,6 +446,16 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   '8Dv5bnX3': 'https://i.ibb.co/hRQWcxC5/IMG-20260815-WA0044.jpg',
   'v6bZj3HM': 'https://i.ibb.co/tTS8Jq41/IMG-20260815-WA0047.jpg',
   '0RGHhQ8Y': 'https://i.ibb.co/XrCcSVNF/IMG-20260815-WA0049.jpg',
+  'k2D20vVT': 'https://i.ibb.co/jkwkGs9Y/IMG-20260822-WA0001.jpg',
+  'qLr3GPg7': 'https://i.ibb.co/ymQcTbkd/IMG-20260822-WA0007.jpg',
+  'Kzjctrv0': 'https://i.ibb.co/M5DyzC02/IMG-20260822-WA0008.jpg',
+  'B2X04c1v': 'https://i.ibb.co/qYtT07Zh/IMG-20260822-WA0006.jpg',
+  'RK9KQzZ': 'https://i.ibb.co/q8d8mkX/IMG-20260822-WA0009.jpg',
+  'LXNPfbqK': 'https://i.ibb.co/XrY4TNdH/IMG-20260822-WA0023.jpg',
+  '4wtLBNCZ': 'https://i.ibb.co/gb98sgQM/IMG-20260823-WA0001.jpg',
+  'wFgz95nS': 'https://i.ibb.co/ycPQwHz6/IMG-20260822-WA0027.jpg',
+  'ns2zckZW': 'https://i.ibb.co/rGP46yTW/IMG-20260821-WA0008.jpg',
+  '93mdrM57': 'https://i.ibb.co/Qj7xK5w4/IMG-20260822-WA0026.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -586,10 +598,35 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
             ...data,
             id: docSnap.id || data.id,
           });
+          if (docSnap.id === 'toyota-highlander-xle-2017-brown-foreign-used' || docSnap.id === 'toyota-corolla-le-2015-silver-direct-belgium') {
+            deleteDoc(doc(db, 'vehicles', docSnap.id)).catch(() => {});
+          }
           if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
             list.push(normalized);
           }
         });
+
+        // Ensure the new 2017 BMW X-Drive is synchronized
+        const hasBmwXDrive = list.some(v => v.id === 'bmw-xdrive-2017-dark-blue-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0023')));
+        if (!hasBmwXDrive) {
+          const bmw = INITIAL_VEHICLES.find(v => v.id === 'bmw-xdrive-2017-dark-blue-direct-belgium');
+          if (bmw) {
+            const norm = normalizeVehicleData(bmw);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
+
+        // Ensure the new 2017 Blue Highlander is synchronized
+        const hasBlueHighlander = list.some(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used' || v.images.some(img => img.includes('IMG-20260822-WA0001')));
+        if (!hasBlueHighlander) {
+          const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
+          if (highlander) {
+            const norm = normalizeVehicleData(highlander);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
 
         // Save fresh data into fast local storage cache
         try {
@@ -690,12 +727,12 @@ export function getVehicles(): Vehicle[] {
 
 /**
  * Client-side fast image optimizer:
- * Uses fast asynchronous decoding (createImageBitmap or ObjectURL) and canvas downscaling (max 2048px, JPEG 0.86)
- * to convert multi-megabyte camera photos into crisp, lightweight web images in milliseconds without quality degradation.
+ * Uses fast asynchronous decoding (createImageBitmap or ObjectURL) and high-fidelity canvas downscaling (max 2560px, JPEG 0.92)
+ * to convert multi-megabyte camera photos into crisp, ultra-high-definition web images in milliseconds without quality degradation or blurring.
  */
-export async function compressImageFile(file: File, maxWidth = 2048, maxHeight = 2048, quality = 0.86): Promise<Blob | File> {
-  // If already small (< 600KB) and standard web format, skip canvas re-encoding to save CPU cycles
-  if (file.size <= 600 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp')) {
+export async function compressImageFile(file: File, maxWidth = 2560, maxHeight = 2560, quality = 0.92): Promise<Blob | File> {
+  // If already reasonable size (< 1.5MB) and standard web format, skip canvas re-encoding to preserve 100% original pixel data
+  if (file.size <= 1500 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/png')) {
     return file;
   }
 

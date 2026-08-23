@@ -12,7 +12,7 @@ export interface Vehicle {
   dealership: string;
   images: string[];
   description: string;
-  engine: string;
+  engine?: string;
   color: string;
   condition: 'Foreign Used' | 'Nigerian Used' | 'Brand New' | 'Direct Belgium' | 'Clean Used' | 'Extremely Clean' | 'Extremely Clean Used' | 'Extremely Clean Nigerian Used' | 'Slightly Used' | 'Like New' | 'Few Months Used' | 'Used' | string;
   isFeatured: boolean;

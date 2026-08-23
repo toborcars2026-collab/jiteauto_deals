@@ -19,7 +19,10 @@ const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 const INQUIRIES_FILE = path.join(DATA_DIR, "inquiries.json");
 
 const KNOWN_DELETED_IDS = new Set<string>([
-  "toyota-corolla-s-2015-silver-few-months-used"
+  "toyota-corolla-s-2015-silver-few-months-used",
+  "lexus-rx350-2015-silver-duty-paid",
+  "toyota-highlander-xle-2017-brown-foreign-used",
+  "toyota-corolla-le-2015-silver-direct-belgium"
 ]);
 
 function ensureDataDir() {

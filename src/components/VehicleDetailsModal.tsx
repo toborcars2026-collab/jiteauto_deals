@@ -75,7 +75,6 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
   // Specs array
   const specs = [
     { label: 'Condition', value: vehicle.condition, isHighlight: true },
-    { label: 'Engine Sizing', value: vehicle.engine },
     { label: 'Exterior Color', value: vehicle.color },
     { label: 'Transmission', value: vehicle.transmission },
     { label: 'Fuel Compound', value: vehicle.fuelType },
