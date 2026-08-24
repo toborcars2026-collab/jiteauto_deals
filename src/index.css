@@ -5,6 +5,44 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+
+  /* Official Deep Rich Brand Gold Palette (#E6A501 - RGB: 230, 165, 1) */
+  --color-gold-50: #FFFDF5;
+  --color-gold-100: #FEF7DC;
+  --color-gold-200: #FDECAB;
+  --color-gold-300: #FBDD72;
+  --color-gold-400: #F3C330;
+  --color-gold-500: #E6A501;
+  --color-gold-600: #C28700;
+  --color-gold-700: #9B6700;
+  --color-gold-800: #784E03;
+  --color-gold-900: #543504;
+  --color-gold-950: #2F1C01;
+
+  /* Override amber/orange default scale to match deep brand Gold #E6A501 */
+  --color-amber-50: #FFFDF5;
+  --color-amber-100: #FEF7DC;
+  --color-amber-200: #FDECAB;
+  --color-amber-300: #FBDD72;
+  --color-amber-400: #F3C330;
+  --color-amber-500: #E6A501;
+  --color-amber-600: #C28700;
+  --color-amber-700: #9B6700;
+  --color-amber-800: #784E03;
+  --color-amber-900: #543504;
+  --color-amber-950: #2F1C01;
+
+  --color-orange-50: #FFFDF5;
+  --color-orange-100: #FEF7DC;
+  --color-orange-200: #FDECAB;
+  --color-orange-300: #FBDD72;
+  --color-orange-400: #F3C330;
+  --color-orange-500: #E6A501;
+  --color-orange-600: #C28700;
+  --color-orange-700: #9B6700;
+  --color-orange-800: #784E03;
+  --color-orange-900: #543504;
+  --color-orange-950: #2F1C01;
 }
 
 /* Custom Scrollbar and layout adjustments */

@@ -2,6 +2,55 @@ import { Vehicle } from "./types";
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    "id": "toyota-highlander-limited-2013-white-direct-belgium",
+    "make": "Toyota",
+    "model": "Highlander",
+    "year": 2013,
+    "price": 19000000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Direct Belgium Import 🇧🇪",
+    "color": "White",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/LTtVy8c/IMG-20260824-WA0011.jpg",
+      "https://i.ibb.co/CKNt71wv/IMG-20260824-WA0023.jpg",
+      "https://i.ibb.co/KpNvPN9P/IMG-20260824-WA0018.jpg",
+      "https://i.ibb.co/SZf0cw8/IMG-20260824-WA0021.jpg",
+      "https://i.ibb.co/N6VYgPf1/IMG-20260824-WA0019.jpg",
+      "https://i.ibb.co/GvjDFZ4K/IMG-20260824-WA0025.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2013 Toyota Highlander Limited Edition\nDirect Belgium 🇧🇪 | Duty Paid\n\n📋 Vehicle Details & Information:\n• Make: Toyota\n• Model: Highlander\n• Year: 2013\n• Edition: Limited Edition\n• Origin: Direct Belgium 🇧🇪\n• Duty Status: Duty Paid 📑\n• Colour: White 🤍\n• Location: Abuja 📍\n• Price: ₦19,000,000 💰\n\n✨ Vehicle Description:\nA 2013 Toyota Highlander Limited Edition, directly from Belgium 🇧🇪 and duty paid. Finished in White, with a clean and well-presented interior featuring leather seating, wood trim and a touchscreen infotainment system. Available in Abuja for ₦19 million.\n\n⭐ Key Features:\n🇧🇪 Direct Belgium\n⭐ Limited Edition\n📑 Duty Paid\n🤍 White Exterior\n🛋️ Light-coloured Leather Interior\n🪵 Wood Interior Trim\n📱 Touchscreen Infotainment Display\n🎛️ Steering-Wheel Controls\n🔑 Push-Button Start\n❄️ Climate-Control System\n⚙️ Automatic Transmission\n☕ Dual Front Cup Holders\n📅 2013 Model\n📍 Abuja"
+  },
+  {
+    "id": "mercedes-benz-c300-2016-grey-direct-belgium",
+    "make": "Mercedes-Benz",
+    "model": "C300",
+    "year": 2016,
+    "price": 25000000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "Sedan",
+    "location": "Abuja",
+    "dealership": "Direct Belgium Import 🇧🇪",
+    "color": "Grey",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/3LhGjDm/IMG-20260824-WA0035.jpg",
+      "https://i.ibb.co/6JZTYp2p/IMG-20260824-WA0037.jpg",
+      "https://i.ibb.co/cKNK9cyj/IMG-20260824-WA0016.jpg",
+      "https://i.ibb.co/9kMc3FF0/IMG-20260824-WA0039.jpg",
+      "https://i.ibb.co/LD5MSN69/IMG-20260824-WA0041.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2016 Mercedes-Benz C300\nForeign Used 🇧🇪 | Original Duty | Panoramic Roof\n\n📋 Vehicle Details & Information:\n• Make: Mercedes-Benz\n• Model: C300\n• Year: 2016\n• Condition: Foreign Used (Direct Belgium 🇧🇪)\n• Origin: Belgium 🇧🇪\n• Colour: Grey 🩶\n• Duty Status: Original Duty 📑\n• Panoramic Roof: Yes ☀️\n• Location: Abuja 📍\n• Price: ₦25,000,000 💰\n\n✨ Vehicle Description:\nA 2016 Mercedes-Benz C300, foreign used and sourced from Belgium 🇧🇪. The vehicle comes with original duty and a panoramic roof, finished in Grey. It is available in Abuja for ₦25 million.\n\n⭐ Key Features:\n🇧🇪 Foreign Used\n📑 Original Duty\n🩶 Grey Colour\n☀️ Panoramic Roof\n📍 Abuja\n💰 ₦25M"
+  },
+  {
     "id": "mercedes-benz-ml350-2015-silver-direct-belgium",
     "make": "Mercedes-Benz",
     "model": "ML350",

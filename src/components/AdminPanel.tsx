@@ -505,11 +505,11 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       <div className="py-16 sm:py-24 bg-slate-950 min-h-screen text-white flex items-center justify-center px-4 relative overflow-hidden">
         {/* Ambient gold glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full pointer-events-none opacity-25">
-          <div className="absolute top-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-amber-500/20 blur-[100px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] rounded-full bg-yellow-600/20 blur-[100px]" />
+          <div className="absolute top-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-gold-500/20 blur-[100px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] rounded-full bg-gold-600/20 blur-[100px]" />
         </div>
 
-        <div className="relative w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-amber-500/30 rounded-3xl p-8 sm:p-10 shadow-2xl shadow-black/80 space-y-6 text-center">
+        <div className="relative w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-gold-500/30 rounded-3xl p-8 sm:p-10 shadow-2xl shadow-black/80 space-y-6 text-center">
           {/* Top-right Cancel/Close Button */}
           {onCancel && (
             <button
@@ -532,12 +532,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
               referrerPolicy="no-referrer"
             />
             <div className="relative">
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 p-0.5 shadow-xl shadow-amber-500/20">
+              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 p-0.5 shadow-xl shadow-gold-500/20">
                 <div className="h-full w-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                  <Lock size={28} className="text-amber-400" />
+                  <Lock size={28} className="text-gold-400" />
                 </div>
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-amber-500 p-1.5 rounded-full text-slate-950 shadow-md">
+              <div className="absolute -bottom-1 -right-1 bg-gold-500 p-1.5 rounded-full text-slate-950 shadow-md">
                 <ShieldCheck size={12} />
               </div>
             </div>
@@ -600,7 +600,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
               )}
               <button
                 type="submit"
-                className={`${onCancel ? 'w-2/3' : 'w-full'} py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-sm font-extrabold shadow-lg shadow-amber-500/20 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2`}
+                className={`${onCancel ? 'w-2/3' : 'w-full'} py-3.5 px-6 rounded-xl bg-gradient-to-r from-gold-400 via-gold-500 to-gold-600 hover:from-gold-500 hover:to-gold-600 text-slate-950 text-sm font-extrabold shadow-lg shadow-gold-500/20 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2`}
               >
                 <KeyRound size={18} />
                 <span>Unlock Console</span>

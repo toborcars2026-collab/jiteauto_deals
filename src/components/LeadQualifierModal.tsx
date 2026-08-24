@@ -103,7 +103,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
     <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
       <div className="relative w-full max-w-xl rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl overflow-hidden">
         {/* Header decoration */}
-        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500" />
+        <div className="h-1.5 bg-gradient-to-r from-gold-400 via-gold-500 to-gold-600" />
 
         {/* Close Button */}
         <button

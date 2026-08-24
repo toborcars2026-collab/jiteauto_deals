@@ -81,7 +81,7 @@ export default function Hero({ onBrowseClick, onConsultantClick }: HeroProps) {
           <div className="lg:col-span-7 flex flex-col justify-center text-left space-y-6">
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-white">
               Find Your Next Car <br />
-              With <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500">Confidence</span>
+              With <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-400 via-gold-500 to-gold-600">Confidence</span>
             </h1>
 
             <p className="text-slate-300 text-lg sm:text-xl max-w-xl font-light leading-relaxed">

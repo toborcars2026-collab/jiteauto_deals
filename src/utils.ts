@@ -5,7 +5,7 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
-const VEHICLES_KEY = 'jite_vehicles_v12';
+const VEHICLES_KEY = 'jite_vehicles_v14';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 
@@ -472,6 +472,17 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'fdSDx0Bv': 'https://i.ibb.co/pjPhLXGy/IMG-20260824-WA0006.jpg',
   'Zzq98DSN': 'https://i.ibb.co/LdVKt7rv/IMG-20260824-WA0008.jpg',
   'G4q4ZMQJ': 'https://i.ibb.co/Xrqrn5x4/IMG-20260824-WA0009.jpg',
+  'TFhp7VM': 'https://i.ibb.co/3LhGjDm/IMG-20260824-WA0035.jpg',
+  '0VX6qWkW': 'https://i.ibb.co/6JZTYp2p/IMG-20260824-WA0037.jpg',
+  'zTkQHyyg': 'https://i.ibb.co/9kMc3FF0/IMG-20260824-WA0039.jpg',
+  'xKHyhFGz': 'https://i.ibb.co/LD5MSN69/IMG-20260824-WA0041.jpg',
+  'qLRL8MDv': 'https://i.ibb.co/cKNK9cyj/IMG-20260824-WA0016.jpg',
+  'MzVFHst': 'https://i.ibb.co/LTtVy8c/IMG-20260824-WA0011.jpg',
+  'LdbPtk06': 'https://i.ibb.co/CKNt71wv/IMG-20260824-WA0023.jpg',
+  'ychj9h89': 'https://i.ibb.co/KpNvPN9P/IMG-20260824-WA0018.jpg',
+  'dHm6t4q': 'https://i.ibb.co/SZf0cw8/IMG-20260824-WA0021.jpg',
+  '998YmLBw': 'https://i.ibb.co/N6VYgPf1/IMG-20260824-WA0019.jpg',
+  'bgnV74MS': 'https://i.ibb.co/GvjDFZ4K/IMG-20260824-WA0025.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -622,6 +633,28 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
           }
         });
 
+        // Ensure the new 2013 Toyota Highlander Limited Edition is synchronized
+        const hasHighlander2013 = list.some(v => v.id === 'toyota-highlander-limited-2013-white-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0011')));
+        if (!hasHighlander2013) {
+          const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-limited-2013-white-direct-belgium');
+          if (highlander) {
+            const norm = normalizeVehicleData(highlander);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
+
+        // Ensure the new 2016 Mercedes-Benz C300 is synchronized
+        const hasC300 = list.some(v => v.id === 'mercedes-benz-c300-2016-grey-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0035')));
+        if (!hasC300) {
+          const c300 = INITIAL_VEHICLES.find(v => v.id === 'mercedes-benz-c300-2016-grey-direct-belgium');
+          if (c300) {
+            const norm = normalizeVehicleData(c300);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
+
         // Ensure the new 2015 Mercedes-Benz ML350 is synchronized
         const hasML350 = list.some(v => v.id === 'mercedes-benz-ml350-2015-silver-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0003')));
         if (!hasML350) {
@@ -684,8 +717,8 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
         onUpdate(list);
       },
       (error) => {
-        console.error('[Firestore] Vehicles onSnapshot error:', error);
-        // Fallback to local cache if network is temporarily disconnected
+        // Fallback to local cache if network is temporarily reconnecting or offline
+        console.warn('[Firestore] Vehicles sync notice:', error?.message || error);
         onUpdate(getVehicles());
       }
     );
@@ -1129,7 +1162,7 @@ export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void 
         onUpdate(list);
       },
       (error) => {
-        console.error('[Firestore] Leads onSnapshot error:', error);
+        console.warn('[Firestore] Leads sync notice:', error?.message || error);
         onUpdate(getLeads());
       }
     );
@@ -1235,7 +1268,7 @@ export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): 
         onUpdate(list);
       },
       (error) => {
-        console.error('[Firestore] Inquiries onSnapshot error:', error);
+        console.warn('[Firestore] Inquiries sync notice:', error?.message || error);
         onUpdate(getInquiries());
       }
     );
