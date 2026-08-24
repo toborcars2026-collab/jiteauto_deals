@@ -2,6 +2,30 @@ import { Vehicle } from "./types";
 
 export const INITIAL_VEHICLES: Vehicle[] = [
   {
+    "id": "mercedes-benz-ml350-2015-silver-direct-belgium",
+    "make": "Mercedes-Benz",
+    "model": "ML350",
+    "year": 2015,
+    "price": 27000000,
+    "transmission": "Automatic",
+    "fuelType": "Petrol",
+    "bodyType": "SUV",
+    "location": "Abuja",
+    "dealership": "Direct Belgium Import 🇧🇪",
+    "color": "Silver",
+    "condition": "Foreign Used",
+    "isFeatured": true,
+    "status": "Active",
+    "images": [
+      "https://i.ibb.co/W4cVgVm1/IMG-20260824-WA0003.jpg",
+      "https://i.ibb.co/SDcXBJpT/IMG-20260820-WA0021.jpg",
+      "https://i.ibb.co/pjPhLXGy/IMG-20260824-WA0006.jpg",
+      "https://i.ibb.co/LdVKt7rv/IMG-20260824-WA0008.jpg",
+      "https://i.ibb.co/Xrqrn5x4/IMG-20260824-WA0009.jpg"
+    ],
+    "description": "🚘 VEHICLE PROFILE SHEET\n2015 Mercedes-Benz ML350\nExtremely Clean | Direct Belgium 🇧🇪\n\n📋 Vehicle Details & Information:\n• Make: Mercedes-Benz\n• Model: ML350\n• Year: 2015\n• Condition: Extremely Clean (Foreign Used / Direct Belgium 🇧🇪)\n• Origin: Direct Belgium 🇧🇪\n• Colour: Silver 🩶\n• Interior: Black 🖤\n• Location: Abuja 📍\n• Price: ₦27,000,000 💰\n\n✨ Vehicle Description:\nA 2015 Mercedes-Benz ML350, direct from Belgium, finished in silver with a black interior. The vehicle is described as extremely clean, with every component intact, and is available in Abuja for ₦27,000,000.\n\n⭐ Key Features:\n🇧🇪 Direct Belgium\n🚘 2015 Mercedes-Benz ML350\n🩶 Silver Exterior\n🖤 Black Interior\n✨ Extremely Clean\n🔧 Every Component Intact\n📍 Abuja\n💰 ₦27M"
+  },
+  {
     "id": "dodge-challenger-2022-white-direct-belgium",
     "make": "Dodge",
     "model": "Challenger",

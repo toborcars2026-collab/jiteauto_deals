@@ -5,7 +5,7 @@ import { Vehicle, Lead, Inquiry } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
-const VEHICLES_KEY = 'jite_vehicles_v11';
+const VEHICLES_KEY = 'jite_vehicles_v12';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 
@@ -467,6 +467,11 @@ const KNOWN_IMGBB_MAP: Record<string, string> = {
   'tMsfP0Qd': 'https://i.ibb.co/pvzDrHbm/IMG-20260822-WA0006-1.jpg',
   'BVWRkWS1': 'https://i.ibb.co/1fyxcywS/IMG-20260822-WA0008-1.jpg',
   'XZVLLfBC': 'https://i.ibb.co/Fbn33kvD/IMG-20260822-WA0009-1.jpg',
+  'rK3GHvJP': 'https://i.ibb.co/SDcXBJpT/IMG-20260820-WA0021.jpg',
+  'rRZd4dDJ': 'https://i.ibb.co/W4cVgVm1/IMG-20260824-WA0003.jpg',
+  'fdSDx0Bv': 'https://i.ibb.co/pjPhLXGy/IMG-20260824-WA0006.jpg',
+  'Zzq98DSN': 'https://i.ibb.co/LdVKt7rv/IMG-20260824-WA0008.jpg',
+  'G4q4ZMQJ': 'https://i.ibb.co/Xrqrn5x4/IMG-20260824-WA0009.jpg',
 };
 
 // Normalize image URLs (convert ImgBB webpage links, Google Drive, Imgur to direct CDN links while maintaining 100% original quality)
@@ -616,6 +621,17 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
             list.push(normalized);
           }
         });
+
+        // Ensure the new 2015 Mercedes-Benz ML350 is synchronized
+        const hasML350 = list.some(v => v.id === 'mercedes-benz-ml350-2015-silver-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0003')));
+        if (!hasML350) {
+          const ml = INITIAL_VEHICLES.find(v => v.id === 'mercedes-benz-ml350-2015-silver-direct-belgium');
+          if (ml) {
+            const norm = normalizeVehicleData(ml);
+            list.unshift(norm);
+            saveVehicleToFirestore(norm).catch(console.warn);
+          }
+        }
 
         // Ensure the new 2022 Dodge Challenger is synchronized
         const hasDodgeChallenger = list.some(v => v.id === 'dodge-challenger-2022-white-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0015')));
