@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2, Share2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2, Share2, Car, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
+import { AppHistoryState } from '../App';
 import ShareVehicleModal from './ShareVehicleModal';
-import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes, OFFICIAL_PHONE_CALL_URL } from '../utils';
+import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes, getVehicleSlug, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -19,6 +20,104 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
+
+  // Layer 3 Navigation: Fullscreen Zoom Lightbox
+  const handleOpenFullscreenZoom = () => {
+    setIsFullscreenZoom(true);
+    try {
+      const currentState = (window.history.state as AppHistoryState | null) || { tab: 'home', modal: 'details' };
+      window.history.pushState(
+        {
+          ...currentState,
+          modal: 'details',
+          viewer: true,
+          vehicleSlug: getVehicleSlug(vehicle),
+          vehicleId: vehicle?.id,
+        },
+        '',
+        window.location.href
+      );
+    } catch {}
+  };
+
+  const handleCloseFullscreenZoom = () => {
+    setIsFullscreenZoom(false);
+    try {
+      const currentState = window.history.state as (AppHistoryState & { viewer?: boolean }) | null;
+      if (currentState?.viewer) {
+        window.history.back();
+        return;
+      }
+    } catch {}
+  };
+
+  // Layer 3 Navigation: Share Vehicle Modal
+  const handleOpenShare = () => {
+    setIsShareOpen(true);
+    try {
+      const currentState = (window.history.state as AppHistoryState | null) || { tab: 'home', modal: 'details' };
+      window.history.pushState(
+        {
+          ...currentState,
+          modal: 'details',
+          share: true,
+          vehicleSlug: getVehicleSlug(vehicle),
+          vehicleId: vehicle?.id,
+        },
+        '',
+        window.location.href
+      );
+    } catch {}
+  };
+
+  const handleCloseShare = () => {
+    setIsShareOpen(false);
+    try {
+      const currentState = window.history.state as (AppHistoryState & { share?: boolean }) | null;
+      if (currentState?.share) {
+        window.history.back();
+        return;
+      }
+    } catch {}
+  };
+
+  // Popstate listener to ensure sub-layers (image viewer & share modal) close sequentially
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as (AppHistoryState & { viewer?: boolean; share?: boolean }) | null;
+      if (!state?.viewer) {
+        setIsFullscreenZoom(false);
+      }
+      if (!state?.share) {
+        setIsShareOpen(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  // Keyboard Escape listener (closes top-most layer first)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isFullscreenZoom) {
+          handleCloseFullscreenZoom();
+        } else if (isShareOpen) {
+          handleCloseShare();
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreenZoom, isShareOpen, onClose]);
 
   if (!isOpen || !vehicle) return null;
 
@@ -86,30 +185,48 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-fadeIn">
       <div className="relative w-full max-w-4xl rounded-3xl bg-white text-slate-900 shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
         
-        {/* Header - Sticky */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
-          <div>
-            <span className="text-[10px] uppercase tracking-widest text-amber-600 font-extrabold font-mono">
-              Vehicle Profile Sheet
-            </span>
-            <h2 className="text-xl font-bold font-display text-slate-900">
-              {vehicle.year} {vehicle.make} {vehicle.model}
-            </h2>
+        {/* Header - Sticky with Highly Visible Back to Jite Auto Deals Navigation Control */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 bg-slate-50 gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              id="details_back_to_catalog_btn"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer select-none shrink-0"
+              title="Back to Jite Auto Deals vehicle catalog"
+              aria-label="Back to Jite Auto Deals"
+            >
+              <ChevronLeft size={16} className="-ml-1" />
+              <span>Back to Jite Auto Deals</span>
+            </button>
+
+            <div className="hidden md:block h-6 w-[1px] bg-slate-200 shrink-0" />
+
+            <div className="hidden sm:block min-w-0">
+              <span className="text-[10px] uppercase tracking-widest text-amber-600 font-extrabold font-mono block leading-none mb-0.5">
+                Vehicle Profile Sheet
+              </span>
+              <h2 className="text-sm sm:text-base font-bold font-display text-slate-900 truncate">
+                {vehicle.year} {vehicle.make} {vehicle.model}
+              </h2>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               id="details_share_vehicle_btn"
-              onClick={() => setIsShareOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-lg transition-all active:scale-95"
+              onClick={handleOpenShare}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl transition-all active:scale-95 cursor-pointer"
               title="Share vehicle link via WhatsApp, Facebook, Copy Link"
             >
               <Share2 size={13} className="text-amber-600" />
-              <span>Share</span>
+              <span className="hidden sm:inline">Share</span>
             </button>
             <button
+              id="details_close_btn"
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-950 transition-all"
-              aria-label="Close modal"
+              className="p-2 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-950 transition-all cursor-pointer"
+              aria-label="Close and return to inventory"
+              title="Close modal and return to website"
             >
               <X size={20} />
             </button>
@@ -148,7 +265,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                     onDragEnd={handleDragEnd}
                     onClick={() => {
                       if (!dragOccurredRef.current) {
-                        setIsFullscreenZoom(true);
+                        handleOpenFullscreenZoom();
                       }
                     }}
                     onError={(e) => {
@@ -161,8 +278,9 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 {/* Top Right Fullscreen Zoom Trigger */}
                 <button
                   type="button"
-                  onClick={() => setIsFullscreenZoom(true)}
-                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-amber-400 border border-amber-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md backdrop-blur-sm z-10"
+                  id="details_open_zoom_btn"
+                  onClick={handleOpenFullscreenZoom}
+                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-amber-400 border border-amber-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md backdrop-blur-sm z-10 cursor-pointer"
                   title="View 100% Original Resolution Photo"
                 >
                   <Maximize2 size={14} />
@@ -333,31 +451,87 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
               <span>Full buyer protection checklist active. Zero advance deposits required.</span>
             </div>
           </div>
+
+          {/* Explore More Vehicles Footer Navigation Banner */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
+            <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
+                <Car size={20} />
+              </div>
+              <div>
+                <h5 className="text-xs font-bold text-slate-900">Looking for other verified vehicles?</h5>
+                <p className="text-[11px] text-slate-500">Explore Nigeria&apos;s curated selection of direct foreign-used and verified cars.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              id="details_browse_all_vehicles_footer_btn"
+              onClick={onClose}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <span>Browse All Vehicles</span>
+              <span>→</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Fullscreen High-Res Image Lightbox Modal */}
       {isFullscreenZoom && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-fadeIn"
+          onClick={(e) => {
+            // Close if user clicked the backdrop outside interactive elements
+            if (e.target === e.currentTarget) {
+              handleCloseFullscreenZoom();
+            }
+          }}
+        >
           {/* Top Control Bar */}
-          <div className="flex items-center justify-between text-white z-10 border-b border-white/10 pb-4">
-            <div>
-              <span className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold">100% Original Resolution Viewer</span>
-              <h3 className="text-sm font-bold text-slate-200">
-                {vehicle.year} {vehicle.make} {vehicle.model} • Photo {currentImageIndex + 1} of {images.length}
-              </h3>
+          <div className="flex items-center justify-between text-white z-10 border-b border-white/10 pb-4 gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                id="viewer_back_to_details_btn"
+                onClick={handleCloseFullscreenZoom}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-400 hover:text-white transition-all text-xs font-bold border border-white/15 cursor-pointer shrink-0 active:scale-95"
+                title="Back to vehicle details (Escape / Back)"
+              >
+                <ArrowLeft size={16} />
+                <span>Back to Vehicle Details</span>
+              </button>
+              
+              <div className="hidden sm:block min-w-0">
+                <span className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold block">100% Original Resolution Viewer</span>
+                <h3 className="text-sm font-bold text-slate-200 truncate">
+                  {vehicle.year} {vehicle.make} {vehicle.model} • Photo {currentImageIndex + 1} of {images.length}
+                </h3>
+              </div>
             </div>
-            <button
-              onClick={() => setIsFullscreenZoom(false)}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20"
-              aria-label="Close Lightbox"
-            >
-              <X size={24} />
-            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                id="viewer_close_lightbox_btn"
+                onClick={handleCloseFullscreenZoom}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20 cursor-pointer"
+                aria-label="Close Lightbox"
+                title="Close Lightbox (Escape / Back)"
+              >
+                <X size={22} />
+              </button>
+            </div>
           </div>
 
           {/* Center Image Container */}
-          <div className="relative flex-1 flex items-center justify-center my-4 overflow-hidden select-none">
+          <div 
+            className="relative flex-1 flex items-center justify-center my-4 overflow-hidden select-none"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                handleCloseFullscreenZoom();
+              }
+            }}
+          >
             <AnimatePresence initial={false} custom={direction} mode="popLayout">
               <motion.img
                 key={currentImageIndex}
@@ -386,16 +560,18 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
               <>
                 <button
                   type="button"
+                  id="viewer_prev_image_btn"
                   onClick={handlePrevImage}
-                  className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10"
+                  className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10 cursor-pointer"
                   aria-label="Previous Image"
                 >
                   <ChevronLeft size={28} />
                 </button>
                 <button
                   type="button"
+                  id="viewer_next_image_btn"
                   onClick={handleNextImage}
-                  className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10"
+                  className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10 cursor-pointer"
                   aria-label="Next Image"
                 >
                   <ChevronRight size={28} />
@@ -411,7 +587,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 <button
                   key={idx}
                   onClick={() => setActiveImageIndex(idx)}
-                  className={`h-12 w-16 rounded-lg overflow-hidden border-2 transition-all ${
+                  className={`h-12 w-16 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
                     currentImageIndex === idx ? 'border-amber-400 scale-105 ring-2 ring-amber-400/50' : 'border-slate-700 opacity-60 hover:opacity-100'
                   }`}
                 >
@@ -427,7 +603,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
       <ShareVehicleModal
         vehicle={vehicle}
         isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
+        onClose={handleCloseShare}
       />
     </div>
   );

@@ -37,9 +37,11 @@ import {
 } from './utils';
 import { INITIAL_VEHICLES } from './data';
 
-interface AppHistoryState {
+export interface AppHistoryState {
   tab: 'home' | 'browse' | 'admin';
   modal?: 'details' | 'qualifier' | null;
+  viewer?: boolean | null;
+  share?: boolean | null;
   vehicleId?: string | null;
   vehicleSlug?: string | null;
 }
@@ -123,22 +125,30 @@ export default function App() {
     document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
   };
 
-  // Navigation: Close Vehicle Details (Uses history.back to cleanly pop history)
+  // Navigation: Close Vehicle Details (Intelligently returns to catalog/homepage)
   const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedVehicle(null);
+    const targetTab = currentTab || 'home';
+    const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
+
     try {
       const histState = window.history.state as AppHistoryState | null;
-      if (histState && histState.modal === 'details') {
+      if (histState && histState.modal === 'details' && window.history.length > 1) {
         window.history.back();
+        // Fallback safety check in case popstate is throttled in some in-app webviews
+        setTimeout(() => {
+          const currentHistState = window.history.state as AppHistoryState | null;
+          if (currentHistState?.modal === 'details') {
+            window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
+          }
+        }, 150);
         return;
       }
     } catch {}
 
-    setIsDetailsOpen(false);
-    setSelectedVehicle(null);
-    const targetTab = currentTab || 'home';
-    const newUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
     try {
-      window.history.replaceState({ tab: targetTab, modal: null }, '', newUrl);
+      window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
     } catch {}
     document.title = targetTab === 'browse'
       ? 'Browse Verified Cars | Jite Auto Deals'
@@ -166,15 +176,28 @@ export default function App() {
 
   // Navigation: Close Qualifier Modal
   const handleCloseQualifier = () => {
+    setIsQualifierOpen(false);
+    setQualifierVehicle(null);
+    const targetTab = currentTab || 'home';
+    const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
+
     try {
       const histState = window.history.state as AppHistoryState | null;
-      if (histState && histState.modal === 'qualifier') {
+      if (histState && histState.modal === 'qualifier' && window.history.length > 1) {
         window.history.back();
+        setTimeout(() => {
+          const currentHistState = window.history.state as AppHistoryState | null;
+          if (currentHistState?.modal === 'qualifier') {
+            window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
+          }
+        }, 150);
         return;
       }
     } catch {}
-    setIsQualifierOpen(false);
-    setQualifierVehicle(null);
+
+    try {
+      window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
+    } catch {}
   };
 
   // Direct Consultant Action (WhatsApp / Call) with no intermediate modal
@@ -241,14 +264,34 @@ export default function App() {
       initialModal = searchParams.get('qualify') ? 'qualifier' : 'details';
     }
 
-    // Root the initial history entry with replaceState (so no duplicate forward/back entries are created on initial load)
+    // Direct entry intelligence:
+    // When a customer lands directly on a specific vehicle page (e.g. from WhatsApp, Facebook, TikTok, Instagram, Google):
+    // We establish the Jite Auto Deals catalog/home as the base history entry, and push the active vehicle on top.
+    // This allows Android's native back button, browser back, and in-app close to return to the catalog
+    // instead of accidentally taking the visitor out of the website.
     try {
-      const initialNavState: AppHistoryState = {
-        tab: initialTab,
-        modal: initialModal,
-        vehicleSlug: initialVehicleSlugOrId,
-      };
-      window.history.replaceState(initialNavState, '', window.location.href);
+      if (initialVehicleSlugOrId) {
+        const baseNavState: AppHistoryState = {
+          tab: initialTab,
+          modal: null,
+        };
+        const baseNavUrl = initialTab === 'home' ? '/' : `/?tab=${initialTab}`;
+        // 1. Establish base homepage history entry
+        window.history.replaceState(baseNavState, '', baseNavUrl);
+        // 2. Push the current vehicle entry with its exact unique URL preserved
+        const vehicleNavState: AppHistoryState = {
+          tab: initialTab,
+          modal: initialModal,
+          vehicleSlug: initialVehicleSlugOrId,
+        };
+        window.history.pushState(vehicleNavState, '', window.location.href);
+      } else {
+        const initialNavState: AppHistoryState = {
+          tab: initialTab,
+          modal: null,
+        };
+        window.history.replaceState(initialNavState, '', window.location.href);
+      }
     } catch {}
 
     const handleSync = (vList?: Vehicle[]) => {
@@ -316,7 +359,7 @@ export default function App() {
 
       const vList = getVehicles();
 
-      if (targetModal === 'details' && vehicleParam) {
+      if ((targetModal === 'details' || Boolean(state?.viewer) || Boolean(state?.share)) && vehicleParam) {
         const found = findVehicleBySlugOrId(vList, vehicleParam);
         if (found) {
           setSelectedVehicle(found);
