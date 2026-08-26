@@ -2150,45 +2150,50 @@ export const INITIAL_VEHICLES: Vehicle[] = [
 export const HOW_IT_WORKS_STEPS = [
   {
     number: "01",
-    title: "Browse or Request",
-    description: "Explore our verified catalog or specify your preferred car, budget, and features in our spec finder form."
+    title: "Tell Us What You Need",
+    description: "Browse our listed vehicles or tell us your preferred brand, model, budget and requirements."
   },
   {
     number: "02",
-    title: "Mechanical Verification",
-    description: "Our certified technicians perform detailed mechanical audits and verify customs paperwork before any agreement."
+    title: "Explore Suitable Vehicles",
+    description: "We review available options from our trusted sourcing network and share matched vehicles with clear details and pricing."
   },
   {
     number: "03",
-    title: "Consultant Matchmaking",
-    description: "Speak directly with a dedicated vehicle consultant to review options, negotiate prices, and schedule test drives."
+    title: "Inspect & Test-Drive",
+    description: "Schedule a physical inspection and test-drive before making any commitment or financial decision."
   },
   {
     number: "04",
-    title: "Seamless Acquisition",
-    description: "Finalize payment safely and receive your inspected vehicle delivered with all verified documentation."
+    title: "Choose Your Purchase Option",
+    description: "Proceed with an outright purchase or explore available vehicle finance options for eligible buyers."
+  },
+  {
+    number: "05",
+    title: "Complete Your Purchase",
+    description: "Finalize your purchase safely through the verified company process after full satisfaction."
   }
 ];
 
 export const TRUST_REASONS = [
   {
-    title: "Independent Sourcing",
-    description: "We are not tied to a single dealership lot. We search multiple trusted partners to find the exact match for your budget."
+    title: "You Have a Real Person to Speak To",
+    description: "Connect directly with Tobor Jite and experienced vehicle consultants who listen to your needs and guide you through the process."
   },
   {
-    title: "Rigorous Mechanical Audits",
-    description: "Every vehicle undergoes thorough gearbox, engine, structural, and electronics diagnostic testing before listing."
+    title: "Inspect & Test-Drive Before Decision",
+    description: "We never ask for online car payments. You always physically view, inspect, and test-drive the vehicle before deciding to buy."
   },
   {
-    title: "Customs & Paperwork Verification",
-    description: "We verify customs clearance documents, VIN history, and registration papers so you never face legal issues."
+    title: "Sourcing Beyond Listed Vehicles",
+    description: "If your preferred car is not currently listed, we explore trusted sourcing options to help locate it for you."
   },
   {
-    title: "Transparent Pricing",
-    description: "No hidden charges or unexpected dealership markups. Clear, honest pricing negotiated directly on your behalf."
+    title: "Vehicle Finance Guidance",
+    description: "Learn about available vehicle finance routes and installment options that may be accessible for eligible buyers."
   },
   {
-    title: "Dedicated Consultant Support",
-    description: "Get 1-on-1 personalized guidance from experienced automotive specialists via WhatsApp or call every step of the way."
+    title: "Clear & Pressure-Free Experience",
+    description: "Browse available options at your own pace without aggressive sales tactics. We prioritize helping you find the right car."
   }
 ];

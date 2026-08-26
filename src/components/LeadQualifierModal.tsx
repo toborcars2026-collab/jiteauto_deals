@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X, Send, Phone, MessageSquare, Sparkles, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, Send, Phone, MessageSquare, CheckCircle, ShieldCheck } from 'lucide-react';
 import { Vehicle } from '../types';
 import { formatCurrency, getWhatsAppLink, getLeadQualificationMessage, saveInquiry, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface LeadQualifierModalProps {
-  vehicle: Vehicle;
+  vehicle: Vehicle | null;
   isOpen: boolean;
   onClose: () => void;
   onOpenConsultantModal?: (vehicle: Vehicle, customMsg?: string) => void;
@@ -15,13 +15,23 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    budget: vehicle.price,
+    budget: vehicle?.price || 0,
     paymentMethod: 'Cash' as 'Cash' | 'Financing',
     readyToBuy: 'Immediately' as 'Immediately' | 'Within 2 Weeks' | 'Within a Month' | 'Just Researching',
   });
   const [isDone, setIsDone] = useState(false);
 
-  if (!isOpen) return null;
+  // Sync budget when vehicle is selected or loaded
+  React.useEffect(() => {
+    if (vehicle?.price) {
+      setFormData((prev) => ({
+        ...prev,
+        budget: prev.budget || vehicle.price,
+      }));
+    }
+  }, [vehicle]);
+
+  if (!isOpen || !vehicle) return null;
 
   const totalSteps = 4;
 
@@ -54,6 +64,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
   };
 
   const handleSubmit = () => {
+    if (!vehicle) return;
     // Save Inquiry to database/localStorage
     saveInquiry({
       name: formData.name,
@@ -84,6 +95,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
   };
 
   const handleCallOption = () => {
+    if (!vehicle) return;
     // Save Inquiry with PreferredContact = Call
     saveInquiry({
       name: formData.name,
@@ -131,7 +143,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
                 <div><span className="text-slate-500">Purchase Frame:</span> {formData.readyToBuy}</div>
               </div>
               <p className="text-xs text-slate-400 animate-pulse mt-4">
-                Launching WhatsApp messenger to assign you to a certified dealer...
+                Opening WhatsApp to connect you with a Jite Auto Deals vehicle consultant...
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-4">

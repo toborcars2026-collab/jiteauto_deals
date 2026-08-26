@@ -1,6 +1,6 @@
 {
   "name": "Jite Auto Deals",
-  "description": "Premium vehicle consultation and lead qualification portal matching buyers with quality vehicles from trusted dealerships.",
+  "description": "Vehicle Consultant in Nigeria helping serious buyers find, source, and navigate vehicle purchases with confidence through trusted automotive relationships.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,13 +1,15 @@
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
-import { Vehicle, Lead, Inquiry } from './types';
+import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
 import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
 const VEHICLES_KEY = 'jite_vehicles_v14';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
+const SETTINGS_KEY = 'jite_business_settings_v1';
+
 
 // Global tombstone blacklist of permanently removed vehicle IDs
 export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
@@ -1355,7 +1357,228 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
 }
 
 // ============================================================================
-// OFFICIAL CONTACT CONFIGURATION
+// CENTRAL BUSINESS SETTINGS FIRESTORE INTEGRATION
+// ============================================================================
+
+export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
+  businessName: 'Jite Auto Deals',
+  brandTagline: 'Vehicle Consultant in Nigeria | Find, Source & Navigate',
+  consultantName: 'Tobor Jite',
+  phoneDisplay: '08180823197',
+  phoneCallUrl: 'tel:+2348180823197',
+  whatsAppNumber: '2348180823197',
+  email: 'contact@jiteautodeals.com',
+  address: 'Lagos, Nigeria (Serving Clients Nationwide)',
+  instagramUrl: 'https://instagram.com/jiteautodeals',
+  tikTokUrl: 'https://tiktok.com/@jiteautodeals',
+  facebookUrl: 'https://facebook.com/jiteautodeals',
+  homepageCtaText: 'Talk to a Vehicle Consultant',
+  footerText: '© 2026 Jite Auto Deals. All rights reserved. Registered automotive sourcing consultancy in Nigeria.',
+  updatedAt: new Date().toISOString(),
+};
+
+/**
+ * Gets cached business settings or defaults.
+ */
+export function getBusinessSettings(): BusinessSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) {
+      return { ...DEFAULT_BUSINESS_SETTINGS, ...JSON.parse(raw) };
+    }
+  } catch {}
+  return DEFAULT_BUSINESS_SETTINGS;
+}
+
+/**
+ * Fetches the central business settings from Cloud Firestore (`settings/business`).
+ */
+export async function fetchBusinessSettings(): Promise<BusinessSettings> {
+  try {
+    const docRef = doc(db, 'settings', 'business');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = { ...DEFAULT_BUSINESS_SETTINGS, ...docSnap.data() } as BusinessSettings;
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+      } catch {}
+      return data;
+    } else {
+      // Seed default settings to Firestore if not present
+      await setDoc(docRef, DEFAULT_BUSINESS_SETTINGS);
+      return DEFAULT_BUSINESS_SETTINGS;
+    }
+  } catch (error) {
+    console.warn('[Firestore] Error fetching business settings:', error);
+    return getBusinessSettings();
+  }
+}
+
+/**
+ * Real-time subscription to central business settings from Cloud Firestore.
+ */
+export function subscribeToBusinessSettings(onUpdate: (settings: BusinessSettings) => void): () => void {
+  try {
+    const docRef = doc(db, 'settings', 'business');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = { ...DEFAULT_BUSINESS_SETTINGS, ...docSnap.data() } as BusinessSettings;
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+          } catch {}
+          onUpdate(data);
+        } else {
+          // Initialize doc if missing
+          setDoc(docRef, DEFAULT_BUSINESS_SETTINGS).catch(() => {});
+          onUpdate(DEFAULT_BUSINESS_SETTINGS);
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Settings sync notice:', error?.message || error);
+        onUpdate(getBusinessSettings());
+      }
+    );
+    return unsubscribe;
+  } catch (e) {
+    onUpdate(getBusinessSettings());
+    return () => {};
+  }
+}
+
+/**
+ * Saves updated business settings directly to Cloud Firestore.
+ */
+export async function saveBusinessSettingsToFirestore(settings: Partial<BusinessSettings>): Promise<BusinessSettings> {
+  const current = getBusinessSettings();
+  const updated: BusinessSettings = {
+    ...current,
+    ...settings,
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+  } catch {}
+
+  try {
+    const docRef = doc(db, 'settings', 'business');
+    await setDoc(docRef, updated, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/business');
+    throw error;
+  }
+
+  return updated;
+}
+
+// ============================================================================
+// DIRECT VEHICLE QUICK-UPDATE HELPERS (FIRESTORE FIRST)
+// ============================================================================
+
+/**
+ * Updates a vehicle's status (Available, Reserved, Sold, Hidden) in Firestore.
+ */
+export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus): Promise<void> {
+  try {
+    const docRef = doc(db, 'vehicles', vehicleId);
+    await updateDoc(docRef, {
+      status,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `vehicles/${vehicleId}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates a vehicle's price directly in Firestore.
+ */
+export async function saveVehiclePrice(vehicleId: string, newPrice: number): Promise<void> {
+  try {
+    const docRef = doc(db, 'vehicles', vehicleId);
+    await updateDoc(docRef, {
+      price: Number(newPrice) || 0,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `vehicles/${vehicleId}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates a vehicle's featured flag directly in Firestore.
+ */
+export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean): Promise<void> {
+  try {
+    const docRef = doc(db, 'vehicles', vehicleId);
+    await updateDoc(docRef, {
+      isFeatured,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `vehicles/${vehicleId}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates a vehicle's homepage slideshow flag and order directly in Firestore.
+ */
+export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boolean, slideshowOrder?: number): Promise<void> {
+  try {
+    const docRef = doc(db, 'vehicles', vehicleId);
+    const updates: any = {
+      inSlideshow,
+      updatedAt: new Date().toISOString()
+    };
+    if (typeof slideshowOrder === 'number') {
+      updates.slideshowOrder = slideshowOrder;
+    }
+    await updateDoc(docRef, updates);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `vehicles/${vehicleId}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates lead status in Firestore.
+ */
+export async function saveLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  try {
+    const docRef = doc(db, 'leads', leadId);
+    await updateDoc(docRef, {
+      status,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `leads/${leadId}`);
+    throw err;
+  }
+}
+
+/**
+ * Updates inquiry status in Firestore.
+ */
+export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): Promise<void> {
+  try {
+    const docRef = doc(db, 'inquiries', inquiryId);
+    await updateDoc(docRef, {
+      status,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `inquiries/${inquiryId}`);
+    throw err;
+  }
+}
+
+// ============================================================================
+// OFFICIAL CONTACT CONFIGURATION & HELPER UTILITIES
 // ============================================================================
 
 export const CONTACT_CONFIG = {
@@ -1366,27 +1589,164 @@ export const CONTACT_CONFIG = {
 };
 
 export const OFFICIAL_PHONE = '+2348180823197';
-export const OFFICIAL_PHONE_DISPLAY = '08180823197';
+export const OFFICIAL_PHONE_DISPLAY = '0818 082 3197';
 export const OFFICIAL_PHONE_CALL_URL = 'tel:+2348180823197';
 export const OFFICIAL_WHATSAPP_NUMBER = '2348180823197';
 export const OFFICIAL_WHATSAPP_URL = 'https://wa.me/2348180823197';
 
-const CONSULTANT_PHONE = OFFICIAL_WHATSAPP_NUMBER;
-
-export function getWhatsAppLink(message?: string): string {
-  if (!message || !message.trim()) {
-    return OFFICIAL_WHATSAPP_URL;
+/**
+ * Robustly formats any raw phone string into a valid international tel: link.
+ * Handles Nigerian local numbers (e.g. 08180823197 -> tel:+2348180823197),
+ * international numbers (e.g. 2348180823197 -> tel:+2348180823197),
+ * and existing tel: protocol links.
+ */
+export function formatPhoneForTel(rawPhone?: string): string {
+  if (!rawPhone || typeof rawPhone !== 'string' || !rawPhone.trim()) {
+    try {
+      const settings = getBusinessSettings();
+      if (settings?.phoneCallUrl && settings.phoneCallUrl.startsWith('tel:')) {
+        return settings.phoneCallUrl;
+      }
+      rawPhone = settings?.phoneDisplay || OFFICIAL_PHONE_DISPLAY;
+    } catch {
+      return OFFICIAL_PHONE_CALL_URL;
+    }
   }
-  return `https://wa.me/${OFFICIAL_WHATSAPP_NUMBER}?text=${encodeURIComponent(message.trim())}`;
+
+  const clean = rawPhone.trim();
+  if (clean.startsWith('tel:')) {
+    // Ensure tel link is clean of spaces or special formatting
+    const numPart = clean.replace(/^tel:/, '').replace(/[^0-9+]/g, '');
+    return `tel:${numPart}`;
+  }
+
+  const digits = clean.replace(/\D/g, '');
+  if (!digits) {
+    return OFFICIAL_PHONE_CALL_URL;
+  }
+
+  if (clean.startsWith('+')) {
+    return `tel:+${digits}`;
+  }
+
+  if (digits.startsWith('0') && digits.length === 11) {
+    return `tel:+234${digits.slice(1)}`;
+  }
+
+  if (digits.startsWith('234')) {
+    return `tel:+${digits}`;
+  }
+
+  if (digits.length === 10) {
+    return `tel:+234${digits}`;
+  }
+
+  return `tel:+${digits}`;
 }
 
-export function getPhoneCallUrl(): string {
+/**
+ * Formats a phone number for user-friendly, legible display.
+ * E.g. "08180823197" -> "0818 082 3197" or "+2348180823197" -> "+234 818 082 3197"
+ */
+export function formatPhoneForDisplay(rawPhone?: string): string {
+  if (!rawPhone || typeof rawPhone !== 'string' || !rawPhone.trim()) {
+    try {
+      const settings = getBusinessSettings();
+      rawPhone = settings?.phoneDisplay || '0818 082 3197';
+    } catch {
+      return '0818 082 3197';
+    }
+  }
+
+  const clean = rawPhone.trim().replace(/^tel:/, '');
+  const digits = clean.replace(/\D/g, '');
+
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+
+  if (digits.length === 13 && digits.startsWith('234')) {
+    return `+234 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  }
+
+  if (digits.length === 10) {
+    return `0${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+
+  return clean;
+}
+
+/**
+ * Authoritative helper to get the latest business phone number for display.
+ */
+export function getBusinessPhoneDisplay(customSettings?: BusinessSettings): string {
+  if (customSettings?.phoneDisplay) {
+    return formatPhoneForDisplay(customSettings.phoneDisplay);
+  }
+  try {
+    const settings = getBusinessSettings();
+    return formatPhoneForDisplay(settings.phoneDisplay);
+  } catch {
+    return OFFICIAL_PHONE_DISPLAY;
+  }
+}
+
+/**
+ * Authoritative helper to get the latest business phone call URL (tel:+234...).
+ */
+export function getBusinessPhoneCallUrl(customSettings?: BusinessSettings): string {
+  if (customSettings?.phoneCallUrl) {
+    return formatPhoneForTel(customSettings.phoneCallUrl);
+  }
+  if (customSettings?.phoneDisplay) {
+    return formatPhoneForTel(customSettings.phoneDisplay);
+  }
+  try {
+    const settings = getBusinessSettings();
+    if (settings.phoneCallUrl) return formatPhoneForTel(settings.phoneCallUrl);
+    if (settings.phoneDisplay) return formatPhoneForTel(settings.phoneDisplay);
+  } catch {}
   return OFFICIAL_PHONE_CALL_URL;
 }
 
-export function handlePhoneCall(): void {
-  window.location.href = OFFICIAL_PHONE_CALL_URL;
+/**
+ * Generates an official WhatsApp chat URL, defaulting dynamically to the central business settings.
+ */
+export function getWhatsAppLink(message?: string, customPhone?: string): string {
+  let targetPhone = customPhone;
+  if (!targetPhone) {
+    try {
+      const settings = getBusinessSettings();
+      targetPhone = settings.whatsAppNumber || OFFICIAL_WHATSAPP_NUMBER;
+    } catch {
+      targetPhone = OFFICIAL_WHATSAPP_NUMBER;
+    }
+  }
+
+  const cleanPhone = (targetPhone || OFFICIAL_WHATSAPP_NUMBER).replace(/\D/g, '');
+  if (!message || !message.trim()) {
+    return `https://wa.me/${cleanPhone}`;
+  }
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message.trim())}`;
 }
+
+/**
+ * Returns a tel: link for making a direct phone call.
+ */
+export function getPhoneCallUrl(customPhone?: string): string {
+  if (customPhone) {
+    return formatPhoneForTel(customPhone);
+  }
+  return getBusinessPhoneCallUrl();
+}
+
+export function handlePhoneCall(customPhone?: string): void {
+  const url = getPhoneCallUrl(customPhone);
+  if (typeof window !== 'undefined') {
+    window.location.href = url;
+  }
+}
+
 
 export function getGeneralConsultationMessage(): string {
   return `Hello Jite Auto Deals! I'm interested in finding a quality vehicle. I'd love to consult with a vehicle specialist to compare my options based on my budget.`;
@@ -1442,19 +1802,82 @@ export function getLeadQualificationMessage(
   );
 }
 
-export function getHelpMeFindCarMessage(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): string {
+export function getHelpMeFindCarMessage(lead: {
+  name: string;
+  phone: string;
+  vehicleType?: string;
+  brand?: string;
+  model?: string;
+  budget: number;
+  location?: string;
+  paymentMethod: string;
+  requirements?: string;
+}): string {
   return (
-    `*CUSTOM VEHICLE HUNT REQUEST* 🚗✨\n` +
-    `Hello Jite Auto Deals! I need help sourcing a vehicle. Here are my selected preferences:\n\n` +
-    `👤 *BUYER INFORMATION:*\n` +
-    `• *Full Name:* ${lead.name}\n` +
-    `• *Phone Number:* ${lead.phone}\n\n` +
-    `🚗 *DESIRED VEHICLE SPECIFICATIONS:*\n` +
-    `• *Body Category:* ${lead.vehicleType}\n` +
-    `• *Preferred Brand:* ${lead.brand}\n\n` +
-    `💳 *ACQUISITION CRITERIA:*\n` +
-    `• *Target Budget:* ${formatCurrency(lead.budget)}\n` +
-    `• *Payment Strategy:* ${lead.paymentMethod === 'Cash' ? 'Outright Cash Purchase' : 'Vehicle Finance Program'}\n\n` +
-    `Please help me find and match a verified vehicle meeting these criteria!`
+    `*VEHICLE CONSULTATION REQUEST (Find My Car)* 🚗\n` +
+    `Hello Jite Auto Deals! I would like help finding a vehicle with the following details:\n\n` +
+    `👤 *Name:* ${lead.name}\n` +
+    `📞 *Phone:* ${lead.phone}\n` +
+    (lead.vehicleType ? `🚘 *Body Type:* ${lead.vehicleType}\n` : '') +
+    (lead.brand ? `🏷️ *Preferred Brand:* ${lead.brand}\n` : '') +
+    (lead.model ? `📋 *Preferred Model:* ${lead.model}\n` : '') +
+    `💰 *Budget:* ${formatCurrency(lead.budget)}\n` +
+    (lead.location ? `📍 *Location:* ${lead.location}\n` : '') +
+    `💳 *Purchase Preference:* ${lead.paymentMethod === 'Financing' ? 'Vehicle Finance' : 'Outright Purchase'}\n` +
+    (lead.requirements ? `📝 *Notes/Requirements:* ${lead.requirements}\n` : '') +
+    `\nPlease let me know suitable options from your sourcing network!`
   );
 }
+
+export function getSourceCarMessage(data: {
+  name: string;
+  phone: string;
+  sourceUrl?: string;
+  vehicleDetails: string;
+  message?: string;
+}): string {
+  return (
+    `*VEHICLE SOURCING REQUEST (Found a Car Elsewhere)* 🔍\n` +
+    `Hello Jite Auto Deals! I found a vehicle elsewhere and would like to speak with a consultant about sourcing and verifying it.\n\n` +
+    `👤 *Name:* ${data.name}\n` +
+    `📞 *Phone:* ${data.phone}\n` +
+    (data.sourceUrl ? `🔗 *Listing Link:* ${data.sourceUrl}\n` : '') +
+    `🚗 *Vehicle Details:* ${data.vehicleDetails}\n` +
+    (data.message ? `💬 *Additional Message:* ${data.message}\n` : '') +
+    `\nPlease review this request and let me know the available sourcing options.`
+  );
+}
+
+/**
+ * Returns vehicles curated for the homepage slideshow.
+ * Defaults to vehicles flagged with `inSlideshow` or top featured vehicles.
+ */
+export function getSlideshowVehicles(vehicles: Vehicle[]): Vehicle[] {
+  if (!Array.isArray(vehicles) || vehicles.length === 0) return [];
+  const activeVehicles = vehicles.filter(v => isVehicleActive(v) && v.images && v.images.length > 0);
+  
+  const explicitlyInSlideshow = activeVehicles
+    .filter(v => v.inSlideshow)
+    .sort((a, b) => (a.slideshowOrder || 0) - (b.slideshowOrder || 0));
+
+  if (explicitlyInSlideshow.length >= 3) {
+    return explicitlyInSlideshow;
+  }
+
+  // Fallback: mix with featured vehicles
+  const featured = activeVehicles.filter(v => v.isFeatured && !v.inSlideshow);
+  const combined = [...explicitlyInSlideshow, ...featured, ...activeVehicles];
+  
+  // Deduplicate by ID
+  const seen = new Set<string>();
+  const result: Vehicle[] = [];
+  for (const v of combined) {
+    if (!seen.has(v.id)) {
+      seen.add(v.id);
+      result.push(v);
+    }
+    if (result.length >= 8) break;
+  }
+  return result;
+}
+

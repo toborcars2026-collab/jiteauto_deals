@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, MessageSquare, ShieldCheck, CheckCircle, Send } from 'lucide-react';
+import { MessageSquare, ShieldCheck, CheckCircle, Send } from 'lucide-react';
 import { saveLead, getWhatsAppLink, getHelpMeFindCarMessage, formatCurrency } from '../utils';
 
 interface HelpMeFindCarProps {
@@ -80,13 +80,17 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Informational left column */}
           <div className="lg:col-span-5 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              <span>Guided Vehicle Consultation</span>
+            </div>
+
             <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
-              Can't Find the Right Car?<br />
-              Let Us Hunt It For You.
+              Tell Us What You're Looking For.
             </h2>
 
             <p className="text-slate-300 text-base sm:text-lg leading-relaxed font-light">
-              Don't spend hours scrolling through multiple listing sites or getting scammed by untrustworthy dealers. Tell us exactly what you want, your target budget, and let our consultants match you with verified listings.
+              Can't find exactly what you want? Tell us your preferred vehicle, budget and requirements and we'll help you explore suitable options.
             </p>
 
             <div className="space-y-4 pt-4 border-t border-slate-800">
@@ -95,8 +99,8 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
                   <ShieldCheck size={16} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-white">100% No-Obligation Consultation</h4>
-                  <p className="text-xs text-slate-400">Our matchmaker service is entirely free until we lock down your purchase.</p>
+                  <h4 className="text-sm font-semibold text-white">Realistic Sourcing Consultation</h4>
+                  <p className="text-xs text-slate-400">We'll review your request and explore suitable sourcing options across trusted dealer partners.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -104,8 +108,8 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
                   <ShieldCheck size={16} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-white">Full Sourcing & Documentation Check</h4>
-                  <p className="text-xs text-slate-400">We verify the customs paper validity and vehicle history thoroughly.</p>
+                  <h4 className="text-sm font-semibold text-white">Full Sourcing & Documentation Review</h4>
+                  <p className="text-xs text-slate-400">We assist in checking vehicle documentation, condition reports, and pre-purchase inspection details.</p>
                 </div>
               </div>
             </div>

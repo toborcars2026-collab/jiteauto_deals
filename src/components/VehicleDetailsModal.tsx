@@ -1,10 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, MapPin, Gauge, ShieldCheck, Phone, MessageSquare, ChevronLeft, ChevronRight, CheckCircle2, CircleDollarSign, Maximize2, Share2, Car, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Vehicle } from '../types';
+import { Vehicle, BusinessSettings } from '../types';
 import { AppHistoryState } from '../App';
 import ShareVehicleModal from './ShareVehicleModal';
-import { formatCurrency, formatMileage, getWhatsAppLink, getVehicleInquiryMessage, getImageUrl, decodeUnicodeEscapes, getVehicleSlug, OFFICIAL_PHONE_CALL_URL } from '../utils';
+import {
+  formatCurrency,
+  formatMileage,
+  getWhatsAppLink,
+  getVehicleInquiryMessage,
+  getImageUrl,
+  decodeUnicodeEscapes,
+  getVehicleSlug,
+  getBusinessPhoneDisplay,
+  getBusinessPhoneCallUrl,
+} from '../utils';
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -12,14 +22,25 @@ interface VehicleDetailsModalProps {
   onClose: () => void;
   onOpenQualifier: (vehicle: Vehicle) => void;
   onOpenConsultantModal?: (vehicle: Vehicle, channel?: 'whatsapp' | 'call') => void;
+  businessSettings?: BusinessSettings;
 }
 
-export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQualifier, onOpenConsultantModal }: VehicleDetailsModalProps) {
+export default function VehicleDetailsModal({
+  vehicle,
+  isOpen,
+  onClose,
+  onOpenQualifier,
+  onOpenConsultantModal,
+  businessSettings,
+}: VehicleDetailsModalProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isFullscreenZoom, setIsFullscreenZoom] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
+
+  const phoneDisplay = getBusinessPhoneDisplay(businessSettings);
+  const phoneCallUrl = getBusinessPhoneCallUrl(businessSettings);
 
   // Layer 3 Navigation: Fullscreen Zoom Lightbox
   const handleOpenFullscreenZoom = () => {
@@ -349,12 +370,33 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
               {/* Financial Box */}
               <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-3">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">Consolidated Retail Price</span>
-                  <span className="px-2 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-bold uppercase rounded font-mono">
-                    {vehicle.condition}
+                  <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
+                    {vehicle.status === 'Sold' ? 'Sold Price' : 'Consolidated Retail Price'}
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    {vehicle.status === 'Sold' ? (
+                      <span className="px-2.5 py-0.5 bg-red-100 border border-red-200 text-red-800 text-[10px] font-extrabold uppercase rounded-lg font-mono">
+                        Sold
+                      </span>
+                    ) : vehicle.status === 'Reserved' ? (
+                      <span className="px-2.5 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-extrabold uppercase rounded-lg font-mono">
+                        Reserved
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-extrabold uppercase rounded-lg font-mono">
+                        Available
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 bg-slate-200/80 border border-slate-300 text-slate-800 text-[10px] font-bold uppercase rounded-lg font-mono">
+                      {vehicle.condition}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-3xl font-mono font-extrabold text-slate-900 tracking-tight">
+                <div
+                  className={`text-3xl font-mono font-extrabold tracking-tight ${
+                    vehicle.status === 'Sold' ? 'text-slate-400 line-through' : 'text-slate-900'
+                  }`}
+                >
                   {formatCurrency(vehicle.price)}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -375,11 +417,11 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 ))}
               </div>
 
-              {/* Mechanical Milestones */}
+              {/* Sourcing Network Info */}
               <div className="flex items-center gap-3 text-xs text-slate-600 font-medium font-mono bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-1.5">
                   <CircleDollarSign size={14} className="text-slate-400" />
-                  <span>Sourcing Agency Ready</span>
+                  <span>Verified Sourcing Network</span>
                 </div>
               </div>
             </div>
@@ -402,7 +444,7 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 Interested in this vehicle? Let Jite Auto Deals help you secure it.
               </h4>
               <p className="text-slate-400 text-xs sm:text-sm max-w-xl">
-                Our specialists assist with independent pre-purchase mechanical audits, registry paperwork review, price negotiation, and convenient vehicle delivery!
+                We coordinate physical viewing, test-drive, customs/document review, and price negotiation before any payment is made.
               </p>
             </div>
 
@@ -414,35 +456,35 @@ export default function VehicleDetailsModal({ vehicle, isOpen, onClose, onOpenQu
                 onClick={() => {
                   onOpenQualifier(vehicle);
                 }}
-                className="md:col-span-1 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg shadow-amber-500/10 transition-all text-center cursor-pointer select-none"
+                className={`md:col-span-1 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg transition-all text-center cursor-pointer select-none active:scale-[0.98] ${
+                  vehicle.status === 'Sold'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30'
+                    : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/10'
+                }`}
               >
-                Get This Car
+                {vehicle.status === 'Sold' ? 'Source Similar Unit' : 'Get This Car'}
               </button>
 
-              <button
-                type="button"
+              <a
+                href={getWhatsAppLink(getVehicleInquiryMessage(vehicle), businessSettings?.whatsAppNumber)}
+                target="_blank"
+                rel="noopener noreferrer"
                 id="vehicle_modal_whatsapp_btn"
-                onClick={() => {
-                  const link = getWhatsAppLink(getVehicleInquiryMessage(vehicle));
-                  window.open(link, '_blank', 'noopener,noreferrer');
-                }}
                 className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white py-3.5 px-6 rounded-xl text-sm font-bold transition-all text-center cursor-pointer select-none"
               >
                 <MessageSquare size={16} />
                 <span>Chat on WhatsApp</span>
-              </button>
+              </a>
 
-              <button
-                type="button"
+              <a
+                href={phoneCallUrl}
                 id="vehicle_modal_call_btn"
-                onClick={() => {
-                  window.location.href = OFFICIAL_PHONE_CALL_URL;
-                }}
-                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 border border-slate-700 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer select-none"
+                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] text-slate-100 border border-slate-700 hover:border-amber-500/50 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer select-none"
+                title={`Call ${phoneDisplay}`}
               >
-                <Phone size={16} className="text-amber-500" />
-                <span>Call 08180823197</span>
-              </button>
+                <Phone size={16} className="text-amber-400" />
+                <span>Call {phoneDisplay}</span>
+              </a>
             </div>
 
             {/* security check banner */}

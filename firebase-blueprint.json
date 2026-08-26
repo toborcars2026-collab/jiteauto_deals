@@ -22,7 +22,9 @@
         "color": { "type": "string" },
         "condition": { "type": "string" },
         "isFeatured": { "type": "boolean" },
-        "status": { "type": "string" },
+        "inSlideshow": { "type": "boolean" },
+        "slideshowOrder": { "type": "number" },
+        "status": { "type": "string", "enum": ["Available", "Reserved", "Sold", "Hidden", "Active", "Inactive"] },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
@@ -30,7 +32,7 @@
     },
     "Lead": {
       "title": "Lead",
-      "description": "General consultation or Help Me Find a Car lead",
+      "description": "General consultation, Find My Car, or Source A Car lead",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -39,12 +41,18 @@
         "vehicleType": { "type": "string" },
         "budget": { "type": "number" },
         "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "location": { "type": "string" },
         "paymentMethod": { "type": "string" },
+        "requirements": { "type": "string" },
+        "type": { "type": "string" },
+        "sourceUrl": { "type": "string" },
+        "sourceImage": { "type": "string" },
         "createdAt": { "type": "string" },
-        "status": { "type": "string" },
+        "status": { "type": "string", "enum": ["New", "Contacted", "In Progress", "Completed", "Closed"] },
         "notes": { "type": "string" }
       },
-      "required": ["name", "phone", "vehicleType", "budget", "brand", "paymentMethod"]
+      "required": ["name", "phone"]
     },
     "Inquiry": {
       "title": "Inquiry",
@@ -60,24 +68,52 @@
         "paymentMethod": { "type": "string" },
         "readyToBuy": { "type": "string" },
         "preferredContact": { "type": "string" },
+        "message": { "type": "string" },
         "createdAt": { "type": "string" },
-        "status": { "type": "string" }
+        "status": { "type": "string", "enum": ["New", "Contacted", "In Progress", "Completed", "Closed"] }
       },
-      "required": ["name", "phone", "vehicleId", "vehicleName", "budget"]
+      "required": ["name", "phone", "vehicleId", "vehicleName"]
+    },
+    "BusinessSettings": {
+      "title": "BusinessSettings",
+      "description": "Centralized business profile, contact channels, and dynamic copy",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string" },
+        "brandTagline": { "type": "string" },
+        "consultantName": { "type": "string" },
+        "phoneDisplay": { "type": "string" },
+        "phoneCallUrl": { "type": "string" },
+        "whatsAppNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "tikTokUrl": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "homepageCtaText": { "type": "string" },
+        "footerText": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["businessName", "phoneDisplay", "whatsAppNumber"]
     }
   },
   "firestore": {
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/entities/Vehicle" },
-      "description": "Public vehicle listings catalog for Jite Auto Deals"
+      "description": "Authoritative vehicle catalog for Jite Auto Deals"
     },
     "/leads/{leadId}": {
       "schema": { "$ref": "#/entities/Lead" },
-      "description": "Submitted consultation leads from prospective buyers"
+      "description": "Customer consultation and sourcing requests"
     },
     "/inquiries/{inquiryId}": {
       "schema": { "$ref": "#/entities/Inquiry" },
       "description": "Direct vehicle acquisition inquiries from prospective buyers"
+    },
+    "/settings/business": {
+      "schema": { "$ref": "#/entities/BusinessSettings" },
+      "description": "Centralized business contact information and public settings"
     }
   }
 }
+

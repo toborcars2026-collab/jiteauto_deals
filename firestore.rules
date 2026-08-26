@@ -1,34 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Central Business Settings (Public read, authenticated admin write)
+    match /settings/business {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
     
-    // Public read and inventory management for vehicles catalog
+    // Vehicles Catalog (Public read, authenticated admin write/delete)
     match /vehicles/{vehicleId} {
       allow read: if true;
-      allow create, update: if request.resource.data.make is string 
-        && request.resource.data.model is string 
-        && request.resource.data.year is number 
-        && request.resource.data.price is number;
-      allow delete: if true;
+      allow create, update, delete: if isAuthenticated();
     }
 
-    // Leads submitted by prospective buyers and managed in Partner Console
+    // Customer Leads (Find My Car & Source a Car)
+    // Public visitors can submit requests; authenticated admins can read, update, and delete
     match /leads/{leadId} {
-      allow read: if true;
-      allow create: if request.resource.data.name is string && request.resource.data.phone is string;
-      allow update, delete: if true;
+      allow read, update, delete: if isAuthenticated();
+      allow create: if request.resource.data.name is string 
+        && request.resource.data.phone is string;
     }
 
-    // Inquiries submitted by prospective buyers and managed in Partner Console
+    // Direct Vehicle Inquiries
+    // Public visitors can submit inquiries; authenticated admins can read, update, and delete
     match /inquiries/{inquiryId} {
-      allow read: if true;
-      allow create: if request.resource.data.name is string && request.resource.data.phone is string;
-      allow update, delete: if true;
+      allow read, update, delete: if isAuthenticated();
+      allow create: if request.resource.data.name is string 
+        && request.resource.data.phone is string;
     }
 
-    // System connectivity test collection
+    // System connectivity and diagnostics collection
     match /test/{docId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
+    }
+
+    // Admins collection (Authenticated admin only)
+    match /admins/{adminId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }
+
+
