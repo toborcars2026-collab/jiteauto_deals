@@ -1367,7 +1367,7 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   phoneDisplay: '08180823197',
   phoneCallUrl: 'tel:+2348180823197',
   whatsAppNumber: '2348180823197',
-  email: 'contact@jiteautodeals.com',
+  email: 'toborcars2026@gmail.com',
   address: 'Lagos, Nigeria (Serving Clients Nationwide)',
   instagramUrl: 'https://instagram.com/jiteautodeals',
   tikTokUrl: 'https://tiktok.com/@jiteautodeals',

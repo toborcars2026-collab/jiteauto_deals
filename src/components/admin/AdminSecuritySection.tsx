@@ -17,6 +17,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
+  sendPasswordResetEmail,
   signOut
 } from 'firebase/auth';
 import { auth } from '../../firebase';
@@ -128,6 +129,26 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
     }
   };
 
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
+  const handleSendResetEmail = async () => {
+    if (!userEmail) return;
+    setIsSendingReset(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await sendPasswordResetEmail(auth, userEmail);
+      setSuccessMessage(`Password reset link sent to ${userEmail}. Check your inbox to set a new password.`);
+      setTimeout(() => setSuccessMessage(null), 8000);
+    } catch (err: any) {
+      console.error('[Send Password Reset Email Error]:', err);
+      setErrorMessage(err?.message || 'Failed to send password reset email. Please try again.');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -213,18 +234,38 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                  setIsChangingPassword(true);
-                }}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-sm shrink-0"
-              >
-                <KeyRound size={14} className="text-amber-400" />
-                <span>Change Password</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendResetEmail}
+                  disabled={isSendingReset}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-all cursor-pointer border border-slate-200 shrink-0 disabled:opacity-50"
+                >
+                  {isSendingReset ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin text-amber-500" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={13} className="text-amber-500" />
+                      <span>Send Reset Email</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                    setIsChangingPassword(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-sm shrink-0"
+                >
+                  <KeyRound size={14} className="text-amber-400" />
+                  <span>Change Password</span>
+                </button>
+              </div>
             </div>
           ) : (
             /* Change Password Form */
