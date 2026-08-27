@@ -611,10 +611,12 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
       vehiclesCol,
       (snapshot) => {
         if (snapshot.empty) {
-          // If Firestore is empty, seed it with default inventory
+          // If Firestore is completely empty on initial startup, seed initial catalog once
           seedInitialVehiclesIfEmpty(0).then(() => {
             const seed = INITIAL_VEHICLES.map(normalizeVehicleData).filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-            localStorage.setItem(VEHICLES_KEY, JSON.stringify(seed));
+            try {
+              localStorage.setItem(VEHICLES_KEY, JSON.stringify(seed));
+            } catch {}
             onUpdate(seed);
           });
           return;
@@ -627,87 +629,12 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
             ...data,
             id: docSnap.id || data.id,
           });
-          if (docSnap.id === 'toyota-highlander-xle-2017-brown-foreign-used' || docSnap.id === 'toyota-corolla-le-2015-silver-direct-belgium') {
-            deleteDoc(doc(db, 'vehicles', docSnap.id)).catch(() => {});
-          }
           if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
             list.push(normalized);
           }
         });
 
-        // Ensure the new 2013 Toyota Highlander Limited Edition is synchronized
-        const hasHighlander2013 = list.some(v => v.id === 'toyota-highlander-limited-2013-white-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0011')));
-        if (!hasHighlander2013) {
-          const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-limited-2013-white-direct-belgium');
-          if (highlander) {
-            const norm = normalizeVehicleData(highlander);
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Ensure the new 2016 Mercedes-Benz C300 is synchronized
-        const hasC300 = list.some(v => v.id === 'mercedes-benz-c300-2016-grey-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0035')));
-        if (!hasC300) {
-          const c300 = INITIAL_VEHICLES.find(v => v.id === 'mercedes-benz-c300-2016-grey-direct-belgium');
-          if (c300) {
-            const norm = normalizeVehicleData(c300);
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Ensure the new 2015 Mercedes-Benz ML350 is synchronized
-        const hasML350 = list.some(v => v.id === 'mercedes-benz-ml350-2015-silver-direct-belgium' || v.images.some(img => img.includes('IMG-20260824-WA0003')));
-        if (!hasML350) {
-          const ml = INITIAL_VEHICLES.find(v => v.id === 'mercedes-benz-ml350-2015-silver-direct-belgium');
-          if (ml) {
-            const norm = normalizeVehicleData(ml);
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Ensure the new 2022 Dodge Challenger is synchronized
-        const hasDodgeChallenger = list.some(v => v.id === 'dodge-challenger-2022-white-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0015')));
-        if (!hasDodgeChallenger) {
-          const dodge = INITIAL_VEHICLES.find(v => v.id === 'dodge-challenger-2022-white-direct-belgium');
-          if (dodge) {
-            const norm = normalizeVehicleData(dodge);
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Ensure the new 2017 BMW X-Drive is synchronized
-        const hasBmwXDrive = list.some(v => v.id === 'bmw-xdrive-2017-dark-blue-direct-belgium' || v.images.some(img => img.includes('IMG-20260822-WA0023')));
-        if (!hasBmwXDrive) {
-          const bmw = INITIAL_VEHICLES.find(v => v.id === 'bmw-xdrive-2017-dark-blue-direct-belgium');
-          if (bmw) {
-            const norm = normalizeVehicleData(bmw);
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Ensure the 2017 Blue Highlander is synchronized with latest images
-        const existingHighlanderIdx = list.findIndex(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
-        const highlander = INITIAL_VEHICLES.find(v => v.id === 'toyota-highlander-xle-2017-blue-foreign-used');
-        if (highlander) {
-          const norm = normalizeVehicleData(highlander);
-          if (existingHighlanderIdx >= 0) {
-            // If existing images don't match the new WA0001-1 images, update it
-            if (!list[existingHighlanderIdx].images[0]?.includes('WA0001-1')) {
-              list[existingHighlanderIdx] = norm;
-              saveVehicleToFirestore(norm).catch(console.warn);
-            }
-          } else {
-            list.unshift(norm);
-            saveVehicleToFirestore(norm).catch(console.warn);
-          }
-        }
-
-        // Save fresh data into fast local storage cache
+        // Save fresh data into local cache
         try {
           localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
         } catch {}
@@ -719,7 +646,7 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
         onUpdate(list);
       },
       (error) => {
-        // Fallback to local cache if network is temporarily reconnecting or offline
+        // Fallback to local cache if network is reconnecting
         console.warn('[Firestore] Vehicles sync notice:', error?.message || error);
         onUpdate(getVehicles());
       }

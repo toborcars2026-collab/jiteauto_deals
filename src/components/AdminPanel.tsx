@@ -171,9 +171,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
     try {
       const res = await requestPasswordReset(email);
-      setAuthSuccessMessage(res.message);
+      if (res.success) {
+        setAuthSuccessMessage(res.message);
+      } else {
+        setAuthError(res.error || 'Failed to send password reset email. Please try again.');
+      }
     } catch (err: any) {
-      setAuthSuccessMessage('If an account exists for this email, password reset instructions have been dispatched.');
+      setAuthError(err?.message || 'Failed to dispatch reset email. Please try again.');
     } finally {
       setIsSubmittingAuth(false);
     }
