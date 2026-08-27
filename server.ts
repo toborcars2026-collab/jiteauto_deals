@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { INITIAL_VEHICLES } from "./src/data";
 
@@ -17,6 +18,65 @@ const VEHICLES_FILE = path.join(DATA_DIR, "vehicles.json");
 const DELETED_FILE = path.join(DATA_DIR, "deleted_ids.json");
 const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 const INQUIRIES_FILE = path.join(DATA_DIR, "inquiries.json");
+const AUTH_FILE = path.join(DATA_DIR, "admin_auth.json");
+
+interface AdminAccount {
+  id: string;
+  email: string;
+  salt: string;
+  hash: string;
+  role: 'admin';
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminSession {
+  token: string;
+  email: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+interface AuthStore {
+  admins: AdminAccount[];
+  sessions: AdminSession[];
+}
+
+function readAuthStore(): AuthStore {
+  ensureDataDir();
+  if (!fs.existsSync(AUTH_FILE)) {
+    const initial: AuthStore = { admins: [], sessions: [] };
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(initial, null, 2), "utf-8");
+    return initial;
+  }
+  try {
+    const raw = fs.readFileSync(AUTH_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch (e) {
+    return { admins: [], sessions: [] };
+  }
+}
+
+function saveAuthStore(store: AuthStore) {
+  ensureDataDir();
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(store, null, 2), "utf-8");
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+}
+
+function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
+  const computedHash = hashPassword(password, salt);
+  const bufA = Buffer.from(computedHash, "hex");
+  const bufB = Buffer.from(expectedHash, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 const KNOWN_DELETED_IDS = new Set<string>([
   "toyota-corolla-s-2015-silver-few-months-used",
@@ -319,6 +379,192 @@ app.post("/api/inquiries", (req, res) => {
   const inquiries = req.body;
   if (Array.isArray(inquiries)) {
     saveInquiriesStore(inquiries);
+  }
+  res.json({ success: true });
+});
+
+// Admin Authentication Endpoints
+app.get("/api/admin/auth/status", (req, res) => {
+  const store = readAuthStore();
+  const isInitialized = store.admins.length > 0;
+  const adminEmail = isInitialized ? store.admins[0].email : null;
+  res.json({ isInitialized, adminEmail });
+});
+
+app.post("/api/admin/auth/setup", (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+    return res.status(400).json({ error: "Please enter a valid email address" });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters long" });
+  }
+
+  const store = readAuthStore();
+  if (store.admins.length > 0) {
+    return res.status(400).json({ error: "Administrator account already exists. Please log in." });
+  }
+
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = hashPassword(password, salt);
+  const newAdmin: AdminAccount = {
+    id: "admin-" + Date.now(),
+    email: cleanEmail,
+    salt,
+    hash,
+    role: "admin",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const token = generateToken();
+  const session: AdminSession = {
+    token,
+    email: cleanEmail,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+  };
+
+  store.admins.push(newAdmin);
+  store.sessions.push(session);
+  saveAuthStore(store);
+
+  res.json({
+    success: true,
+    token,
+    user: { email: cleanEmail, role: "admin" },
+  });
+});
+
+app.post("/api/admin/auth/login", (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const store = readAuthStore();
+
+  // If no admin exists yet, prompt first-time setup
+  if (store.admins.length === 0) {
+    return res.status(404).json({
+      error: "No administrator account found. Please initialize the first administrator account.",
+      code: "NO_ADMIN_EXISTS"
+    });
+  }
+
+  const admin = store.admins.find((a) => a.email.toLowerCase() === cleanEmail);
+  if (!admin) {
+    return res.status(401).json({ error: "Invalid administrator email or password." });
+  }
+
+  const isValid = verifyPassword(password, admin.salt, admin.hash);
+  if (!isValid) {
+    return res.status(401).json({ error: "Invalid administrator email or password." });
+  }
+
+  const token = generateToken();
+  const session: AdminSession = {
+    token,
+    email: admin.email,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+  };
+
+  // Keep latest 20 active sessions
+  store.sessions = store.sessions.filter((s) => s.expiresAt > Date.now()).slice(-20);
+  store.sessions.push(session);
+  saveAuthStore(store);
+
+  res.json({
+    success: true,
+    token,
+    user: { email: admin.email, role: "admin" },
+  });
+});
+
+app.get("/api/admin/auth/verify", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+  if (!token) {
+    return res.status(401).json({ valid: false, error: "Missing authorization token" });
+  }
+
+  const store = readAuthStore();
+  const session = store.sessions.find((s) => s.token === token && s.expiresAt > Date.now());
+  if (!session) {
+    return res.status(401).json({ valid: false, error: "Invalid or expired session" });
+  }
+
+  res.json({
+    valid: true,
+    user: { email: session.email, role: "admin" },
+  });
+});
+
+app.post("/api/admin/auth/change-password", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+  if (!token) {
+    return res.status(401).json({ error: "Missing authorization token" });
+  }
+
+  const store = readAuthStore();
+  const session = store.sessions.find((s) => s.token === token && s.expiresAt > Date.now());
+  if (!session) {
+    return res.status(401).json({ error: "Invalid or expired session" });
+  }
+
+  const { oldPassword, newPassword } = req.body || {};
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: "Both current password and new password are required" });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters long" });
+  }
+
+  const admin = store.admins.find((a) => a.email.toLowerCase() === session.email.toLowerCase());
+  if (!admin) {
+    return res.status(404).json({ error: "Administrator account not found" });
+  }
+
+  const isValid = verifyPassword(oldPassword, admin.salt, admin.hash);
+  if (!isValid) {
+    return res.status(400).json({ error: "Incorrect current password. Please verify and try again." });
+  }
+
+  const newSalt = crypto.randomBytes(16).toString("hex");
+  const newHash = hashPassword(newPassword, newSalt);
+  admin.salt = newSalt;
+  admin.hash = newHash;
+  admin.updatedAt = new Date().toISOString();
+
+  saveAuthStore(store);
+  res.json({ success: true, message: "Password updated successfully" });
+});
+
+app.post("/api/admin/auth/forgot-password", (req, res) => {
+  // Always return generic confirmation to protect against email enumeration
+  res.json({
+    success: true,
+    message: "If an administrator account matches this email, password reset instructions have been dispatched."
+  });
+});
+
+app.post("/api/admin/auth/logout", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+  if (token) {
+    const store = readAuthStore();
+    store.sessions = store.sessions.filter((s) => s.token !== token);
+    saveAuthStore(store);
   }
   res.json({ success: true });
 });

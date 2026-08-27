@@ -25,7 +25,7 @@ import {
 import AdminSecuritySection from './AdminSecuritySection';
 
 interface AdminSettingsTabProps {
-  currentUser?: User | null;
+  currentUser?: { email: string | null } | null;
   onSignOut?: () => void;
   onSettingsSaved?: (settings: BusinessSettings) => void;
 }

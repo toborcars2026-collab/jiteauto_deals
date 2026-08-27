@@ -774,6 +774,103 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 /**
+ * Fast targeted fetch for a single vehicle by slug or ID directly from Firestore.
+ * Prioritizes opening a direct vehicle link in milliseconds without needing to read the entire catalogue first.
+ */
+export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | null> {
+  if (!identifier) return null;
+  const clean = decodeURIComponent(identifier).toLowerCase().trim().replace(/^\/vehicles\/?/, '').replace(/\/$/, '');
+  if (!clean) return null;
+
+  // 1. Instant check from local in-memory/localStorage cache
+  const cachedList = getVehicles();
+  const cachedMatch = findVehicleBySlugOrId(cachedList, clean);
+  if (cachedMatch) {
+    return cachedMatch;
+  }
+
+  // 2. Direct Firestore single document lookup by document ID
+  try {
+    const docRef = doc(db, 'vehicles', clean);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data() as Vehicle;
+      const normalized = normalizeVehicleData({
+        ...data,
+        id: docSnap.id || data.id,
+      });
+      if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
+        // Update local cache
+        const updated = [normalized, ...cachedList.filter(v => v.id !== normalized.id)];
+        try {
+          localStorage.setItem(VEHICLES_KEY, JSON.stringify(updated));
+        } catch {}
+        return normalized;
+      }
+    }
+  } catch (e) {
+    console.warn('[Firestore] Direct doc get error, falling back to query:', e);
+  }
+
+  // 3. Fallback: fetch full list if slug differs from Firestore ID
+  try {
+    const all = await fetchVehicles();
+    return findVehicleBySlugOrId(all, clean) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Preloads the primary HD vehicle image in the browser <head> using high priority link prefetching.
+ */
+export function preloadPrimaryImage(rawUrl: string | undefined | null): void {
+  if (!rawUrl || typeof document === 'undefined') return;
+  const url = getImageUrl(rawUrl);
+  if (!url) return;
+
+  // Check if link already exists
+  const existing = document.querySelector(`link[rel="preload"][href="${CSS.escape(url)}"]`);
+  if (!existing) {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = url;
+    link.fetchPriority = 'high';
+    document.head.appendChild(link);
+  }
+
+  // Also prime the browser Image cache object
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = url;
+}
+
+/**
+ * Extracts initial vehicle slug or ID synchronously from current browser URL.
+ */
+export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: boolean } {
+  if (typeof window === 'undefined') return { slugOrId: null, qualify: false };
+  const searchParams = new URLSearchParams(window.location.search);
+  const pathname = window.location.pathname;
+  const hash = window.location.hash;
+
+  let initialSlugOrId: string | null = null;
+  if (pathname.startsWith('/vehicles/')) {
+    initialSlugOrId = pathname.replace(/^\/vehicles\/?/, '');
+  } else if (searchParams.get('vehicle')) {
+    initialSlugOrId = searchParams.get('vehicle');
+  } else if (searchParams.get('v')) {
+    initialSlugOrId = searchParams.get('v');
+  } else if (hash.startsWith('#/vehicles/')) {
+    initialSlugOrId = hash.replace(/^#\/vehicles\/?/, '');
+  }
+
+  const qualify = searchParams.get('qualify') === '1' || searchParams.get('qualify') === 'true';
+  return { slugOrId: initialSlugOrId, qualify };
+}
+
+/**
  * Gets cached vehicles from localStorage or fallback seed data.
  */
 export function getVehicles(): Vehicle[] {

@@ -13,17 +13,13 @@ import {
   Info
 } from 'lucide-react';
 import {
-  User,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  updatePassword,
-  sendPasswordResetEmail,
-  signOut
-} from 'firebase/auth';
-import { auth } from '../../firebase';
+  changeAdminPassword,
+  requestPasswordReset,
+  logoutAdminSession
+} from '../../services/adminAuth';
 
 interface AdminSecuritySectionProps {
-  currentUser: User | null;
+  currentUser: { email: string | null } | null;
   onSignOut?: () => void;
 }
 
@@ -41,7 +37,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const userEmail = currentUser?.email || auth.currentUser?.email || 'admin@jiteautodeals.com';
+  const userEmail = currentUser?.email || 'admin@jiteautodeals.com';
 
   const resetForm = () => {
     setCurrentPassword('');
@@ -79,40 +75,19 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
       return;
     }
 
-    const activeUser = auth.currentUser;
-    if (!activeUser || !activeUser.email) {
-      setErrorMessage('No active authenticated session found. Please sign in again.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      // 2. Re-authenticate user
-      const credential = EmailAuthProvider.credential(activeUser.email, currentPassword);
-      await reauthenticateWithCredential(activeUser, credential);
-
-      // 3. Update password in Firebase Authentication
-      await updatePassword(activeUser, newPassword);
-
-      setSuccessMessage('Password changed successfully.');
-      resetForm();
-      setTimeout(() => setSuccessMessage(null), 6000);
-    } catch (err: any) {
-      const code = err?.code || '';
-      console.error('[Firebase Auth Password Change Error]:', code);
-
-      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setErrorMessage('Current password is incorrect. Please verify your current password.');
-      } else if (code === 'auth/weak-password') {
-        setErrorMessage('New password is too weak. Please use at least 8 characters with a mix of letters and numbers.');
-      } else if (code === 'auth/requires-recent-login') {
-        setErrorMessage('This operation requires recent authentication. Please sign out and sign in again before updating your password.');
-      } else if (code === 'auth/too-many-requests') {
-        setErrorMessage('Too many failed attempts. Please wait a few moments and try again.');
+      const res = await changeAdminPassword(currentPassword, newPassword);
+      if (res.success) {
+        setSuccessMessage('Password changed successfully.');
+        resetForm();
+        setTimeout(() => setSuccessMessage(null), 6000);
       } else {
-        setErrorMessage(err?.message || 'Failed to update password. Please try again.');
+        setErrorMessage(res.error || 'Failed to change password. Please verify your current password.');
       }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to update password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +95,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await logoutAdminSession();
       if (onSignOut) {
         onSignOut();
       }
@@ -138,8 +113,8 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
     setSuccessMessage(null);
 
     try {
-      await sendPasswordResetEmail(auth, userEmail);
-      setSuccessMessage(`Password reset link sent to ${userEmail}. Check your inbox to set a new password.`);
+      const res = await requestPasswordReset(userEmail);
+      setSuccessMessage(res.message || `Password reset link sent to ${userEmail}. Check your inbox to set a new password.`);
       setTimeout(() => setSuccessMessage(null), 8000);
     } catch (err: any) {
       console.error('[Send Password Reset Email Error]:', err);

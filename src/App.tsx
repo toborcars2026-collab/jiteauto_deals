@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   MessageSquare,
   Phone,
@@ -17,23 +17,16 @@ import TrustStrip from './components/TrustStrip';
 import ProblemSolution from './components/ProblemSolution';
 import ThreePaths from './components/ThreePaths';
 import FeaturedVehicles from './components/FeaturedVehicles';
-import HowItWorks from './components/HowItWorks';
 import WhyChooseUs from './components/WhyChooseUs';
+import HowItWorks from './components/HowItWorks';
 import AboutFounder from './components/AboutFounder';
-import BrowseCarsPage from './components/BrowseCarsPage';
-import FindMyCarPage from './components/FindMyCarPage';
-import SourceCarPage from './components/SourceCarPage';
-import HowItWorksPage from './components/HowItWorksPage';
-import AboutPage from './components/AboutPage';
 import VehicleDetailsModal from './components/VehicleDetailsModal';
-import ConsultantModal from './components/ConsultantModal';
-import LeadQualifierModal from './components/LeadQualifierModal';
-import AdminPanel from './components/AdminPanel';
 import Footer from './components/Footer';
 import { Vehicle, NavigationTab, BusinessSettings } from './types';
 import {
   getVehicles,
   fetchVehicles,
+  fetchSingleVehicle,
   subscribeToVehicles,
   getBusinessSettings,
   fetchBusinessSettings,
@@ -46,7 +39,19 @@ import {
   getVehicleSlug,
   getBusinessPhoneDisplay,
   getBusinessPhoneCallUrl,
+  preloadPrimaryImage,
+  getInitialVehicleRoute,
 } from './utils';
+
+// Code-split heavy and secondary page views to keep initial bundle ultra-lightweight
+const BrowseCarsPage = lazy(() => import('./components/BrowseCarsPage'));
+const FindMyCarPage = lazy(() => import('./components/FindMyCarPage'));
+const SourceCarPage = lazy(() => import('./components/SourceCarPage'));
+const HowItWorksPage = lazy(() => import('./components/HowItWorksPage'));
+const AboutPage = lazy(() => import('./components/AboutPage'));
+const ConsultantModal = lazy(() => import('./components/ConsultantModal'));
+const LeadQualifierModal = lazy(() => import('./components/LeadQualifierModal'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 export interface AppHistoryState {
   tab: NavigationTab;
@@ -57,18 +62,48 @@ export interface AppHistoryState {
   vehicleSlug?: string | null;
 }
 
+// Extract initial route & preload high-priority image immediately on module execution
+const initialRoute = getInitialVehicleRoute();
+const initialVehiclesList = getVehicles();
+const initialMatchedVehicle = initialRoute.slugOrId
+  ? findVehicleBySlugOrId(initialVehiclesList, initialRoute.slugOrId) || null
+  : null;
+
+if (initialMatchedVehicle?.images?.[0]) {
+  preloadPrimaryImage(initialMatchedVehicle.images[0]);
+}
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('home');
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getVehicles());
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => initialVehiclesList);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => getBusinessSettings());
 
-  // Modal states
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  // Modal states - instantly initialized from URL if a vehicle link was tapped
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(() => {
+    if (initialRoute.slugOrId && !initialRoute.qualify) {
+      return initialMatchedVehicle;
+    }
+    return null;
+  });
+  const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(() => {
+    return Boolean(initialRoute.slugOrId && !initialRoute.qualify);
+  });
+  const [isVehicleLoading, setIsVehicleLoading] = useState<boolean>(() => {
+    return Boolean(initialRoute.slugOrId && !initialMatchedVehicle && !initialRoute.qualify);
+  });
+
   const [isConsultantOpen, setIsConsultantOpen] = useState(false);
   const [consultantVehicle, setConsultantVehicle] = useState<Vehicle | null>(null);
-  const [isQualifierOpen, setIsQualifierOpen] = useState(false);
-  const [qualifierVehicle, setQualifierVehicle] = useState<Vehicle | null>(null);
+
+  const [isQualifierOpen, setIsQualifierOpen] = useState<boolean>(() => {
+    return Boolean(initialRoute.slugOrId && initialRoute.qualify);
+  });
+  const [qualifierVehicle, setQualifierVehicle] = useState<Vehicle | null>(() => {
+    if (initialRoute.slugOrId && initialRoute.qualify) {
+      return initialMatchedVehicle;
+    }
+    return null;
+  });
 
   // Tab navigation handler with clean history stack
   const handleTabChange = (newTab: NavigationTab, replace: boolean = false) => {
@@ -118,6 +153,8 @@ export default function App() {
   // Open Vehicle Details Modal (pushes history state for seamless Back button)
   const handleViewDetails = (vehicle: Vehicle) => {
     const slug = getVehicleSlug(vehicle);
+    preloadPrimaryImage(vehicle.images?.[0]);
+
     const newState: AppHistoryState = {
       tab: currentTab,
       modal: 'details',
@@ -131,6 +168,7 @@ export default function App() {
     } catch {}
 
     setSelectedVehicle(vehicle);
+    setIsVehicleLoading(false);
     setIsDetailsOpen(true);
     document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
   };
@@ -139,6 +177,7 @@ export default function App() {
   const handleCloseDetails = () => {
     setIsDetailsOpen(false);
     setSelectedVehicle(null);
+    setIsVehicleLoading(false);
     const targetTab = currentTab || 'home';
     const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
 
@@ -212,11 +251,10 @@ export default function App() {
     } catch {}
   };
 
-  // 1. Initial Page Load and Data Initialization
+  // 1. Initial Page Load and Data Prioritization
   useEffect(() => {
+    const route = getInitialVehicleRoute();
     const searchParams = new URLSearchParams(window.location.search);
-    const pathname = window.location.pathname;
-    const hash = window.location.hash;
     const tabParam = searchParams.get('tab') as NavigationTab | null;
 
     const validTabs: NavigationTab[] = ['home', 'browse', 'find-car', 'source-car', 'how-it-works', 'about', 'admin'];
@@ -226,25 +264,9 @@ export default function App() {
     }
     setCurrentTab(initialTab);
 
-    let initialVehicleSlugOrId: string | null = null;
-    if (pathname.startsWith('/vehicles/')) {
-      initialVehicleSlugOrId = pathname.replace(/^\/vehicles\/?/, '');
-    } else if (searchParams.get('vehicle')) {
-      initialVehicleSlugOrId = searchParams.get('vehicle');
-    } else if (searchParams.get('v')) {
-      initialVehicleSlugOrId = searchParams.get('v');
-    } else if (hash.startsWith('#/vehicles/')) {
-      initialVehicleSlugOrId = hash.replace(/^#\/vehicles\/?/, '');
-    }
-
-    let initialModal: 'details' | 'qualifier' | null = null;
-    if (initialVehicleSlugOrId) {
-      initialModal = searchParams.get('qualify') ? 'qualifier' : 'details';
-    }
-
-    // Direct entry intelligence for shared WhatsApp/Social vehicle links
+    // Direct entry navigation state management
     try {
-      if (initialVehicleSlugOrId) {
+      if (route.slugOrId) {
         const baseNavState: AppHistoryState = {
           tab: initialTab,
           modal: null,
@@ -254,12 +276,12 @@ export default function App() {
 
         const vehicleState: AppHistoryState = {
           tab: initialTab,
-          modal: initialModal,
-          vehicleSlug: initialVehicleSlugOrId,
+          modal: route.qualify ? 'qualifier' : 'details',
+          vehicleSlug: route.slugOrId,
         };
-        const vehicleUrl = initialModal === 'qualifier'
-          ? `/?vehicle=${encodeURIComponent(initialVehicleSlugOrId)}&qualify=1`
-          : `/?vehicle=${encodeURIComponent(initialVehicleSlugOrId)}`;
+        const vehicleUrl = route.qualify
+          ? `/?vehicle=${encodeURIComponent(route.slugOrId)}&qualify=1`
+          : `/?vehicle=${encodeURIComponent(route.slugOrId)}`;
         window.history.pushState(vehicleState, '', vehicleUrl);
       } else {
         const initialNavState: AppHistoryState = {
@@ -271,20 +293,39 @@ export default function App() {
       }
     } catch {}
 
-    // Load initial vehicles from Firestore
+    // Priority 1: If user requested a direct vehicle link, fetch that single document immediately
+    if (route.slugOrId) {
+      fetchSingleVehicle(route.slugOrId).then((matched) => {
+        if (matched) {
+          preloadPrimaryImage(matched.images?.[0]);
+          if (route.qualify) {
+            setQualifierVehicle(matched);
+            setIsQualifierOpen(true);
+          } else {
+            setSelectedVehicle(matched);
+            setIsDetailsOpen(true);
+            document.title = `${matched.year} ${matched.make} ${matched.model} - ${formatCurrency(matched.price)} | Jite Auto Deals`;
+          }
+        }
+        setIsVehicleLoading(false);
+      }).catch(() => {
+        setIsVehicleLoading(false);
+      });
+    }
+
+    // Priority 2: Deferred background sync of the remaining catalogue and business settings
     fetchVehicles().then((loadedVehicles) => {
       if (loadedVehicles && loadedVehicles.length > 0) {
         setVehicles(loadedVehicles);
 
-        if (initialVehicleSlugOrId) {
-          const matched = findVehicleBySlugOrId(loadedVehicles, initialVehicleSlugOrId);
+        if (route.slugOrId) {
+          const matched = findVehicleBySlugOrId(loadedVehicles, route.slugOrId);
           if (matched) {
-            if (initialModal === 'qualifier') {
-              setQualifierVehicle(matched);
-              setIsQualifierOpen(true);
+            preloadPrimaryImage(matched.images?.[0]);
+            if (route.qualify) {
+              setQualifierVehicle((prev) => prev || matched);
             } else {
-              setSelectedVehicle(matched);
-              setIsDetailsOpen(true);
+              setSelectedVehicle((prev) => prev || matched);
             }
           }
         }
@@ -294,10 +335,11 @@ export default function App() {
     // Real-time Firestore sync for vehicles
     const unsubscribeVehicles = subscribeToVehicles((updatedVehicles) => {
       setVehicles(updatedVehicles);
-      if (initialVehicleSlugOrId) {
-        const matched = findVehicleBySlugOrId(updatedVehicles, initialVehicleSlugOrId);
+      if (route.slugOrId) {
+        const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
         if (matched) {
           setSelectedVehicle((prev) => (prev ? matched : prev));
+          setQualifierVehicle((prev) => (prev ? matched : prev));
         }
       }
     });
@@ -436,60 +478,72 @@ export default function App() {
 
         {/* TAB: BROWSE CARS */}
         {currentTab === 'browse' && (
-          <BrowseCarsPage
-            vehicles={vehicles}
-            onViewDetails={handleViewDetails}
-            onConsultVehicle={(car) => handleOpenConsultant(car)}
-            onFindMyCar={() => handleTabChange('find-car')}
-            onSourceCar={() => handleTabChange('source-car')}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <BrowseCarsPage
+              vehicles={vehicles}
+              onViewDetails={handleViewDetails}
+              onConsultVehicle={(car) => handleOpenConsultant(car)}
+              onFindMyCar={() => handleTabChange('find-car')}
+              onSourceCar={() => handleTabChange('source-car')}
+            />
+          </Suspense>
         )}
 
         {/* TAB: FIND MY CAR (SPEC FINDER) */}
         {currentTab === 'find-car' && (
-          <FindMyCarPage
-            onGoHome={() => handleTabChange('home')}
-            onBrowseCars={() => handleTabChange('browse')}
-            businessSettings={businessSettings}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <FindMyCarPage
+              onGoHome={() => handleTabChange('home')}
+              onBrowseCars={() => handleTabChange('browse')}
+              businessSettings={businessSettings}
+            />
+          </Suspense>
         )}
 
         {/* TAB: SOURCE A CAR (FOUND ELSEWHERE) */}
         {currentTab === 'source-car' && (
-          <SourceCarPage
-            onGoHome={() => handleTabChange('home')}
-            onBrowseCars={() => handleTabChange('browse')}
-            businessSettings={businessSettings}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <SourceCarPage
+              onGoHome={() => handleTabChange('home')}
+              onBrowseCars={() => handleTabChange('browse')}
+              businessSettings={businessSettings}
+            />
+          </Suspense>
         )}
 
         {/* TAB: HOW IT WORKS & FINANCE */}
         {currentTab === 'how-it-works' && (
-          <HowItWorksPage
-            onGoHome={() => handleTabChange('home')}
-            onTalkToConsultant={() => handleOpenConsultant(null)}
-            onFindMyCar={() => handleTabChange('find-car')}
-            onBrowseCars={() => handleTabChange('browse')}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <HowItWorksPage
+              onGoHome={() => handleTabChange('home')}
+              onTalkToConsultant={() => handleOpenConsultant(null)}
+              onFindMyCar={() => handleTabChange('find-car')}
+              onBrowseCars={() => handleTabChange('browse')}
+            />
+          </Suspense>
         )}
 
         {/* TAB: ABOUT TOBOR JITE */}
         {currentTab === 'about' && (
-          <AboutPage
-            onGoHome={() => handleTabChange('home')}
-            onTalkToConsultant={() => handleOpenConsultant(null)}
-            onBrowseCars={() => handleTabChange('browse')}
-            onFindMyCar={() => handleTabChange('find-car')}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <AboutPage
+              onGoHome={() => handleTabChange('home')}
+              onTalkToConsultant={() => handleOpenConsultant(null)}
+              onBrowseCars={() => handleTabChange('browse')}
+              onFindMyCar={() => handleTabChange('find-car')}
+            />
+          </Suspense>
         )}
 
         {/* TAB: ADMIN COMMAND CENTER */}
         {currentTab === 'admin' && (
-          <AdminPanel
-            vehicles={vehicles}
-            setVehicles={setVehicles}
-            onCancel={() => handleTabChange('home')}
-          />
+          <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" /></div>}>
+            <AdminPanel
+              vehicles={vehicles}
+              setVehicles={setVehicles}
+              onCancel={() => handleTabChange('home')}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -499,10 +553,11 @@ export default function App() {
         onOpenConsultation={() => handleOpenConsultant(null)}
       />
 
-      {/* Vehicle Details Modal */}
+      {/* Vehicle Details Modal - Primary priority, rendered instantly */}
       <VehicleDetailsModal
         vehicle={selectedVehicle}
         isOpen={isDetailsOpen}
+        isLoading={isVehicleLoading}
         onClose={handleCloseDetails}
         onOpenQualifier={handleOpenQualifier}
         businessSettings={businessSettings}
@@ -516,21 +571,29 @@ export default function App() {
       />
 
       {/* 1-on-1 Consultant Modal */}
-      <ConsultantModal
-        isOpen={isConsultantOpen}
-        onClose={() => {
-          setIsConsultantOpen(false);
-          setConsultantVehicle(null);
-        }}
-        vehicle={consultantVehicle}
-      />
+      {isConsultantOpen && (
+        <Suspense fallback={null}>
+          <ConsultantModal
+            isOpen={isConsultantOpen}
+            onClose={() => {
+              setIsConsultantOpen(false);
+              setConsultantVehicle(null);
+            }}
+            vehicle={consultantVehicle}
+          />
+        </Suspense>
+      )}
 
       {/* Lead Qualifier Modal */}
-      <LeadQualifierModal
-        vehicle={qualifierVehicle}
-        isOpen={isQualifierOpen}
-        onClose={handleCloseQualifier}
-      />
+      {isQualifierOpen && (
+        <Suspense fallback={null}>
+          <LeadQualifierModal
+            vehicle={qualifierVehicle}
+            isOpen={isQualifierOpen}
+            onClose={handleCloseQualifier}
+          />
+        </Suspense>
+      )}
 
       {/* Floating Consultation Action (Subtle, non-intrusive, only on explore/browse tabs, never covers forms or modals) */}
       {!isDetailsOpen && !isConsultantOpen && !isQualifierOpen && (currentTab === 'home' || currentTab === 'browse') && (

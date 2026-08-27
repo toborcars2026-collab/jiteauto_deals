@@ -19,6 +19,7 @@ import {
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onOpenQualifier: (vehicle: Vehicle) => void;
   onOpenConsultantModal?: (vehicle: Vehicle, channel?: 'whatsapp' | 'call') => void;
@@ -28,6 +29,7 @@ interface VehicleDetailsModalProps {
 export default function VehicleDetailsModal({
   vehicle,
   isOpen,
+  isLoading = false,
   onClose,
   onOpenQualifier,
   onOpenConsultantModal,
@@ -41,6 +43,28 @@ export default function VehicleDetailsModal({
 
   const phoneDisplay = getBusinessPhoneDisplay(businessSettings);
   const phoneCallUrl = getBusinessPhoneCallUrl(businessSettings);
+
+  // Eagerly preload images as soon as vehicle is available
+  useEffect(() => {
+    if (vehicle?.images && vehicle.images.length > 0) {
+      // Preload primary image
+      const primaryUrl = getImageUrl(vehicle.images[0]);
+      const img0 = new Image();
+      img0.src = primaryUrl;
+
+      // Progressively preload secondary images in background after main image
+      const timer = setTimeout(() => {
+        vehicle.images.slice(1, 4).forEach((imgUrl) => {
+          if (imgUrl) {
+            const nextImg = new Image();
+            nextImg.src = getImageUrl(imgUrl);
+          }
+        });
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [vehicle]);
 
   // Layer 3 Navigation: Fullscreen Zoom Lightbox
   const handleOpenFullscreenZoom = () => {
@@ -140,7 +164,73 @@ export default function VehicleDetailsModal({
     };
   }, [isFullscreenZoom, isShareOpen, onClose]);
 
-  if (!isOpen || !vehicle) return null;
+  if (!isOpen) return null;
+
+  // Render high-fidelity skeleton if modal is opened while single vehicle data is arriving from Firestore
+  if (!vehicle || isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+        <div className="relative w-full max-w-4xl rounded-3xl bg-white text-slate-900 shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 bg-slate-50 gap-2 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                id="details_back_to_catalog_btn"
+                onClick={onClose}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 text-amber-400 rounded-xl text-xs font-bold shrink-0"
+              >
+                <ChevronLeft size={16} className="-ml-1" />
+                <span>Back to Jite Auto Deals</span>
+              </button>
+              <div className="hidden sm:block">
+                <div className="h-2.5 w-24 bg-slate-200 rounded animate-pulse mb-1" />
+                <div className="h-4 w-44 bg-slate-200 rounded animate-pulse" />
+              </div>
+            </div>
+            <button
+              id="details_close_btn"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-950 transition-all cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Body Skeleton */}
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8 animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-6 space-y-4">
+                <div className="aspect-[4/3] rounded-2xl bg-slate-200 relative overflow-hidden flex items-center justify-center">
+                  <Car className="text-slate-300 w-16 h-16 animate-pulse" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+                </div>
+                <div className="flex gap-2.5">
+                  <div className="h-14 w-20 rounded-lg bg-slate-200" />
+                  <div className="h-14 w-20 rounded-lg bg-slate-200" />
+                  <div className="h-14 w-20 rounded-lg bg-slate-200" />
+                </div>
+              </div>
+              <div className="lg:col-span-6 space-y-6">
+                <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-3">
+                  <div className="h-3 w-32 bg-slate-200 rounded" />
+                  <div className="h-8 w-48 bg-slate-200 rounded" />
+                  <div className="h-3 w-36 bg-slate-200 rounded" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 rounded-xl p-3 h-14" />
+                  <div className="bg-slate-50 rounded-xl p-3 h-14" />
+                  <div className="bg-slate-50 rounded-xl p-3 h-14" />
+                  <div className="bg-slate-50 rounded-xl p-3 h-14" />
+                </div>
+              </div>
+            </div>
+            <div className="h-28 bg-slate-100 rounded-2xl" />
+            <div className="h-24 bg-slate-900 rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Ensure unique image list
   const uniqueImages = Array.from(new Set(vehicle.images.filter(Boolean)));
@@ -277,6 +367,8 @@ export default function VehicleDetailsModal({
                     alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
                     className="w-full h-full object-cover transition-transform cursor-grab active:cursor-grabbing"
                     style={{ imageRendering: '-webkit-optimize-contrast' }}
+                    loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.2}
@@ -352,6 +444,8 @@ export default function VehicleDetailsModal({
                       <img
                         src={getImageUrl(img)}
                         alt="thumbnail"
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                         style={{ imageRendering: '-webkit-optimize-contrast' }}
                         onError={(e) => {

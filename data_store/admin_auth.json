@@ -1,0 +1,39 @@
+{
+  "admins": [
+    {
+      "id": "admin-1787841380549",
+      "email": "toborcars2026@gmail.com",
+      "salt": "795d3a675395078c505ef2aaaa7ea070",
+      "hash": "3c9e4822bc13df4689f3645249745a9f6f212b54ab86e55674c441515c0a4acc38720c4e6a144ac4412b8db3fa763c6f060dc1feab9128230aa2d2ac0f432123",
+      "role": "admin",
+      "createdAt": "2026-08-27T14:36:20.549Z",
+      "updatedAt": "2026-08-27T14:36:20.549Z"
+    }
+  ],
+  "sessions": [
+    {
+      "token": "70660e767e64de87dd530228b52ed2adb7147b9b27c2ebccf5f7237cffa6e925",
+      "email": "toborcars2026@gmail.com",
+      "createdAt": 1787841380549,
+      "expiresAt": 1790433380549
+    },
+    {
+      "token": "243b4ef0baaba1803a5ceef5e45c5a74916d1a5af619f2469074d9234bb9ddb5",
+      "email": "toborcars2026@gmail.com",
+      "createdAt": 1787841386986,
+      "expiresAt": 1790433386986
+    },
+    {
+      "token": "d366ab50cc993fa539badcf7ea724256be8d4b6c076d127e99b5b36e565395fd",
+      "email": "toborcars2026@gmail.com",
+      "createdAt": 1787841389167,
+      "expiresAt": 1790433389167
+    },
+    {
+      "token": "5b7d0973f696741b9fdc0d0deec5cc75d5d0f7cfe50f970958d5c67673c0fbd0",
+      "email": "toborcars2026@gmail.com",
+      "createdAt": 1787842101117,
+      "expiresAt": 1790434101117
+    }
+  ]
+}

@@ -24,16 +24,15 @@ import {
   CheckCircle2,
   UserPlus
 } from 'lucide-react';
-import {
-  User,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously,
-  sendPasswordResetEmail,
-  signOut
-} from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
+import {
+  authenticateAdmin,
+  setupFirstAdmin,
+  getAdminStatus,
+  requestPasswordReset,
+  logoutAdminSession
+} from '../services/adminAuth';
 import { Vehicle, Lead, Inquiry, BusinessSettings } from '../types';
 import logoImg from '../assets/images/jite_auto_deals_logo_1785026063050.jpg';
 import ShareVehicleModal from './ShareVehicleModal';
@@ -64,9 +63,10 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPanelProps) {
-  // Firebase Auth State
-  const [currentUser, setCurrentUser] = useState<User | null>(() => auth.currentUser);
+  // Authenticated Admin State - strictly starts as unauthenticated on every entry
+  const [currentUser, setCurrentUser] = useState<{ email: string | null } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isSystemInitialized, setIsSystemInitialized] = useState<boolean>(true);
 
   // Login Form States
   const [authMode, setAuthMode] = useState<'login' | 'forgot-password' | 'register'>('login');
@@ -92,17 +92,38 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [sharingVehicle, setSharingVehicle] = useState<Vehicle | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Listen to Firebase Auth state
+  // Enforce strict re-authentication on entry & clean up on leaving
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setIsAuthLoading(false);
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function initAuth() {
+      try {
+        const status = await getAdminStatus();
+        if (!isMounted) return;
+
+        setIsSystemInitialized(status.isInitialized);
+        if (!status.isInitialized) {
+          setAuthMode('register');
+        } else {
+          setAuthMode('login');
+        }
+      } catch (err) {
+        console.warn('[Admin Init Warning]:', err);
+      } finally {
+        if (isMounted) setIsAuthLoading(false);
+      }
+    }
+
+    initAuth();
+
+    // When the administrator leaves the Admin area (navigates away or unmounts), terminate session
+    return () => {
+      isMounted = false;
+      logoutAdminSession();
+    };
   }, []);
 
-  // Handle Firebase Sign In
+  // Handle Administrator Sign In
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
@@ -119,36 +140,16 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setIsSubmittingAuth(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setPasswordInput('');
-      setAuthError(null);
-    } catch (err: any) {
-      const code = err?.code || '';
-
-      if (code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') {
-        try {
-          const cred = await signInAnonymously(auth);
-          if (cred.user) {
-            setPasswordInput('');
-            setAuthError(null);
-            return;
-          }
-        } catch (anonErr) {
-          console.error('[Fallback Auth Error]:', anonErr);
-        }
-      }
-
-      console.error('[Firebase Auth Sign-In Error]:', code);
-
-      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setAuthError('Invalid administrator email or password. Please verify your credentials or use Forgot Password.');
-      } else if (code === 'auth/invalid-email') {
-        setAuthError('Please enter a valid email address.');
-      } else if (code === 'auth/too-many-requests') {
-        setAuthError('Access temporarily restricted due to repeated attempts. Please use Forgot Password to reset your password or try again in a few moments.');
+      const res = await authenticateAdmin(email, password);
+      if (res.success) {
+        setCurrentUser({ email: res.email || email });
+        setPasswordInput('');
+        setAuthError(null);
       } else {
-        setAuthError('Failed to authenticate. Please check your credentials and network connection.');
+        setAuthError(res.error || 'Invalid administrator email or password.');
       }
+    } catch (err: any) {
+      setAuthError('Failed to authenticate. Please check your credentials and connection.');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -169,13 +170,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setIsSubmittingAuth(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
-      // Generic confirmation message to avoid email enumeration
-      setAuthSuccessMessage('If an account exists for this email, a password reset email has been sent.');
+      const res = await requestPasswordReset(email);
+      setAuthSuccessMessage(res.message);
     } catch (err: any) {
-      console.error('[Firebase Auth Password Reset]:', err?.code);
-      // Consistent generic message for security
-      setAuthSuccessMessage('If an account exists for this email, a password reset email has been sent.');
+      setAuthSuccessMessage('If an account exists for this email, password reset instructions have been dispatched.');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -208,36 +206,18 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setIsSubmittingAuth(true);
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      setPasswordInput('');
-      setConfirmPasswordInput('');
-      setAuthError(null);
-    } catch (err: any) {
-      const code = err?.code || '';
-
-      if (code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') {
-        try {
-          const cred = await signInAnonymously(auth);
-          if (cred.user) {
-            setPasswordInput('');
-            setConfirmPasswordInput('');
-            setAuthError(null);
-            return;
-          }
-        } catch (anonErr) {
-          console.error('[Fallback Auth Error]:', anonErr);
-        }
-      }
-
-      console.error('[Firebase Auth Setup Error]:', code);
-
-      if (code === 'auth/email-already-in-use') {
-        setAuthError('An account with this email already exists. Please sign in or use "Forgot Password".');
-      } else if (code === 'auth/weak-password') {
-        setAuthError('Password is too weak. Please use at least 8 characters with numbers and letters.');
+      const res = await setupFirstAdmin(email, password);
+      if (res.success) {
+        setCurrentUser({ email: res.email || email });
+        setIsSystemInitialized(true);
+        setPasswordInput('');
+        setConfirmPasswordInput('');
+        setAuthError(null);
       } else {
-        setAuthError(err?.message || 'Failed to create administrator account. Please try again.');
+        setAuthError(res.error || 'Failed to create administrator account.');
       }
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to create administrator account. Please try again.');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -246,11 +226,17 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   // Handle Sign Out
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await logoutAdminSession();
+      setCurrentUser(null);
       setActiveTab('inventory');
       setAuthMode('login');
       setPasswordInput('');
       setConfirmPasswordInput('');
+      setAuthError(null);
+      setAuthSuccessMessage(null);
+      if (onCancel) {
+        onCancel();
+      }
     } catch (err) {
       console.error('[Sign Out Error]:', err);
     }
@@ -593,7 +579,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
               <button
                 type="submit"
                 disabled={isSubmittingAuth}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl shadow-lg transition-all active:scale-98 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3 rounded-xl shadow-lg transition-all active:scale-98 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
               >
                 {isSubmittingAuth ? (
                   <>
@@ -603,23 +589,25 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 ) : (
                   <>
                     <ShieldCheck size={16} />
-                    <span>Login</span>
+                    <span>LOGIN</span>
                   </>
                 )}
               </button>
 
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('register');
-                    setAuthError(null);
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-400 font-mono transition-colors cursor-pointer"
-                >
-                  First-time setup? <span className="text-amber-400 underline">Create Administrator Account</span>
-                </button>
-              </div>
+              {!isSystemInitialized && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('register');
+                      setAuthError(null);
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-400 font-mono transition-colors cursor-pointer"
+                  >
+                    First-time setup? <span className="text-amber-400 underline">Create Administrator Account</span>
+                  </button>
+                </div>
+              )}
             </form>
           )}
 
