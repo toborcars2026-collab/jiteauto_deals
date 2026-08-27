@@ -2,12 +2,14 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
 import { INITIAL_VEHICLES } from "./src/data";
 
 const app = express();
 const PORT = 3000;
 
+app.use(cookieParser());
 // Increase body limit to support high-res image uploads or base64 previews
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -20,40 +22,125 @@ const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 const INQUIRIES_FILE = path.join(DATA_DIR, "inquiries.json");
 const AUTH_FILE = path.join(DATA_DIR, "admin_auth.json");
 
-interface AdminAccount {
-  id: string;
-  email: string;
+interface MasterPasswordConfig {
   salt: string;
   hash: string;
-  role: 'admin';
-  createdAt: string;
   updatedAt: string;
 }
 
 interface AdminSession {
   token: string;
-  email: string;
   createdAt: number;
   expiresAt: number;
 }
 
 interface AuthStore {
-  admins: AdminAccount[];
+  passwordConfig: MasterPasswordConfig | null;
   sessions: AdminSession[];
+}
+
+// In-memory rate limiting for brute-force protection
+interface LoginAttempt {
+  count: number;
+  firstAttempt: number;
+  lockedUntil?: number;
+}
+const loginAttempts = new Map<string, LoginAttempt>();
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || "unknown-ip";
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; waitSeconds?: number } {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+  if (!attempt) return { allowed: true };
+
+  // If locked out
+  if (attempt.lockedUntil && now < attempt.lockedUntil) {
+    const waitSeconds = Math.ceil((attempt.lockedUntil - now) / 1000);
+    return { allowed: false, waitSeconds };
+  }
+
+  // Reset window if 5 minutes elapsed
+  if (now - attempt.firstAttempt > 5 * 60 * 1000) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+
+  if (attempt.count >= 5) {
+    attempt.lockedUntil = now + 5 * 60 * 1000; // 5 minutes lockout
+    const waitSeconds = 300;
+    return { allowed: false, waitSeconds };
+  }
+
+  return { allowed: true };
+}
+
+function recordFailedAttempt(ip: string) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip) || { count: 0, firstAttempt: now };
+  attempt.count += 1;
+  loginAttempts.set(ip, attempt);
+}
+
+function resetRateLimit(ip: string) {
+  loginAttempts.delete(ip);
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+}
+
+function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
+  if (!password || !salt || !expectedHash) return false;
+  const variants = [password, password.trim()];
+  for (const variant of variants) {
+    const computedHash = hashPassword(variant, salt);
+    const bufA = Buffer.from(computedHash, "hex");
+    const bufB = Buffer.from(expectedHash, "hex");
+    if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString("hex");
 }
 
 function readAuthStore(): AuthStore {
   ensureDataDir();
   if (!fs.existsSync(AUTH_FILE)) {
-    const initial: AuthStore = { admins: [], sessions: [] };
+    const initial: AuthStore = {
+      passwordConfig: null,
+      sessions: []
+    };
     fs.writeFileSync(AUTH_FILE, JSON.stringify(initial, null, 2), "utf-8");
     return initial;
   }
   try {
     const raw = fs.readFileSync(AUTH_FILE, "utf-8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (parsed.passwordConfig && (!parsed.passwordConfig.hash || !parsed.passwordConfig.salt)) {
+      parsed.passwordConfig = null;
+    }
+    if (!Array.isArray(parsed.sessions)) {
+      parsed.sessions = [];
+    }
+    return parsed;
   } catch (e) {
-    return { admins: [], sessions: [] };
+    const fallback: AuthStore = {
+      passwordConfig: null,
+      sessions: []
+    };
+    saveAuthStore(fallback);
+    return fallback;
   }
 }
 
@@ -62,20 +149,38 @@ function saveAuthStore(store: AuthStore) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(store, null, 2), "utf-8");
 }
 
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+function extractAdminToken(req: express.Request): string | null {
+  // 1. Check HttpOnly Cookie
+  if (req.cookies && req.cookies.jite_admin_session) {
+    return req.cookies.jite_admin_session;
+  }
+  // 2. Check Authorization Header (Bearer token)
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.substring(7).trim();
+  }
+  return null;
 }
 
-function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
-  const computedHash = hashPassword(password, salt);
-  const bufA = Buffer.from(computedHash, "hex");
-  const bufB = Buffer.from(expectedHash, "hex");
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+function validateAdminSession(req: express.Request): boolean {
+  const token = extractAdminToken(req);
+  if (!token) return false;
+  const store = readAuthStore();
+  const validSession = store.sessions.find(
+    (s) => s.token === token && s.expiresAt > Date.now()
+  );
+  return Boolean(validSession);
 }
 
-function generateToken(): string {
-  return crypto.randomBytes(32).toString("hex");
+// Server-side middleware to protect admin actions
+function requireAdminSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (validateAdminSession(req)) {
+    return next();
+  }
+  return res.status(401).json({
+    error: "Unauthorized. Please authenticate as administrator.",
+    code: "UNAUTHORIZED_ADMIN"
+  });
 }
 
 const KNOWN_DELETED_IDS = new Set<string>([
@@ -319,7 +424,7 @@ app.get("/api/vehicles", (req, res) => {
   res.json(vehicles);
 });
 
-app.post("/api/vehicles", (req, res) => {
+app.post("/api/vehicles", requireAdminSession, (req, res) => {
   const newVehicles = req.body;
   if (!Array.isArray(newVehicles)) {
     return res.status(400).json({ error: "Expected array of vehicles" });
@@ -328,7 +433,7 @@ app.post("/api/vehicles", (req, res) => {
   res.json({ success: true, count: saved.length, vehicles: saved });
 });
 
-app.delete("/api/vehicles/:id", (req, res) => {
+app.delete("/api/vehicles/:id", requireAdminSession, (req, res) => {
   const vehicleId = req.params.id;
   if (!vehicleId) {
     return res.status(400).json({ error: "Missing vehicle id" });
@@ -340,7 +445,7 @@ app.delete("/api/vehicles/:id", (req, res) => {
   res.json({ success: true, deletedId: vehicleId, remaining: filtered.length });
 });
 
-app.post("/api/vehicles/delete", (req, res) => {
+app.post("/api/vehicles/delete", requireAdminSession, (req, res) => {
   const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ error: "Missing vehicle id" });
@@ -352,7 +457,7 @@ app.post("/api/vehicles/delete", (req, res) => {
   res.json({ success: true, deletedId: id, remaining: filtered.length });
 });
 
-app.post("/api/vehicles/reset", (req, res) => {
+app.post("/api/vehicles/reset", requireAdminSession, (req, res) => {
   saveVehiclesStore(INITIAL_VEHICLES);
   res.json({ success: true, vehicles: INITIAL_VEHICLES });
 });
@@ -383,190 +488,251 @@ app.post("/api/inquiries", (req, res) => {
   res.json({ success: true });
 });
 
-// Admin Authentication Endpoints
+// Admin Authentication Endpoints (Server-Side First-Time Setup & Password Auth)
 app.get("/api/admin/auth/status", (req, res) => {
   const store = readAuthStore();
-  const isInitialized = store.admins.length > 0;
-  const adminEmail = isInitialized ? store.admins[0].email : null;
-  res.json({ isInitialized, adminEmail });
+  const isSetup = Boolean(store.passwordConfig && store.passwordConfig.hash && store.passwordConfig.salt);
+  res.json({
+    isSetup,
+    mode: "password_only"
+  });
 });
 
 app.post("/api/admin/auth/setup", (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
-    return res.status(400).json({ error: "Email and password are required" });
+  const store = readAuthStore();
+  // Prevent overriding if already set up
+  if (store.passwordConfig && store.passwordConfig.hash && store.passwordConfig.salt) {
+    return res.status(400).json({
+      success: false,
+      error: "Administrator password has already been configured. Please log in."
+    });
   }
 
-  const cleanEmail = email.trim().toLowerCase();
-  if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
-    return res.status(400).json({ error: "Please enter a valid email address" });
+  const { password, confirmPassword } = req.body || {};
+  if (!password || typeof password !== "string") {
+    return res.status(400).json({
+      success: false,
+      error: "Administrator password is required."
+    });
   }
 
   if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters long" });
+    return res.status(400).json({
+      success: false,
+      error: "Password must be at least 8 characters long."
+    });
   }
 
-  const store = readAuthStore();
-  if (store.admins.length > 0) {
-    return res.status(400).json({ error: "Administrator account already exists. Please log in." });
+  if (confirmPassword && password !== confirmPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "Passwords do not match."
+    });
   }
 
+  // Create salt & hash
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = hashPassword(password, salt);
-  const newAdmin: AdminAccount = {
-    id: "admin-" + Date.now(),
-    email: cleanEmail,
+
+  store.passwordConfig = {
     salt,
     hash,
-    role: "admin",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
+  // Automatically log in administrator upon first-time setup
   const token = generateToken();
   const session: AdminSession = {
     token,
-    email: cleanEmail,
     createdAt: Date.now(),
-    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
   };
 
-  store.admins.push(newAdmin);
-  store.sessions.push(session);
+  store.sessions = [session];
   saveAuthStore(store);
 
-  res.json({
+  // Set secure HttpOnly cookie
+  res.cookie("jite_admin_session", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/"
+  });
+
+  return res.json({
     success: true,
     token,
-    user: { email: cleanEmail, role: "admin" },
+    role: "admin",
+    message: "Administrator password configured successfully."
   });
 });
 
 app.post("/api/admin/auth/login", (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const store = readAuthStore();
-
-  // If no admin exists yet, prompt first-time setup
-  if (store.admins.length === 0) {
-    return res.status(404).json({
-      error: "No administrator account found. Please initialize the first administrator account.",
-      code: "NO_ADMIN_EXISTS"
+  const clientIp = getClientIp(req);
+  const rateCheck = checkRateLimit(clientIp);
+  if (!rateCheck.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: `Too many failed login attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
+      code: "RATE_LIMITED"
     });
   }
 
-  const admin = store.admins.find((a) => a.email.toLowerCase() === cleanEmail);
-  if (!admin) {
-    return res.status(401).json({ error: "Invalid administrator email or password." });
+  const { password } = req.body || {};
+  if (!password || typeof password !== "string") {
+    recordFailedAttempt(clientIp);
+    return res.status(400).json({
+      success: false,
+      error: "Please enter the administrator password."
+    });
   }
 
-  const isValid = verifyPassword(password, admin.salt, admin.hash);
-  if (!isValid) {
-    return res.status(401).json({ error: "Invalid administrator email or password." });
+  const store = readAuthStore();
+  const config = store.passwordConfig;
+
+  // If no password configured yet, inform client to proceed to setup
+  if (!config || !config.hash || !config.salt) {
+    return res.status(400).json({
+      success: false,
+      needsSetup: true,
+      error: "Administrator password has not been configured yet. Please complete initial setup."
+    });
   }
+
+  // Check stored hash
+  const isValid = verifyPassword(password, config.salt, config.hash);
+
+  if (!isValid) {
+    recordFailedAttempt(clientIp);
+    return res.status(401).json({
+      success: false,
+      error: "Incorrect administrator password. Please try again."
+    });
+  }
+
+  // Password verified successfully
+  resetRateLimit(clientIp);
 
   const token = generateToken();
   const session: AdminSession = {
     token,
-    email: admin.email,
     createdAt: Date.now(),
-    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
   };
 
-  // Keep latest 20 active sessions
-  store.sessions = store.sessions.filter((s) => s.expiresAt > Date.now()).slice(-20);
+  // Keep latest 25 sessions
+  store.sessions = store.sessions.filter((s) => s.expiresAt > Date.now()).slice(-24);
   store.sessions.push(session);
   saveAuthStore(store);
 
-  res.json({
+  // Set secure HttpOnly cookie
+  res.cookie("jite_admin_session", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/"
+  });
+
+  return res.json({
     success: true,
     token,
-    user: { email: admin.email, role: "admin" },
+    role: "admin"
   });
 });
 
 app.get("/api/admin/auth/verify", (req, res) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
-  if (!token) {
-    return res.status(401).json({ valid: false, error: "Missing authorization token" });
+  const isValid = validateAdminSession(req);
+  if (!isValid) {
+    return res.status(401).json({
+      authenticated: false,
+      error: "Session expired or unauthenticated."
+    });
   }
 
-  const store = readAuthStore();
-  const session = store.sessions.find((s) => s.token === token && s.expiresAt > Date.now());
-  if (!session) {
-    return res.status(401).json({ valid: false, error: "Invalid or expired session" });
-  }
-
-  res.json({
-    valid: true,
-    user: { email: session.email, role: "admin" },
+  return res.json({
+    authenticated: true,
+    role: "admin"
   });
 });
 
-app.post("/api/admin/auth/change-password", (req, res) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
-  if (!token) {
-    return res.status(401).json({ error: "Missing authorization token" });
+app.post("/api/admin/auth/change-password", requireAdminSession, (req, res) => {
+  const { currentPassword, oldPassword, newPassword, confirmPassword } = req.body || {};
+  const passwordToCheck = currentPassword || oldPassword;
+
+  if (!passwordToCheck || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "Both current password and new password are required."
+    });
+  }
+
+  if (typeof newPassword !== "string" || newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: "New password must be at least 8 characters long."
+    });
+  }
+
+  if (confirmPassword && newPassword !== confirmPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "New password and confirmation do not match."
+    });
   }
 
   const store = readAuthStore();
-  const session = store.sessions.find((s) => s.token === token && s.expiresAt > Date.now());
-  if (!session) {
-    return res.status(401).json({ error: "Invalid or expired session" });
+  if (!store.passwordConfig || !store.passwordConfig.hash || !store.passwordConfig.salt) {
+    return res.status(400).json({
+      success: false,
+      error: "No administrator password configured."
+    });
   }
 
-  const { oldPassword, newPassword } = req.body || {};
-  if (!oldPassword || !newPassword) {
-    return res.status(400).json({ error: "Both current password and new password are required" });
-  }
-
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: "New password must be at least 8 characters long" });
-  }
-
-  const admin = store.admins.find((a) => a.email.toLowerCase() === session.email.toLowerCase());
-  if (!admin) {
-    return res.status(404).json({ error: "Administrator account not found" });
-  }
-
-  const isValid = verifyPassword(oldPassword, admin.salt, admin.hash);
+  const isValid = verifyPassword(passwordToCheck, store.passwordConfig.salt, store.passwordConfig.hash);
   if (!isValid) {
-    return res.status(400).json({ error: "Incorrect current password. Please verify and try again." });
+    return res.status(400).json({
+      success: false,
+      error: "Incorrect current password. Please verify and try again."
+    });
   }
 
+  if (passwordToCheck === newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "New password must be different from your current password."
+    });
+  }
+
+  // Generate new cryptographic salt and hash
   const newSalt = crypto.randomBytes(16).toString("hex");
   const newHash = hashPassword(newPassword, newSalt);
-  admin.salt = newSalt;
-  admin.hash = newHash;
-  admin.updatedAt = new Date().toISOString();
+
+  store.passwordConfig = {
+    salt: newSalt,
+    hash: newHash,
+    updatedAt: new Date().toISOString()
+  };
 
   saveAuthStore(store);
-  res.json({ success: true, message: "Password updated successfully" });
-});
 
-app.post("/api/admin/auth/forgot-password", (req, res) => {
-  // Always return generic confirmation to protect against email enumeration
-  res.json({
+  return res.json({
     success: true,
-    message: "If an administrator account matches this email, password reset instructions have been dispatched."
+    message: "Administrator password changed successfully."
   });
 });
 
 app.post("/api/admin/auth/logout", (req, res) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+  const token = extractAdminToken(req);
   if (token) {
     const store = readAuthStore();
     store.sessions = store.sessions.filter((s) => s.token !== token);
     saveAuthStore(store);
   }
-  res.json({ success: true });
+
+  res.clearCookie("jite_admin_session", { path: "/" });
+  return res.json({ success: true });
 });
 
 function getSlug(v: any) {

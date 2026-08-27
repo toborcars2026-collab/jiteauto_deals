@@ -14,7 +14,6 @@ import {
   ShieldCheck,
   Lock
 } from 'lucide-react';
-import { User } from 'firebase/auth';
 import { BusinessSettings } from '../../types';
 import {
   getBusinessSettings,

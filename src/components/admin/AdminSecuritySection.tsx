@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   ShieldCheck,
   KeyRound,
-  Mail,
   Lock,
   Eye,
   EyeOff,
@@ -14,16 +13,15 @@ import {
 } from 'lucide-react';
 import {
   changeAdminPassword,
-  requestPasswordReset,
   logoutAdminSession
 } from '../../services/adminAuth';
 
 interface AdminSecuritySectionProps {
-  currentUser: { email: string | null } | null;
+  currentUser?: { email?: string | null; role?: string } | null;
   onSignOut?: () => void;
 }
 
-export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSecuritySectionProps) {
+export default function AdminSecuritySection({ onSignOut }: AdminSecuritySectionProps) {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -36,8 +34,6 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const userEmail = currentUser?.email || 'admin@jiteautodeals.com';
 
   const resetForm = () => {
     setCurrentPassword('');
@@ -56,7 +52,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
 
     // 1. Basic validation
     if (!currentPassword) {
-      setErrorMessage('Please enter your current password.');
+      setErrorMessage('Please enter your current administrator password.');
       return;
     }
 
@@ -66,7 +62,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
     }
 
     if (newPassword !== confirmPassword) {
-      setErrorMessage('New password and confirmation do not match.');
+      setErrorMessage('New password and confirmation password do not match.');
       return;
     }
 
@@ -80,7 +76,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
     try {
       const res = await changeAdminPassword(currentPassword, newPassword);
       if (res.success) {
-        setSuccessMessage('Password changed successfully.');
+        setSuccessMessage('Administrator password changed successfully.');
         resetForm();
         setTimeout(() => setSuccessMessage(null), 6000);
       } else {
@@ -104,26 +100,6 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
     }
   };
 
-  const [isSendingReset, setIsSendingReset] = useState(false);
-
-  const handleSendResetEmail = async () => {
-    if (!userEmail) return;
-    setIsSendingReset(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await requestPasswordReset(userEmail);
-      setSuccessMessage(res.message || `Password reset link sent to ${userEmail}. Check your inbox to set a new password.`);
-      setTimeout(() => setSuccessMessage(null), 8000);
-    } catch (err: any) {
-      console.error('[Send Password Reset Email Error]:', err);
-      setErrorMessage(err?.message || 'Failed to send password reset email. Please try again.');
-    } finally {
-      setIsSendingReset(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -134,7 +110,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
             <span>SECURITY</span>
           </h2>
           <p className="text-slate-500 text-xs mt-1">
-            Manage your administrator credentials and account security through Firebase Authentication.
+            Manage your administrator password and command center access security.
           </p>
         </div>
 
@@ -166,31 +142,31 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
 
       {/* Main Security Card */}
       <div className="bg-slate-50/70 p-6 sm:p-8 rounded-3xl border border-slate-200/80 space-y-6">
-        {/* Admin Account Section */}
+        {/* Administrator Role Status */}
         <div className="space-y-2">
           <label className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold block">
-            Admin Account
+            Access Level
           </label>
           <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
-              <Mail size={16} />
+              <Lock size={16} />
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-sm font-semibold text-slate-900 truncate block font-mono">
-                {userEmail}
+                Administrator
               </span>
               <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                Verified Firebase Administrator
+                Verified Server-Side Session Active
               </span>
             </div>
           </div>
         </div>
 
-        {/* Password Section */}
+        {/* Password Management */}
         <div className="space-y-2 pt-2 border-t border-slate-200/60">
           <label className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold block">
-            Password
+            Administrator Password
           </label>
           
           {!isChangingPassword ? (
@@ -204,43 +180,23 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
                     ••••••••••••
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Encrypted and securely handled by Firebase Authentication
+                    Encrypted with PBKDF2 & cryptographic salt on the server
                   </span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSendResetEmail}
-                  disabled={isSendingReset}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-all cursor-pointer border border-slate-200 shrink-0 disabled:opacity-50"
-                >
-                  {isSendingReset ? (
-                    <>
-                      <RefreshCw size={13} className="animate-spin text-amber-500" />
-                      <span>Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mail size={13} className="text-amber-500" />
-                      <span>Send Reset Email</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                    setIsChangingPassword(true);
-                  }}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-sm shrink-0"
-                >
-                  <KeyRound size={14} className="text-amber-400" />
-                  <span>Change Password</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                  setIsChangingPassword(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-sm shrink-0"
+              >
+                <KeyRound size={14} className="text-amber-400" />
+                <span>Change Password</span>
+              </button>
             </div>
           ) : (
             /* Change Password Form */
@@ -248,9 +204,9 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-900 flex items-center gap-2">
                   <KeyRound size={15} className="text-amber-500" />
-                  <span>Update Admin Password</span>
+                  <span>Update Administrator Password</span>
                 </h4>
-                <span className="text-[11px] text-slate-400 font-mono">Firebase Reauthentication</span>
+                <span className="text-[11px] text-slate-400 font-mono">Server Cryptographic Update</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -333,7 +289,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-start gap-2 text-[11px] text-slate-600">
                 <Info size={14} className="text-amber-500 mt-0.5 shrink-0" />
                 <span>
-                  <strong>Password Policy:</strong> Minimum 8 characters. For maximum security, use a combination of uppercase letters, lowercase letters, numbers, and symbols.
+                  <strong>Password Policy:</strong> Minimum 8 characters. The password is hashed server-side using SHA-512 with 100,000 PBKDF2 iterations and never stored in plaintext.
                 </span>
               </div>
 
@@ -360,7 +316,7 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
                   ) : (
                     <>
                       <ShieldCheck size={14} />
-                      <span>Change Password</span>
+                      <span>Update Password</span>
                     </>
                   )}
                 </button>
@@ -374,10 +330,10 @@ export default function AdminSecuritySection({ currentUser, onSignOut }: AdminSe
           <div className="space-y-1">
             <h4 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider flex items-center gap-2">
               <ShieldCheck size={15} className="text-amber-500" />
-              <span>Account Security</span>
+              <span>Server-Side Authentication Security</span>
             </h4>
             <p className="text-xs text-slate-600 font-light">
-              Your administrator account is protected by Firebase Authentication. Passwords are encrypted with industry-standard cryptographic salts and are never stored in plaintext or database documents.
+              Your administrator command center is protected with server-side authentication, rate limiting, and HttpOnly cookies. Passwords are never sent to third parties or embedded in frontend code.
             </p>
           </div>
 

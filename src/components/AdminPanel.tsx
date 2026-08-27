@@ -8,33 +8,29 @@ import {
   Building2,
   Phone,
   Lock,
-  ShieldCheck,
   ShieldAlert,
+  ShieldCheck,
   Eye,
   EyeOff,
   KeyRound,
-  Mail,
   LogOut,
   ChevronDown,
   ChevronUp,
   BarChart3,
   RotateCcw,
   RefreshCw,
-  ArrowLeft,
+  ArrowRight,
   CheckCircle2,
-  UserPlus
+  Sparkles
 } from 'lucide-react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebase';
 import {
   authenticateAdmin,
-  setupFirstAdmin,
-  getAdminStatus,
-  requestPasswordReset,
-  logoutAdminSession
+  verifyAdminSession,
+  logoutAdminSession,
+  checkAdminAuthStatus,
+  setupFirstTimeAdmin
 } from '../services/adminAuth';
 import { Vehicle, Lead, Inquiry, BusinessSettings } from '../types';
-import logoImg from '../assets/images/jite_auto_deals_logo_1785026063050.jpg';
 import ShareVehicleModal from './ShareVehicleModal';
 import AdminInventoryTab from './admin/AdminInventoryTab';
 import AdminSlideshowTab from './admin/AdminSlideshowTab';
@@ -63,20 +59,22 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPanelProps) {
-  // Authenticated Admin State - strictly starts as unauthenticated on every entry
-  const [currentUser, setCurrentUser] = useState<{ email: string | null } | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-  const [isSystemInitialized, setIsSystemInitialized] = useState<boolean>(true);
+  // Authenticated state - starts unauthenticated
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isVerifyingSession, setIsVerifyingSession] = useState<boolean>(true);
+  const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(true);
 
-  // Login Form States
-  const [authMode, setAuthMode] = useState<'login' | 'forgot-password' | 'register'>('login');
-  const [emailInput, setEmailInput] = useState('');
+  // Setup Form State
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+  const [showSetupPassword, setShowSetupPassword] = useState(false);
+  const [showSetupConfirmPassword, setShowSetupConfirmPassword] = useState(false);
+
+  // Simple Password Login Form
   const [passwordInput, setPasswordInput] = useState('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(null);
 
   // Dashboard Tabs & Data
   const [activeTab, setActiveTab] = useState<'inventory' | 'slideshow' | 'add-car' | 'leads' | 'inquiries' | 'settings'>('inventory');
@@ -92,138 +90,108 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [sharingVehicle, setSharingVehicle] = useState<Vehicle | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Enforce strict re-authentication on entry & clean up on leaving
+  // Quick initial check to see if an active session exists and if setup has been done
   useEffect(() => {
     let isMounted = true;
 
-    async function initAuth() {
+    async function checkAuthAndSession() {
       try {
-        const status = await getAdminStatus();
-        if (!isMounted) return;
+        const [validSession, status] = await Promise.all([
+          verifyAdminSession(),
+          checkAdminAuthStatus()
+        ]);
 
-        setIsSystemInitialized(status.isInitialized);
-        if (!status.isInitialized) {
-          setAuthMode('register');
-        } else {
-          setAuthMode('login');
+        if (isMounted) {
+          setIsSetupCompleted(status.isSetup);
+          if (validSession) {
+            setIsAuthenticated(true);
+          }
         }
       } catch (err) {
-        console.warn('[Admin Init Warning]:', err);
+        // Fall back to login/setup screen
       } finally {
-        if (isMounted) setIsAuthLoading(false);
+        if (isMounted) {
+          setIsVerifyingSession(false);
+        }
       }
     }
 
-    initAuth();
+    checkAuthAndSession();
 
-    // When the administrator leaves the Admin area (navigates away or unmounts), terminate session
     return () => {
       isMounted = false;
-      logoutAdminSession();
     };
   }, []);
 
-  // Handle Administrator Sign In
-  const handleSignIn = async (e: React.FormEvent) => {
+  // Handle First-Time Administrator Password Setup
+  const handleFirstTimeSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    setAuthSuccessMessage(null);
 
-    const email = emailInput.trim();
-    const password = passwordInput;
-
-    if (!email || !password) {
-      setAuthError('Please enter both your administrator email and password.');
+    if (!setupPassword) {
+      setAuthError('Please enter an administrator password.');
       return;
     }
 
-    setIsSubmittingAuth(true);
-
-    try {
-      const res = await authenticateAdmin(email, password);
-      if (res.success) {
-        setCurrentUser({ email: res.email || email });
-        setPasswordInput('');
-        setAuthError(null);
-      } else {
-        setAuthError(res.error || 'Invalid administrator email or password.');
-      }
-    } catch (err: any) {
-      setAuthError('Failed to authenticate. Please check your credentials and connection.');
-    } finally {
-      setIsSubmittingAuth(false);
-    }
-  };
-
-  // Handle Password Reset (Forgot Password)
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthSuccessMessage(null);
-
-    const email = emailInput.trim();
-    if (!email) {
-      setAuthError('Please enter the administrator email address to receive reset instructions.');
-      return;
-    }
-
-    setIsSubmittingAuth(true);
-
-    try {
-      const res = await requestPasswordReset(email);
-      if (res.success) {
-        setAuthSuccessMessage(res.message);
-      } else {
-        setAuthError(res.error || 'Failed to send password reset email. Please try again.');
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Failed to dispatch reset email. Please try again.');
-    } finally {
-      setIsSubmittingAuth(false);
-    }
-  };
-
-  // Handle Initial Admin Registration (Setup)
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthSuccessMessage(null);
-
-    const email = emailInput.trim();
-    const password = passwordInput;
-
-    if (!email || !password) {
-      setAuthError('Please fill in all required fields.');
-      return;
-    }
-
-    if (password.length < 8) {
+    if (setupPassword.length < 8) {
       setAuthError('Password must be at least 8 characters long.');
       return;
     }
 
-    if (password !== confirmPasswordInput) {
-      setAuthError('Passwords do not match. Please verify your confirmation password.');
+    if (setupPassword !== setupConfirmPassword) {
+      setAuthError('Passwords do not match. Please re-enter.');
       return;
     }
 
-    setIsSubmittingAuth(true);
+    setIsSubmitting(true);
 
     try {
-      const res = await setupFirstAdmin(email, password);
+      const res = await setupFirstTimeAdmin(setupPassword, setupConfirmPassword);
       if (res.success) {
-        setCurrentUser({ email: res.email || email });
-        setIsSystemInitialized(true);
-        setPasswordInput('');
-        setConfirmPasswordInput('');
+        setIsSetupCompleted(true);
+        setIsAuthenticated(true);
+        setSetupPassword('');
+        setSetupConfirmPassword('');
         setAuthError(null);
       } else {
-        setAuthError(res.error || 'Failed to create administrator account.');
+        setAuthError(res.error || 'Failed to setup administrator password.');
       }
     } catch (err: any) {
-      setAuthError(err?.message || 'Failed to create administrator account. Please try again.');
+      setAuthError('Failed to connect to authentication server. Please try again.');
     } finally {
-      setIsSubmittingAuth(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Simple Password Administrator Sign In
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    const password = passwordInput;
+    if (!password) {
+      setAuthError('Please enter the administrator password.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const res = await authenticateAdmin(password);
+      if (res.success) {
+        setIsAuthenticated(true);
+        setPasswordInput('');
+        setAuthError(null);
+      } else if (res.needsSetup) {
+        setIsSetupCompleted(false);
+        setAuthError('First-time setup is required. Please set your password.');
+      } else {
+        setAuthError(res.error || 'Incorrect administrator password.');
+      }
+    } catch (err: any) {
+      setAuthError('Failed to connect to authentication server. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -231,13 +199,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const handleSignOut = async () => {
     try {
       await logoutAdminSession();
-      setCurrentUser(null);
+      setIsAuthenticated(false);
       setActiveTab('inventory');
-      setAuthMode('login');
       setPasswordInput('');
-      setConfirmPasswordInput('');
       setAuthError(null);
-      setAuthSuccessMessage(null);
       if (onCancel) {
         onCancel();
       }
@@ -248,7 +213,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   // Real-time synchronization for Leads, Inquiries, Vehicles, and Settings
   useEffect(() => {
-    if (!currentUser) return;
+    if (!isAuthenticated) return;
 
     fetchLeads().then((l) => setLeads(l));
     fetchInquiries().then((i) => setInquiries(i));
@@ -276,7 +241,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       unsubVehicles();
       unsubSettings();
     };
-  }, [currentUser]);
+  }, [isAuthenticated]);
 
   // Handle Start Edit Vehicle
   const handleStartEdit = (car: Vehicle) => {
@@ -308,20 +273,158 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     }
   };
 
-  // Loading state while checking Firebase Auth session
-  if (isAuthLoading) {
+  // Initial fast check state
+  if (isVerifyingSession) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6 bg-slate-900 text-white">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw size={28} className="animate-spin text-amber-400" />
-          <span className="text-xs font-mono text-slate-400">Verifying administrator session...</span>
+          <span className="text-xs font-mono text-slate-400">Loading Administrator Command Center...</span>
         </div>
       </div>
     );
   }
 
-  // Unauthenticated Admin Login / Forgot Password Screen
-  if (!currentUser) {
+  // First-Time Setup Screen or Password-Only Login Screen
+  if (!isAuthenticated) {
+    if (!isSetupCompleted) {
+      return (
+        <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-900 text-white">
+          <div className="w-full max-w-md bg-slate-950 border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-2 shadow-inner">
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold font-display tracking-tight text-white">
+                  Jite Auto Deals
+                </h2>
+                <p className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold mt-1">
+                  FIRST-TIME ADMINISTRATOR SETUP
+                </p>
+                <p className="text-xs text-slate-400 mt-1 font-sans">
+                  Create your master password to secure and access the command center.
+                </p>
+              </div>
+            </div>
+
+            {/* Error Banner */}
+            {authError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+                <ShieldAlert size={16} className="shrink-0 text-rose-400" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            {/* First-Time Setup Form */}
+            <form onSubmit={handleFirstTimeSetup} className="space-y-4 animate-fadeIn">
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                  Administrator Password
+                </label>
+                <div className="relative">
+                  <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type={showSetupPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    minLength={8}
+                    placeholder="Create Admin Password (min 8 chars)"
+                    value={setupPassword}
+                    onChange={(e) => {
+                      setSetupPassword(e.target.value);
+                      if (authError) setAuthError(null);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupPassword(!showSetupPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                    title={showSetupPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showSetupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                  Confirm Administrator Password
+                </label>
+                <div className="relative">
+                  <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type={showSetupConfirmPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    placeholder="Confirm Admin Password"
+                    value={setupConfirmPassword}
+                    onChange={(e) => {
+                      setSetupConfirmPassword(e.target.value);
+                      if (authError) setAuthError(null);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupConfirmPassword(!showSetupConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                    title={showSetupConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showSetupConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                  <Sparkles size={13} />
+                  <span>Zero-Cloud Plaintext Security</span>
+                </div>
+                <p>
+                  Your password is cryptographically salted & hashed (100,000 PBKDF2 iterations) strictly on the server and is never stored in plaintext or exposed to browsers.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Configuring Password...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>COMPLETE SETUP & ENTER ADMIN</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-full text-xs text-slate-500 hover:text-slate-400 font-mono text-center pt-2 cursor-pointer"
+              >
+                Return to Website
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-900 text-white">
         <div className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden">
@@ -329,31 +432,20 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2 shadow-inner">
               <Lock size={26} />
             </div>
             <div>
               <h2 className="text-2xl font-bold font-display tracking-tight text-white">
                 Jite Auto Deals
               </h2>
-              <p className="text-xs uppercase tracking-widest text-slate-400 font-mono mt-0.5">
-                {authMode === 'forgot-password'
-                  ? 'Reset Password'
-                  : authMode === 'register'
-                  ? 'First-Time Administrator Setup'
-                  : 'Administrator Login'}
+              <p className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold mt-1">
+                ADMINISTRATOR LOGIN
               </p>
             </div>
           </div>
 
-          {/* Feedback Banners */}
-          {authSuccessMessage && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono flex items-center gap-2.5 animate-fadeIn">
-              <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
-              <span>{authSuccessMessage}</span>
-            </div>
-          )}
-
+          {/* Error Banner */}
           {authError && (
             <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center gap-2 animate-fadeIn">
               <ShieldAlert size={16} className="shrink-0 text-rose-400" />
@@ -361,259 +453,55 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
             </div>
           )}
 
-          {/* FORGOT PASSWORD FORM */}
-          {authMode === 'forgot-password' && (
-            <form onSubmit={handleForgotPassword} className="space-y-4 animate-fadeIn">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    placeholder="Enter email"
-                    value={emailInput}
-                    onChange={(e) => {
-                      setEmailInput(e.target.value);
-                      if (authError) setAuthError(null);
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 font-mono mt-1">
-                  Enter your administrator email to receive secure password reset instructions.
-                </p>
+          {/* Password Login Form */}
+          <form onSubmit={handlePasswordLogin} className="space-y-4 animate-fadeIn">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                Password
+              </label>
+              <div className="relative">
+                <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoFocus
+                  placeholder="Enter Admin Password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (authError) setAuthError(null);
+                  }}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={isSubmittingAuth}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl shadow-lg transition-all active:scale-98 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isSubmittingAuth ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Sending Reset Link...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mail size={16} />
-                    <span>Send Reset Email</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('login');
-                  setAuthError(null);
-                  setAuthSuccessMessage(null);
-                }}
-                className="w-full text-xs text-slate-400 hover:text-slate-200 font-mono flex items-center justify-center gap-1 pt-2 transition-colors cursor-pointer"
-              >
-                <ArrowLeft size={13} />
-                <span>Back to Administrator Login</span>
-              </button>
-            </form>
-          )}
-
-          {/* INITIAL ADMIN SETUP FORM */}
-          {authMode === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4 animate-fadeIn">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                  Email *
-                </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="Enter email"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                  Password (min 8 characters) *
-                </label>
-                <div className="relative">
-                  <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    placeholder="Enter password"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                  Confirm Password *
-                </label>
-                <div className="relative">
-                  <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    placeholder="Confirm password"
-                    value={confirmPasswordInput}
-                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingAuth}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl shadow-lg transition-all active:scale-98 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isSubmittingAuth ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Creating Administrator Account...</span>
-                  </>
-                ) : (
-                  <>
-                    <UserPlus size={16} />
-                    <span>Create Administrator Account</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('login');
-                  setAuthError(null);
-                }}
-                className="w-full text-xs text-slate-400 hover:text-slate-200 font-mono flex items-center justify-center gap-1 pt-2 transition-colors cursor-pointer"
-              >
-                <ArrowLeft size={13} />
-                <span>Existing Administrator? Login</span>
-              </button>
-            </form>
-          )}
-
-          {/* STANDARD SIGN IN FORM */}
-          {authMode === 'login' && (
-            <form onSubmit={handleSignIn} className="space-y-4 animate-fadeIn">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    placeholder="Enter email"
-                    value={emailInput}
-                    onChange={(e) => {
-                      setEmailInput(e.target.value);
-                      if (authError) setAuthError(null);
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode('forgot-password');
-                      setAuthError(null);
-                      setAuthSuccessMessage(null);
-                    }}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 font-mono transition-colors cursor-pointer"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Enter password"
-                    value={passwordInput}
-                    onChange={(e) => {
-                      setPasswordInput(e.target.value);
-                      if (authError) setAuthError(null);
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingAuth}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3 rounded-xl shadow-lg transition-all active:scale-98 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
-              >
-                {isSubmittingAuth ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Signing in...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck size={16} />
-                    <span>LOGIN</span>
-                  </>
-                )}
-              </button>
-
-              {!isSystemInitialized && (
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode('register');
-                      setAuthError(null);
-                    }}
-                    className="text-xs text-slate-500 hover:text-slate-400 font-mono transition-colors cursor-pointer"
-                  >
-                    First-time setup? <span className="text-amber-400 underline">Create Administrator Account</span>
-                  </button>
-                </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <span>ENTER ADMIN COMMAND CENTER</span>
+                  <ArrowRight size={16} />
+                </>
               )}
-            </form>
-          )}
+            </button>
+          </form>
 
           {onCancel && (
             <button
@@ -651,15 +539,15 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-bold font-display text-white">
-                  Operational Control Center
+                  Admin Command Center
                 </h1>
                 <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
                   ● Firestore Live Sync
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2 flex-wrap">
-                <span>Authenticated Admin:</span>
-                <span className="text-amber-400 font-bold">{currentUser.email || 'Admin'}</span>
+                <span>Access Level:</span>
+                <span className="text-amber-400 font-bold">Master Administrator</span>
               </p>
             </div>
           </div>
@@ -689,7 +577,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
               type="button"
               onClick={handleSignOut}
               className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 text-xs font-mono flex items-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
-              title="Sign Out of Firebase Admin"
+              title="Sign Out of Admin Command Center"
             >
               <LogOut size={13} className="text-rose-400" />
               <span>Sign Out</span>
@@ -894,7 +782,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
           {activeTab === 'settings' && (
             <AdminSettingsTab
-              currentUser={currentUser}
+              currentUser={{ email: 'Administrator' }}
               onSignOut={handleSignOut}
               onSettingsSaved={(updated) => {
                 setBusinessSettings(updated);
@@ -916,4 +804,3 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     </div>
   );
 }
-

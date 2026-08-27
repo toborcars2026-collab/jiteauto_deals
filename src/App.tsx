@@ -52,7 +52,6 @@ const AboutPage = lazy(() => import('./components/AboutPage'));
 const ConsultantModal = lazy(() => import('./components/ConsultantModal'));
 const LeadQualifierModal = lazy(() => import('./components/LeadQualifierModal'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
-const ResetPasswordModal = lazy(() => import('./components/ResetPasswordModal').then(m => ({ default: m.ResetPasswordModal })));
 
 export interface AppHistoryState {
   tab: NavigationTab;
@@ -78,18 +77,6 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('home');
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => initialVehiclesList);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => getBusinessSettings());
-
-  // Password reset action code from email link
-  const [resetPasswordCode, setResetPasswordCode] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const oobCode = params.get('oobCode');
-    if (mode === 'resetPassword' && oobCode) {
-      return oobCode;
-    }
-    return null;
-  });
 
   // Modal states - instantly initialized from URL if a vehicle link was tapped
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(() => {
@@ -604,29 +591,6 @@ export default function App() {
             vehicle={qualifierVehicle}
             isOpen={isQualifierOpen}
             onClose={handleCloseQualifier}
-          />
-        </Suspense>
-      )}
-
-      {/* Password Reset Modal (from email link) */}
-      {resetPasswordCode && (
-        <Suspense fallback={null}>
-          <ResetPasswordModal
-            oobCode={resetPasswordCode}
-            onSuccess={() => {
-              setResetPasswordCode(null);
-              try {
-                window.history.replaceState({ tab: 'admin', modal: null }, '', '/?tab=admin');
-              } catch {}
-              handleTabChange('admin');
-            }}
-            onCancel={() => {
-              setResetPasswordCode(null);
-              try {
-                window.history.replaceState({ tab: 'admin', modal: null }, '', '/?tab=admin');
-              } catch {}
-              handleTabChange('admin');
-            }}
           />
         </Suspense>
       )}
