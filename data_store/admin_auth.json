@@ -1,4 +1,19 @@
 {
-  "passwordConfig": null,
-  "sessions": []
+  "passwordConfig": {
+    "salt": "68c0ca6a2e904382e86b91d70ce6f810",
+    "hash": "bb9270e99648fb98accd65b12b27c7de19da4bc8ebf0547b7ad4d8f42677d4233dfb548957abe58b9b83081f25856c04bf1634fa050e31fe0f48c2049c56771a",
+    "updatedAt": "2026-08-28T23:07:51.260Z"
+  },
+  "sessions": [
+    {
+      "token": "132c9089109ea55db9bc0e5d18ec95cd431d71175266e78e51ea7694148c8f72",
+      "createdAt": 1787958471901,
+      "expiresAt": 1788563271901
+    },
+    {
+      "token": "0d6b3732b2eb0b6043a7779c885616e628d11fe5c4aea4c59f969af9dee570ee",
+      "createdAt": 1787958491082,
+      "expiresAt": 1788563291082
+    }
+  ]
 }

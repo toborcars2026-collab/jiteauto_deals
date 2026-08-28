@@ -11,6 +11,7 @@ import {
   saveAdminAuthConfig,
   clearAdminAuthConfig
 } from "./api/_authHelper";
+import adminAuthHandler from "./api/admin-auth";
 
 const app = express();
 const PORT = 3000;
@@ -495,6 +496,10 @@ app.post("/api/inquiries", (req, res) => {
 });
 
 // Admin Authentication Endpoints (Server-Side First-Time Setup & Password Auth)
+app.all("/api/admin-auth", async (req, res) => {
+  return adminAuthHandler(req, res);
+});
+
 app.get("/api/admin/auth/status", async (req, res) => {
   try {
     const config = await getAdminAuthConfig();

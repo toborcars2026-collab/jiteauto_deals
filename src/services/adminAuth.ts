@@ -30,20 +30,93 @@ export function getAdminAuthHeaders(): Record<string, string> {
 }
 
 /**
+ * Universal resilient fetcher that supports both modular /api/admin/auth/* and /api/admin-auth?action=*
+ */
+async function callAdminApi(
+  action: 'status' | 'setup' | 'login' | 'verify' | 'change-password' | 'logout' | 'reset',
+  options: RequestInit = {}
+): Promise<{ ok: boolean; status: number; data: any }> {
+  const isGet = (options.method || 'GET').toUpperCase() === 'GET';
+  const primaryUrl = `/api/admin/auth/${action}`;
+  const fallbackUrl = `/api/admin-auth?action=${action}`;
+
+  const defaultHeaders = isGet
+    ? { 'Cache-Control': 'no-cache' }
+    : getAdminAuthHeaders();
+
+  const mergedOptions: RequestInit = {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...(options.headers || {})
+    }
+  };
+
+  try {
+    let res = await fetch(primaryUrl, mergedOptions);
+    
+    // If endpoint is 404/502/503 or returns HTML error, try fallback
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok && (res.status === 404 || res.status === 502 || res.status === 503 || !contentType.includes('application/json'))) {
+      try {
+        const fallbackRes = await fetch(fallbackUrl, mergedOptions);
+        if (fallbackRes.ok || fallbackRes.status < 500) {
+          res = fallbackRes;
+        }
+      } catch (fallbackErr) {
+        // Stick with original res
+      }
+    }
+
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = { error: res.statusText || 'Unable to parse server response.' };
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      data
+    };
+  } catch (netErr: any) {
+    // Attempt fallback upon direct network error
+    try {
+      const fallbackRes = await fetch(fallbackUrl, mergedOptions);
+      let data: any = {};
+      try {
+        data = await fallbackRes.json();
+      } catch {
+        data = { error: fallbackRes.statusText || 'Unable to parse server response.' };
+      }
+      return {
+        ok: fallbackRes.ok,
+        status: fallbackRes.status,
+        data
+      };
+    } catch (finalErr) {
+      console.error(`[AdminAuth API Error on action "${action}"]:`, finalErr);
+      return {
+        ok: false,
+        status: 0,
+        data: { error: 'Unable to connect to authentication server. Please verify your internet connection.' }
+      };
+    }
+  }
+}
+
+/**
  * Checks whether administrator first-time password setup has already been completed.
  */
 export async function checkAdminAuthStatus(): Promise<AdminAuthStatus> {
   try {
-    const res = await fetch('/api/admin/auth/status', {
-      method: 'GET',
-      headers: { 'Cache-Control': 'no-cache' },
-      credentials: 'include'
-    });
-    if (res.ok) {
-      const data = await res.json();
+    const result = await callAdminApi('status', { method: 'GET' });
+    if (result.ok && result.data) {
       return {
-        isSetup: Boolean(data.isSetup),
-        mode: data.mode || 'password_only'
+        isSetup: Boolean(result.data.isSetup),
+        mode: result.data.mode || 'password_only'
       };
     }
     return { isSetup: false, mode: 'password_only' };
@@ -78,34 +151,26 @@ export async function setupFirstTimeAdmin(password: string, confirmPassword: str
   }
 
   try {
-    const res = await fetch('/api/admin/auth/setup', {
+    const result = await callAdminApi('setup', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      credentials: 'include',
       body: JSON.stringify({ password, confirmPassword })
     });
 
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      if (data.token && typeof window !== 'undefined') {
-        localStorage.setItem(TOKEN_KEY, data.token);
+    if (result.ok && result.data.success) {
+      if (result.data.token && typeof window !== 'undefined') {
+        localStorage.setItem(TOKEN_KEY, result.data.token);
       }
       return {
         success: true,
-        role: data.role || 'admin'
+        role: result.data.role || 'admin'
       };
     }
 
     return {
       success: false,
-      error: data.error || 'Failed to setup administrator password.'
+      error: result.data.error || 'Failed to setup administrator password.'
     };
   } catch (err: any) {
-    console.error('[Admin Setup Error]:', err);
     return {
       success: false,
       error: 'Unable to connect to authentication server. Please try again.'
@@ -126,35 +191,27 @@ export async function authenticateAdmin(password: string): Promise<AdminAuthResu
   }
 
   try {
-    const res = await fetch('/api/admin/auth/login', {
+    const result = await callAdminApi('login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      credentials: 'include',
       body: JSON.stringify({ password })
     });
 
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      if (data.token && typeof window !== 'undefined') {
-        localStorage.setItem(TOKEN_KEY, data.token);
+    if (result.ok && result.data.success) {
+      if (result.data.token && typeof window !== 'undefined') {
+        localStorage.setItem(TOKEN_KEY, result.data.token);
       }
       return {
         success: true,
-        role: data.role || 'admin'
+        role: result.data.role || 'admin'
       };
     }
 
     return {
       success: false,
-      needsSetup: Boolean(data.needsSetup),
-      error: data.error || 'Incorrect administrator password. Please try again.'
+      needsSetup: Boolean(result.data.needsSetup),
+      error: result.data.error || 'Incorrect administrator password. Please try again.'
     };
   } catch (err: any) {
-    console.error('[Admin Login Error]:', err);
     return {
       success: false,
       error: 'Incorrect administrator password. Please try again.'
@@ -167,15 +224,9 @@ export async function authenticateAdmin(password: string): Promise<AdminAuthResu
  */
 export async function verifyAdminSession(): Promise<boolean> {
   try {
-    const res = await fetch('/api/admin/auth/verify', {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-      credentials: 'include'
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return Boolean(data.authenticated);
+    const result = await callAdminApi('verify', { method: 'GET' });
+    if (result.ok && result.data) {
+      return Boolean(result.data.authenticated);
     }
     return false;
   } catch (err) {
@@ -205,31 +256,26 @@ export async function changeAdminPassword(
   }
 
   try {
-    const res = await fetch('/api/admin/auth/change-password', {
+    const result = await callAdminApi('change-password', {
       method: 'POST',
-      headers: getAdminAuthHeaders(),
-      credentials: 'include',
       body: JSON.stringify({
         currentPassword,
         newPassword
       })
     });
 
-    const data = await res.json();
-
-    if (res.ok && data.success) {
+    if (result.ok && result.data.success) {
       return {
         success: true,
-        message: data.message || 'Administrator password updated successfully.'
+        message: result.data.message || 'Administrator password updated successfully.'
       };
     }
 
     return {
       success: false,
-      error: data.error || 'Failed to update administrator password.'
+      error: result.data.error || 'Failed to update administrator password.'
     };
   } catch (err: any) {
-    console.error('[Admin Change Password Error]:', err);
     return {
       success: false,
       error: 'Unable to connect to server to update password. Please try again.'
@@ -247,13 +293,9 @@ export async function logoutAdminSession(): Promise<void> {
   }
 
   try {
-    await fetch('/api/admin/auth/logout', {
+    await callAdminApi('logout', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : ''
-      },
-      credentials: 'include'
+      body: JSON.stringify({ token })
     });
   } catch (err) {
     // Non-blocking
@@ -266,21 +308,18 @@ export async function logoutAdminSession(): Promise<void> {
  */
 export async function resetAdminSetup(resetKey?: string): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
-    const res = await fetch('/api/admin/auth/reset', {
+    const result = await callAdminApi('reset', {
       method: 'POST',
-      headers: getAdminAuthHeaders(),
-      credentials: 'include',
       body: JSON.stringify({ resetKey })
     });
 
-    const data = await res.json();
-    if (res.ok && data.success) {
+    if (result.ok && result.data.success) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem(TOKEN_KEY);
       }
-      return { success: true, message: data.message };
+      return { success: true, message: result.data.message };
     }
-    return { success: false, error: data.error || 'Failed to reset admin setup.' };
+    return { success: false, error: result.data.error || 'Failed to reset admin setup.' };
   } catch (err: any) {
     return { success: false, error: 'Unable to connect to server.' };
   }

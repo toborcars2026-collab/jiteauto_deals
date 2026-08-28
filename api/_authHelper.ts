@@ -1,14 +1,10 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, type Firestore } from 'firebase/firestore';
 import crypto from 'crypto';
 import type { IncomingMessage, ServerResponse } from 'http';
-import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 
-// Initialize Firebase App for Server / Serverless environment
-export function getDb(): Firestore {
-  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  return getFirestore(app, firebaseConfig.firestoreDatabaseId);
-}
+// Central Firestore REST Configuration
+export const FIREBASE_PROJECT_ID = 'gen-lang-client-0327661147';
+export const FIRESTORE_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
+const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/settings/admin_security`;
 
 export interface StoredAuthConfig {
   salt: string;
@@ -16,10 +12,10 @@ export interface StoredAuthConfig {
   updatedAt: string;
 }
 
-// In-memory cache for fast verification
+// In-memory cache for ultra-fast serverless verification (3-second TTL)
 let cachedAuthConfig: StoredAuthConfig | null = null;
 let cacheTime = 0;
-const CACHE_TTL_MS = 5 * 1000; // 5 seconds
+const CACHE_TTL_MS = 3 * 1000;
 
 // Active session token store
 const activeSessions = new Map<string, { createdAt: number; expiresAt: number }>();
@@ -89,7 +85,7 @@ export function generateToken(): string {
 }
 
 /**
- * Fetches admin auth configuration from Firestore
+ * Fetches admin auth configuration from Firestore using standard REST API (no heavy SDKs required).
  */
 export async function getAdminAuthConfig(): Promise<StoredAuthConfig | null> {
   const now = Date.now();
@@ -98,50 +94,94 @@ export async function getAdminAuthConfig(): Promise<StoredAuthConfig | null> {
   }
 
   try {
-    const db = getDb();
-    const docRef = doc(db, 'settings', 'admin_security');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data && data.salt && data.hash) {
-        cachedAuthConfig = {
-          salt: data.salt,
-          hash: data.hash,
-          updatedAt: data.updatedAt || new Date().toISOString()
-        };
-        cacheTime = now;
-        return cachedAuthConfig;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(FIRESTORE_DOC_URL, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.status === 404) {
+      cachedAuthConfig = null;
+      cacheTime = now;
+      return null;
+    }
+
+    if (res.ok) {
+      const data: any = await res.json();
+      if (data && data.fields) {
+        const salt = data.fields.salt?.stringValue || '';
+        const hash = data.fields.hash?.stringValue || '';
+        const updatedAt = data.fields.updatedAt?.stringValue || new Date().toISOString();
+
+        if (salt && hash) {
+          cachedAuthConfig = { salt, hash, updatedAt };
+          cacheTime = now;
+          return cachedAuthConfig;
+        }
       }
     }
     cachedAuthConfig = null;
     return null;
   } catch (err) {
-    console.error('[AdminAuth] Error fetching config from Firestore:', err);
+    console.error('[AdminAuth] Error fetching config via Firestore REST:', err);
     return cachedAuthConfig;
   }
 }
 
 /**
- * Persists admin auth configuration to Firestore
+ * Persists admin auth configuration to Firestore using standard REST API.
  */
 export async function saveAdminAuthConfig(config: StoredAuthConfig): Promise<void> {
-  const db = getDb();
-  const docRef = doc(db, 'settings', 'admin_security');
-  await setDoc(docRef, config);
-  cachedAuthConfig = config;
-  cacheTime = Date.now();
+  try {
+    const payload = {
+      fields: {
+        salt: { stringValue: config.salt },
+        hash: { stringValue: config.hash },
+        updatedAt: { stringValue: config.updatedAt }
+      }
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const res = await fetch(FIRESTORE_DOC_URL, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Firestore REST write failed (${res.status}): ${errText}`);
+    }
+
+    cachedAuthConfig = config;
+    cacheTime = Date.now();
+  } catch (err) {
+    console.error('[AdminAuth] Error saving config via Firestore REST:', err);
+    throw err;
+  }
 }
 
 /**
- * Resets admin auth configuration in Firestore (returns system to First-Time Setup)
+ * Resets admin auth configuration in Firestore (returns system to First-Time Setup).
  */
 export async function clearAdminAuthConfig(): Promise<void> {
-  const db = getDb();
-  const docRef = doc(db, 'settings', 'admin_security');
   try {
-    await deleteDoc(docRef);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    await fetch(FIRESTORE_DOC_URL, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
   } catch (err) {
-    await setDoc(docRef, { salt: '', hash: '', updatedAt: new Date().toISOString() });
+    console.error('[AdminAuth] Error clearing config via Firestore REST:', err);
   }
   cachedAuthConfig = null;
   cacheTime = 0;
@@ -150,6 +190,11 @@ export async function clearAdminAuthConfig(): Promise<void> {
 
 export function parseJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve) => {
+    // If Express or another middleware already parsed the body:
+    if ((req as any).body && typeof (req as any).body === 'object') {
+      return resolve((req as any).body);
+    }
+
     let data = '';
     req.on('data', (chunk) => {
       data += chunk;
@@ -207,7 +252,7 @@ export function isSessionValid(token: string | null): boolean {
   if (session) {
     return session.expiresAt > Date.now();
   }
-  // If in a newly spawned serverless instance, accept valid 64-hex tokens
+  // Serverless stateless verification: Any valid 64-hex SHA token format
   return token.length === 64 && /^[0-9a-f]+$/i.test(token);
 }
 
@@ -216,5 +261,5 @@ export function setCorsAndHeaders(req: IncomingMessage, res: ServerResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With');
 }
