@@ -404,7 +404,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   </>
                 ) : (
                   <>
-                    <span>COMPLETE SETUP & ENTER ADMIN</span>
+                    <span>CREATE ADMINISTRATOR PASSWORD</span>
                     <ArrowRight size={16} />
                   </>
                 )}

@@ -353,6 +353,36 @@ export default function AdminSecuritySection({ onSignOut }: AdminSecuritySection
             <span>Sign Out</span>
           </button>
         </div>
+
+        {/* Development / Maintenance Reset Option (Authenticated Admin Only) */}
+        <div className="pt-4 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs font-bold text-slate-700 block">Reset System to First-Time Setup</span>
+            <span className="text-[11px] text-slate-400">Clears current administrator credentials and returns the system to initial setup.</span>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (window.confirm('Are you sure you want to reset administrator credentials? You will be prompted to create a new password upon return.')) {
+                try {
+                  const res = await (await import('../../services/adminAuth')).resetAdminSetup();
+                  if (res.success) {
+                    alert('System reset successfully. Returning to First-Time Setup.');
+                    if (onSignOut) onSignOut();
+                    window.location.reload();
+                  } else {
+                    alert(res.error || 'Failed to reset.');
+                  }
+                } catch (e) {
+                  alert('Reset failed.');
+                }
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer shrink-0"
+          >
+            Reset Setup State
+          </button>
+        </div>
       </div>
     </div>
   );

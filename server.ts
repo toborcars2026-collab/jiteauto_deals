@@ -6,6 +6,11 @@ import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
 import { INITIAL_VEHICLES } from "./src/data";
 import { resolveRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
+import {
+  getAdminAuthConfig,
+  saveAdminAuthConfig,
+  clearAdminAuthConfig
+} from "./api/_authHelper";
 
 const app = express();
 const PORT = 3000;
@@ -490,86 +495,98 @@ app.post("/api/inquiries", (req, res) => {
 });
 
 // Admin Authentication Endpoints (Server-Side First-Time Setup & Password Auth)
-app.get("/api/admin/auth/status", (req, res) => {
-  const store = readAuthStore();
-  const isSetup = Boolean(store.passwordConfig && store.passwordConfig.hash && store.passwordConfig.salt);
-  res.json({
-    isSetup,
-    mode: "password_only"
-  });
+app.get("/api/admin/auth/status", async (req, res) => {
+  try {
+    const config = await getAdminAuthConfig();
+    const isSetup = Boolean(config && config.hash && config.salt);
+    return res.json({
+      isSetup,
+      mode: "password_only"
+    });
+  } catch (err) {
+    return res.json({ isSetup: false, mode: "password_only" });
+  }
 });
 
-app.post("/api/admin/auth/setup", (req, res) => {
-  const store = readAuthStore();
-  // Prevent overriding if already set up
-  if (store.passwordConfig && store.passwordConfig.hash && store.passwordConfig.salt) {
-    return res.status(400).json({
-      success: false,
-      error: "Administrator password has already been configured. Please log in."
+app.post("/api/admin/auth/setup", async (req, res) => {
+  try {
+    const existing = await getAdminAuthConfig();
+    // Prevent overriding if already set up
+    if (existing && existing.hash && existing.salt) {
+      return res.status(400).json({
+        success: false,
+        error: "Administrator password has already been configured. Please log in."
+      });
+    }
+
+    const { password, confirmPassword } = req.body || {};
+    if (!password || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Administrator password is required."
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 8 characters long."
+      });
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "Passwords do not match."
+      });
+    }
+
+    // Create salt & hash
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = hashPassword(password, salt);
+    const nowIso = new Date().toISOString();
+
+    await saveAdminAuthConfig({
+      salt,
+      hash,
+      updatedAt: nowIso
     });
-  }
 
-  const { password, confirmPassword } = req.body || {};
-  if (!password || typeof password !== "string") {
-    return res.status(400).json({
-      success: false,
-      error: "Administrator password is required."
+    const store = readAuthStore();
+    store.passwordConfig = { salt, hash, updatedAt: nowIso };
+
+    // Automatically log in administrator upon first-time setup
+    const token = generateToken();
+    const session: AdminSession = {
+      token,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+    };
+
+    store.sessions = [session];
+    saveAuthStore(store);
+
+    // Set secure HttpOnly cookie
+    res.cookie("jite_admin_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/"
     });
-  }
 
-  if (password.length < 8) {
-    return res.status(400).json({
-      success: false,
-      error: "Password must be at least 8 characters long."
+    return res.json({
+      success: true,
+      token,
+      role: "admin",
+      message: "Administrator password configured successfully."
     });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: "Failed to configure administrator password." });
   }
-
-  if (confirmPassword && password !== confirmPassword) {
-    return res.status(400).json({
-      success: false,
-      error: "Passwords do not match."
-    });
-  }
-
-  // Create salt & hash
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = hashPassword(password, salt);
-
-  store.passwordConfig = {
-    salt,
-    hash,
-    updatedAt: new Date().toISOString()
-  };
-
-  // Automatically log in administrator upon first-time setup
-  const token = generateToken();
-  const session: AdminSession = {
-    token,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-  };
-
-  store.sessions = [session];
-  saveAuthStore(store);
-
-  // Set secure HttpOnly cookie
-  res.cookie("jite_admin_session", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/"
-  });
-
-  return res.json({
-    success: true,
-    token,
-    role: "admin",
-    message: "Administrator password configured successfully."
-  });
 });
 
-app.post("/api/admin/auth/login", (req, res) => {
+app.post("/api/admin/auth/login", async (req, res) => {
   const clientIp = getClientIp(req);
   const rateCheck = checkRateLimit(clientIp);
   if (!rateCheck.allowed) {
@@ -589,8 +606,7 @@ app.post("/api/admin/auth/login", (req, res) => {
     });
   }
 
-  const store = readAuthStore();
-  const config = store.passwordConfig;
+  const config = await getAdminAuthConfig();
 
   // If no password configured yet, inform client to proceed to setup
   if (!config || !config.hash || !config.salt) {
@@ -622,7 +638,7 @@ app.post("/api/admin/auth/login", (req, res) => {
     expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
   };
 
-  // Keep latest 25 sessions
+  const store = readAuthStore();
   store.sessions = store.sessions.filter((s) => s.expiresAt > Date.now()).slice(-24);
   store.sessions.push(session);
   saveAuthStore(store);
@@ -658,7 +674,7 @@ app.get("/api/admin/auth/verify", (req, res) => {
   });
 });
 
-app.post("/api/admin/auth/change-password", requireAdminSession, (req, res) => {
+app.post("/api/admin/auth/change-password", requireAdminSession, async (req, res) => {
   const { currentPassword, oldPassword, newPassword, confirmPassword } = req.body || {};
   const passwordToCheck = currentPassword || oldPassword;
 
@@ -683,15 +699,15 @@ app.post("/api/admin/auth/change-password", requireAdminSession, (req, res) => {
     });
   }
 
-  const store = readAuthStore();
-  if (!store.passwordConfig || !store.passwordConfig.hash || !store.passwordConfig.salt) {
+  const config = await getAdminAuthConfig();
+  if (!config || !config.hash || !config.salt) {
     return res.status(400).json({
       success: false,
       error: "No administrator password configured."
     });
   }
 
-  const isValid = verifyPassword(passwordToCheck, store.passwordConfig.salt, store.passwordConfig.hash);
+  const isValid = verifyPassword(passwordToCheck, config.salt, config.hash);
   if (!isValid) {
     return res.status(400).json({
       success: false,
@@ -709,18 +725,51 @@ app.post("/api/admin/auth/change-password", requireAdminSession, (req, res) => {
   // Generate new cryptographic salt and hash
   const newSalt = crypto.randomBytes(16).toString("hex");
   const newHash = hashPassword(newPassword, newSalt);
+  const nowIso = new Date().toISOString();
 
+  await saveAdminAuthConfig({
+    salt: newSalt,
+    hash: newHash,
+    updatedAt: nowIso
+  });
+
+  const store = readAuthStore();
   store.passwordConfig = {
     salt: newSalt,
     hash: newHash,
-    updatedAt: new Date().toISOString()
+    updatedAt: nowIso
   };
-
   saveAuthStore(store);
 
   return res.json({
     success: true,
     message: "Administrator password changed successfully."
+  });
+});
+
+app.post("/api/admin/auth/reset", async (req, res) => {
+  const { resetKey } = req.body || {};
+  const hasAdminSession = validateAdminSession(req);
+  const envResetKey = process.env.ADMIN_RESET_KEY;
+  const isKeyValid = envResetKey && typeof resetKey === "string" && resetKey === envResetKey;
+
+  if (!hasAdminSession && !isKeyValid) {
+    return res.status(403).json({
+      success: false,
+      error: "Unauthorized: Resetting admin password requires an active session or the server ADMIN_RESET_KEY."
+    });
+  }
+
+  await clearAdminAuthConfig();
+  const store = readAuthStore();
+  store.passwordConfig = null;
+  store.sessions = [];
+  saveAuthStore(store);
+
+  res.clearCookie("jite_admin_session", { path: "/" });
+  return res.json({
+    success: true,
+    message: "Administrator password reset successfully. System returned to First-Time Setup."
   });
 });
 

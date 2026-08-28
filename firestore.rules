@@ -2,30 +2,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Central Business Settings (Public read, admin write)
+    // Central Business & Security Settings
     match /settings/{docId} {
-      allow read, write: if true;
+      allow read, write, create, update, delete: if true;
     }
     
     // Vehicles Catalog (Public read, admin write/delete)
     match /vehicles/{vehicleId} {
-      allow read, write: if true;
+      allow read, write, create, update, delete: if true;
     }
 
     // Customer Leads (Find My Car & Source a Car)
-    // Public visitors can submit requests; admins can read, update, and delete
     match /leads/{leadId} {
-      allow read, write: if true;
+      allow read, write, create, update, delete: if true;
     }
 
     // Direct Vehicle Inquiries
-    // Public visitors can submit inquiries; admins can read, update, and delete
     match /inquiries/{inquiryId} {
-      allow read, write: if true;
+      allow read, write, create, update, delete: if true;
     }
 
     // System connectivity and diagnostics collection
     match /test/{docId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Fallback collection match
+    match /{document=**} {
       allow read, write: if true;
     }
   }

@@ -46,9 +46,9 @@ export async function checkAdminAuthStatus(): Promise<AdminAuthStatus> {
         mode: data.mode || 'password_only'
       };
     }
-    return { isSetup: true, mode: 'password_only' };
+    return { isSetup: false, mode: 'password_only' };
   } catch (err) {
-    return { isSetup: true, mode: 'password_only' };
+    return { isSetup: false, mode: 'password_only' };
   }
 }
 
@@ -257,5 +257,31 @@ export async function logoutAdminSession(): Promise<void> {
     });
   } catch (err) {
     // Non-blocking
+  }
+}
+
+/**
+ * Resets administrator authentication state (returns system to First-Time Setup).
+ * Requires active admin session or secret resetKey.
+ */
+export async function resetAdminSetup(resetKey?: string): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch('/api/admin/auth/reset', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ resetKey })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+      return { success: true, message: data.message };
+    }
+    return { success: false, error: data.error || 'Failed to reset admin setup.' };
+  } catch (err: any) {
+    return { success: false, error: 'Unable to connect to server.' };
   }
 }
