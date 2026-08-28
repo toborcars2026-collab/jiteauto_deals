@@ -10,6 +10,7 @@ import {
   generateToken,
   createAdminSession,
   revokeAdminSession,
+  revokeAllSessions,
   extractAdminToken,
   isSessionValid,
   getClientIp,
@@ -28,14 +29,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  // Parse action from URL or query
+  // Parse action from URL query or path
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   let action = url.searchParams.get('action') || '';
   
   if (!action) {
     const parts = url.pathname.split('/').filter(Boolean);
-    // e.g. /api/admin/auth/login -> action = login
-    // e.g. /api/admin-auth -> default to status if GET, login if POST
     if (parts.length >= 3 && parts[0] === 'api' && (parts[1] === 'admin' || parts[1] === 'auth')) {
       action = parts[parts.length - 1];
     } else if (parts[parts.length - 1] === 'admin-auth') {
@@ -47,74 +46,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     switch (action) {
       case 'status': {
         const config = await getAdminAuthConfig();
-        const isSetup = Boolean(config && config.salt && config.hash);
         res.statusCode = 200;
         res.end(JSON.stringify({
-          isSetup,
+          isSetup: true,
           mode: 'password_only',
           updatedAt: config?.updatedAt || null
-        }));
-        return;
-      }
-
-      case 'setup': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const existing = await getAdminAuthConfig();
-        if (existing && existing.salt && existing.hash) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({
-            success: false,
-            error: 'Administrator password has already been configured. Please log in.'
-          }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { password, confirmPassword } = body;
-
-        if (!password || typeof password !== 'string') {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Administrator password is required.' }));
-          return;
-        }
-
-        if (password.length < 8) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Password must be at least 8 characters long.' }));
-          return;
-        }
-
-        if (confirmPassword && password !== confirmPassword) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Passwords do not match.' }));
-          return;
-        }
-
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = hashPassword(password, salt);
-        const nowIso = new Date().toISOString();
-
-        await saveAdminAuthConfig({
-          salt,
-          hash,
-          updatedAt: nowIso
-        });
-
-        const token = generateToken();
-        createAdminSession(token);
-
-        res.setHeader('Set-Cookie', `jite_admin_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`);
-        res.statusCode = 200;
-        res.end(JSON.stringify({
-          success: true,
-          token,
-          role: 'admin',
-          message: 'Administrator password configured successfully.'
         }));
         return;
       }
@@ -132,7 +68,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           res.statusCode = 429;
           res.end(JSON.stringify({
             success: false,
-            error: `Too many failed login attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
+            error: `Too many failed attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
             code: 'RATE_LIMITED'
           }));
           return;
@@ -149,16 +85,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         }
 
         const config = await getAdminAuthConfig();
-        if (!config || !config.salt || !config.hash) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({
-            success: false,
-            needsSetup: true,
-            error: 'Administrator password has not been configured yet. Please complete initial setup.'
-          }));
-          return;
-        }
-
         const isValid = verifyPassword(password, config.salt, config.hash);
         if (!isValid) {
           recordFailedAttempt(clientIp);
@@ -229,12 +155,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         }
 
         const config = await getAdminAuthConfig();
-        if (!config || !config.salt || !config.hash) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Administrator configuration not found.' }));
-          return;
-        }
-
         const isCurrentValid = verifyPassword(passwordToCheck, config.salt, config.hash);
         if (!isCurrentValid) {
           res.statusCode = 401;
@@ -252,6 +172,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           updatedAt: nowIso
         });
 
+        revokeAllSessions();
         const token = generateToken();
         createAdminSession(token);
 
@@ -300,11 +221,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         }
 
         await clearAdminAuthConfig();
+        revokeAllSessions();
         res.setHeader('Set-Cookie', 'jite_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
         res.statusCode = 200;
         res.end(JSON.stringify({
           success: true,
-          message: 'Administrator password reset successfully. System returned to First-Time Setup.'
+          message: 'Administrator password restored to initialized default.'
         }));
         return;
       }

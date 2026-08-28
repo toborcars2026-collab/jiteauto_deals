@@ -33,7 +33,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.statusCode = 429;
     res.end(JSON.stringify({
       success: false,
-      error: `Too many failed login attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
+      error: `Too many failed attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
       code: 'RATE_LIMITED'
     }));
     return;
@@ -51,16 +51,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     const config = await getAdminAuthConfig();
-    if (!config || !config.salt || !config.hash) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({
-        success: false,
-        needsSetup: true,
-        error: 'Administrator password has not been configured yet. Please complete initial setup.'
-      }));
-      return;
-    }
-
     const isValid = verifyPassword(password, config.salt, config.hash);
     if (!isValid) {
       recordFailedAttempt(clientIp);
@@ -76,7 +66,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const token = generateToken();
     createAdminSession(token);
 
-    // Set secure HttpOnly cookie
     res.setHeader('Set-Cookie', `jite_admin_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`);
     res.statusCode = 200;
     res.end(JSON.stringify({
@@ -85,8 +74,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       role: 'admin'
     }));
   } catch (err: any) {
-    console.error('[API /api/admin/auth/login] Error:', err);
+    console.error('[Admin Login API Error]:', err);
     res.statusCode = 500;
-    res.end(JSON.stringify({ success: false, error: 'Authentication service unavailable. Please try again.' }));
+    res.end(JSON.stringify({
+      success: false,
+      error: 'Authentication server error. Please try again.'
+    }));
   }
 }

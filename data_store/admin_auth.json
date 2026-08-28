@@ -1,19 +1,19 @@
 {
   "passwordConfig": {
-    "salt": "68c0ca6a2e904382e86b91d70ce6f810",
-    "hash": "bb9270e99648fb98accd65b12b27c7de19da4bc8ebf0547b7ad4d8f42677d4233dfb548957abe58b9b83081f25856c04bf1634fa050e31fe0f48c2049c56771a",
-    "updatedAt": "2026-08-28T23:07:51.260Z"
+    "salt": "8a848906b6093a1bbcaded81b019696f",
+    "hash": "223fb1019378b7fc5f7872d3da39f35e4d2d760754f7567d6560c5877e9e78c750f6c6fad4a25d3b3420e84796f6fb15b3de13767cda3806e7e79fa63205920d",
+    "updatedAt": "2026-08-28T23:11:22.289Z"
   },
   "sessions": [
     {
-      "token": "132c9089109ea55db9bc0e5d18ec95cd431d71175266e78e51ea7694148c8f72",
-      "createdAt": 1787958471901,
-      "expiresAt": 1788563271901
+      "token": "a21f00855c66dfbafbe4201835642475301681101f214e161427df2f989d3598",
+      "createdAt": 1787958682879,
+      "expiresAt": 1788563482879
     },
     {
-      "token": "0d6b3732b2eb0b6043a7779c885616e628d11fe5c4aea4c59f969af9dee570ee",
-      "createdAt": 1787958491082,
-      "expiresAt": 1788563291082
+      "token": "1cacb4858b0cf063c314b16040975af76e9c21bd4d41af0562eccd63d0f322fa",
+      "createdAt": 1787959551292,
+      "expiresAt": 1788564351292
     }
   ]
 }

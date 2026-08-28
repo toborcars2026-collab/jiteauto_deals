@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import {
   setCorsAndHeaders,
-  clearAdminAuthConfig,
-  parseJsonBody,
   extractAdminToken,
-  isSessionValid
+  isSessionValid,
+  clearAdminAuthConfig,
+  revokeAllSessions,
+  parseJsonBody
 } from '../../_authHelper';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -27,8 +28,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const { resetKey } = body;
     const token = extractAdminToken(req);
     const hasAdminSession = isSessionValid(token);
-
-    // Security check: Must either have an active admin session or match environment ADMIN_RESET_KEY
     const envResetKey = process.env.ADMIN_RESET_KEY;
     const isKeyValid = envResetKey && typeof resetKey === 'string' && resetKey === envResetKey;
 
@@ -42,16 +41,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     await clearAdminAuthConfig();
-
+    revokeAllSessions();
     res.setHeader('Set-Cookie', 'jite_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
     res.statusCode = 200;
     res.end(JSON.stringify({
       success: true,
-      message: 'Administrator password reset successfully. System returned to First-Time Setup.'
+      message: 'Administrator password restored to initialized default.'
     }));
   } catch (err: any) {
-    console.error('[API /api/admin/auth/reset] Error:', err);
+    console.error('[Admin Reset Error]:', err);
     res.statusCode = 500;
-    res.end(JSON.stringify({ success: false, error: 'Failed to reset administrator setup.' }));
+    res.end(JSON.stringify({
+      success: false,
+      error: 'Unable to reset admin credentials on server.'
+    }));
   }
 }

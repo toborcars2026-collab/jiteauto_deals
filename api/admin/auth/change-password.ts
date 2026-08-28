@@ -8,6 +8,7 @@ import {
   verifyPassword,
   generateToken,
   createAdminSession,
+  revokeAllSessions,
   parseJsonBody
 } from '../../_authHelper';
 
@@ -50,12 +51,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     const config = await getAdminAuthConfig();
-    if (!config || !config.salt || !config.hash) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ success: false, error: 'Administrator configuration not found.' }));
-      return;
-    }
-
     const isCurrentValid = verifyPassword(passwordToCheck, config.salt, config.hash);
     if (!isCurrentValid) {
       res.statusCode = 401;
@@ -73,6 +68,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       updatedAt: nowIso
     });
 
+    revokeAllSessions();
     const token = generateToken();
     createAdminSession(token);
 
@@ -84,8 +80,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       message: 'Administrator password changed successfully.'
     }));
   } catch (err: any) {
-    console.error('[API /api/admin/auth/change-password] Error:', err);
+    console.error('[Admin Change-Password Error]:', err);
     res.statusCode = 500;
-    res.end(JSON.stringify({ success: false, error: 'Failed to update administrator password. Please try again.' }));
+    res.end(JSON.stringify({
+      success: false,
+      error: 'Unable to update password on server. Please try again.'
+    }));
   }
 }
