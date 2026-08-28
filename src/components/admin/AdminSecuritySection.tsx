@@ -102,15 +102,22 @@ export default function AdminSecuritySection({ onSignOut }: AdminSecuritySection
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Navigation Breadcrumb */}
       <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-500 uppercase tracking-widest mb-1">
+            <span>SETTINGS</span>
+            <span>→</span>
+            <span>SECURITY</span>
+            <span>→</span>
+            <span>CHANGE ADMINISTRATOR PASSWORD</span>
+          </div>
           <h2 className="text-xl font-bold text-slate-900 font-display flex items-center gap-2">
             <ShieldCheck className="text-amber-500" size={22} />
-            <span>SECURITY</span>
+            <span>Administrator Security</span>
           </h2>
           <p className="text-slate-500 text-xs mt-1">
-            Manage your administrator password and command center access security.
+            Manage your master administrator password and secure command center access.
           </p>
         </div>
 
@@ -212,8 +219,8 @@ export default function AdminSecuritySection({ onSignOut }: AdminSecuritySection
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Current Password */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    Current Password *
+                  <label className="text-xs font-bold font-mono text-slate-700 block uppercase tracking-wider">
+                    CURRENT PASSWORD *
                   </label>
                   <div className="relative">
                     <input
@@ -236,8 +243,8 @@ export default function AdminSecuritySection({ onSignOut }: AdminSecuritySection
 
                 {/* New Password */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    New Password *
+                  <label className="text-xs font-bold font-mono text-slate-700 block uppercase tracking-wider">
+                    NEW PASSWORD *
                   </label>
                   <div className="relative">
                     <input
@@ -261,8 +268,8 @@ export default function AdminSecuritySection({ onSignOut }: AdminSecuritySection
 
                 {/* Confirm New Password */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    Confirm New Password *
+                  <label className="text-xs font-bold font-mono text-slate-700 block uppercase tracking-wider">
+                    CONFIRM NEW PASSWORD *
                   </label>
                   <div className="relative">
                     <input

@@ -42,6 +42,7 @@ import {
   preloadPrimaryImage,
   getInitialVehicleRoute,
 } from './utils';
+import { generateVehicleMetadata, generateTabMetadata, updateClientMeta } from './metaHelper';
 
 // Code-split heavy and secondary page views to keep initial bundle ultra-lightweight
 const BrowseCarsPage = lazy(() => import('./components/BrowseCarsPage'));
@@ -136,17 +137,10 @@ export default function App() {
     setIsConsultantOpen(false);
     setIsQualifierOpen(false);
 
-    // Dynamic document title
-    const titles: Record<NavigationTab, string> = {
-      home: 'Jite Auto Deals - Vehicle Consultant in Nigeria | Find, Source & Navigate',
-      browse: 'Browse Available Cars | Jite Auto Deals - Vehicle Consultant',
-      'find-car': 'Find My Car | Vehicle Specification Finder - Jite Auto Deals',
-      'source-car': 'Source a Car | External Listing Verification - Jite Auto Deals',
-      'how-it-works': 'How It Works & Vehicle Finance | Jite Auto Deals',
-      about: 'About Tobor Jite | Jite Auto Deals - Vehicle Consultant',
-      admin: 'Admin Dashboard | Jite Auto Deals',
-    };
-    document.title = titles[newTab] || titles.home;
+    // Dynamic metadata update
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const meta = generateTabMetadata(newTab, origin);
+    updateClientMeta(meta);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -170,7 +164,11 @@ export default function App() {
     setSelectedVehicle(vehicle);
     setIsVehicleLoading(false);
     setIsDetailsOpen(true);
-    document.title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${formatCurrency(vehicle.price)} | Jite Auto Deals`;
+    
+    // Dynamic vehicle metadata update
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const meta = generateVehicleMetadata(vehicle, origin);
+    updateClientMeta(meta);
   };
 
   // Close Vehicle Details Modal (returns gracefully to previous catalog/page)
@@ -180,6 +178,10 @@ export default function App() {
     setIsVehicleLoading(false);
     const targetTab = currentTab || 'home';
     const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const meta = generateTabMetadata(targetTab, origin);
+    updateClientMeta(meta);
 
     try {
       const histState = window.history.state as AppHistoryState | null;
@@ -304,7 +306,9 @@ export default function App() {
           } else {
             setSelectedVehicle(matched);
             setIsDetailsOpen(true);
-            document.title = `${matched.year} ${matched.make} ${matched.model} - ${formatCurrency(matched.price)} | Jite Auto Deals`;
+            const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+            const meta = generateVehicleMetadata(matched, origin);
+            updateClientMeta(meta);
           }
         }
         setIsVehicleLoading(false);

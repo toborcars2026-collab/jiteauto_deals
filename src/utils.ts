@@ -63,10 +63,10 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
   
   if (typeof window !== 'undefined' && window.location) {
     const origin = window.location.origin;
-    return `${origin}/?vehicle=${encodeURIComponent(slug)}`;
+    return `${origin}/vehicles/${encodeURIComponent(slug)}`;
   }
   
-  return `https://jiteautodeals-sable.vercel.app/?vehicle=${encodeURIComponent(slug)}`;
+  return `https://jiteautodeals-sable.vercel.app/vehicles/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -785,12 +785,18 @@ export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: bo
   let initialSlugOrId: string | null = null;
   if (pathname.startsWith('/vehicles/')) {
     initialSlugOrId = pathname.replace(/^\/vehicles\/?/, '');
+  } else if (pathname.startsWith('/car/')) {
+    initialSlugOrId = pathname.replace(/^\/car\/?/, '');
+  } else if (pathname.startsWith('/v/')) {
+    initialSlugOrId = pathname.replace(/^\/v\/?/, '');
   } else if (searchParams.get('vehicle')) {
     initialSlugOrId = searchParams.get('vehicle');
   } else if (searchParams.get('v')) {
     initialSlugOrId = searchParams.get('v');
   } else if (hash.startsWith('#/vehicles/')) {
     initialSlugOrId = hash.replace(/^#\/vehicles\/?/, '');
+  } else if (hash.startsWith('#/car/')) {
+    initialSlugOrId = hash.replace(/^#\/car\/?/, '');
   }
 
   const qualify = searchParams.get('qualify') === '1' || searchParams.get('qualify') === 'true';

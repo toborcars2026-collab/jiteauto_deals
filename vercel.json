@@ -1,8 +1,25 @@
 {
+  "version": 2,
   "rewrites": [
     {
+      "source": "/(assets|public)/:match*",
+      "destination": "/$1/:match*"
+    },
+    {
+      "source": "/(.*\\.(?:js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|json|webmanifest|txt|xml))",
+      "destination": "/$1"
+    },
+    {
+      "source": "/api/resolve-image",
+      "destination": "/api/resolve-image"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/api/index"
     }
   ]
 }

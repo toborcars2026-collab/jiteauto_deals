@@ -5,6 +5,7 @@ import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
 import { INITIAL_VEHICLES } from "./src/data";
+import { resolveRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
 
 const app = express();
 const PORT = 3000;
@@ -766,66 +767,78 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
-    app.use(vite.middlewares);
   }
 
-  // OpenGraph metadata injection for direct vehicle links (/vehicles/:slug)
-  app.get("/vehicles/:slug", async (req, res, next) => {
+  // Universal HTML Page Handler with Dynamic Open Graph / Twitter Metadata Injection
+  const renderDynamicPage = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Skip static assets, internal vite routes, and API endpoints
+    const p = req.path;
+    if (
+      p.startsWith("/api/") ||
+      p.startsWith("/@") ||
+      p.startsWith("/src/") ||
+      p.startsWith("/node_modules/") ||
+      /\.(js|ts|tsx|jsx|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|json|map)$/i.test(p)
+    ) {
+      return next();
+    }
+
     try {
-      const slug = req.params.slug;
-      const vehicle = findVehicleBySlug(slug);
+      const vehicles = readVehiclesStore();
       const host = req.get("host") || "jiteautodeals-sable.vercel.app";
       const protocol = req.protocol || "https";
-      const fullUrl = `${protocol}://${host}/vehicles/${slug}`;
+      const origin = `${protocol}://${host}`;
+      const originalUrl = req.originalUrl || req.url || "/";
 
-      let html = "";
+      // Resolve metadata dynamically based on route and query
+      const meta = resolveRouteMetadata(originalUrl, vehicles, origin);
+
+      let baseHtml = "";
       if (process.env.NODE_ENV !== "production" && vite) {
         const indexPath = path.join(process.cwd(), "index.html");
-        html = fs.readFileSync(indexPath, "utf-8");
-        html = await vite.transformIndexHtml(req.originalUrl, html);
+        baseHtml = fs.readFileSync(indexPath, "utf-8");
+        baseHtml = await vite.transformIndexHtml(originalUrl, baseHtml);
       } else {
         const distIndexPath = path.join(process.cwd(), "dist", "index.html");
         if (fs.existsSync(distIndexPath)) {
-          html = fs.readFileSync(distIndexPath, "utf-8");
+          baseHtml = fs.readFileSync(distIndexPath, "utf-8");
         } else {
-          return next();
+          const indexPath = path.join(process.cwd(), "index.html");
+          baseHtml = fs.readFileSync(indexPath, "utf-8");
         }
       }
 
-      if (vehicle) {
-        const title = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ₦${Number(vehicle.price || 0).toLocaleString()} | Jite Auto Deals`;
-        const rawDesc = decodeUnicodeEscapes(vehicle.description || "").replace(/\s+/g, " ").trim();
-        const desc = `${vehicle.condition || "Verified"} • ${vehicle.transmission || "Automatic"} • ${vehicle.location || "Nigeria"}. ${rawDesc.slice(0, 160)}`;
-        const img = vehicle.images && vehicle.images[0] ? vehicle.images[0] : "";
+      // Inject full Open Graph, Twitter Card, and SEO metadata into HTML head
+      const finalHtml = injectMetadataIntoHtml(baseHtml, meta);
 
-        const metaTags = `<title>${title}</title>
-    <meta name="description" content="${desc}" />
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="${desc}" />
-    <meta property="og:image" content="${img}" />
-    <meta property="og:url" content="${fullUrl}" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Jite Auto Deals" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${title}" />
-    <meta name="twitter:description" content="${desc}" />
-    <meta name="twitter:image" content="${img}" />`;
-        html = html.replace(/<title>.*?<\/title>/i, metaTags);
-      }
-
-      res.setHeader("Content-Type", "text/html");
-      return res.status(200).send(html);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(finalHtml);
     } catch (err) {
       next();
     }
-  });
+  };
 
-  if (process.env.NODE_ENV === "production") {
+  // Mount HTML renderer for explicit routes
+  app.get("/vehicles/:slug", renderDynamicPage);
+  app.get("/car/:slug", renderDynamicPage);
+  app.get("/v/:slug", renderDynamicPage);
+  app.get("/browse", renderDynamicPage);
+  app.get("/inventory", renderDynamicPage);
+  app.get("/find-car", renderDynamicPage);
+  app.get("/find-my-car", renderDynamicPage);
+  app.get("/source-car", renderDynamicPage);
+  app.get("/source-a-car", renderDynamicPage);
+  app.get("/how-it-works", renderDynamicPage);
+  app.get("/about", renderDynamicPage);
+  app.get("/admin", renderDynamicPage);
+  app.get("/", renderDynamicPage);
+
+  if (process.env.NODE_ENV !== "production" && vite) {
+    app.use(vite.middlewares);
+  } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    app.get("*", renderDynamicPage);
   }
 
   app.listen(PORT, "0.0.0.0", () => {

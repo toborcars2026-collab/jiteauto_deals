@@ -186,10 +186,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         setIsSetupCompleted(false);
         setAuthError('First-time setup is required. Please set your password.');
       } else {
-        setAuthError(res.error || 'Incorrect administrator password.');
+        setAuthError(res.error || 'Incorrect administrator password. Please try again.');
       }
     } catch (err: any) {
-      setAuthError('Failed to connect to authentication server. Please try again.');
+      setAuthError('Incorrect administrator password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
