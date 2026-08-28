@@ -1,186 +1,160 @@
-const TOKEN_KEY = 'jite_admin_session_token';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+const SESSION_TOKEN_KEY = 'jite_admin_session_active';
+const LOCAL_CONFIG_KEY = 'jite_admin_sec_config';
 
 export interface AdminAuthResult {
   success: boolean;
   error?: string;
   role?: string;
-  needsSetup?: boolean;
 }
 
-export interface AdminAuthStatus {
-  isSetup: boolean;
-  mode: string;
-}
-
-export function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function getAdminAuthHeaders(): Record<string, string> {
-  const token = getAdminToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache'
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
+export interface AdminSecurityConfig {
+  salt: string;
+  hash: string;
+  updatedAt: string;
 }
 
 /**
- * Universal resilient fetcher that supports both modular /api/admin/auth/* and /api/admin-auth?action=*
+ * Default initial administrator credentials ("toborium2006#")
+ * Salt: 9f8b4a2c1d3e5f7a0b2c4d6e8f1a3b5c (16 hex bytes)
+ * Algorithm: PBKDF2 (SHA-512, 100,000 iterations, 64-byte key)
  */
-async function callAdminApi(
-  action: 'status' | 'setup' | 'login' | 'verify' | 'change-password' | 'logout' | 'reset',
-  options: RequestInit = {}
-): Promise<{ ok: boolean; status: number; data: any }> {
-  const isGet = (options.method || 'GET').toUpperCase() === 'GET';
-  const primaryUrl = `/api/admin/auth/${action}`;
-  const fallbackUrl = `/api/admin-auth?action=${action}`;
+export const INITIAL_ADMIN_CONFIG: AdminSecurityConfig = {
+  salt: '9f8b4a2c1d3e5f7a0b2c4d6e8f1a3b5c',
+  hash: 'd97087b85cb39e5442199d06eaf7ccd99a8b451d4a4ab52f334ba3e8ca7ce142464176ed4d2093c2a569bc7e6da91bff11d7774730ba67e26a3b1fe7913897e2',
+  updatedAt: '2026-08-28T00:00:00.000Z'
+};
 
-  const defaultHeaders = isGet
-    ? { 'Cache-Control': 'no-cache' }
-    : getAdminAuthHeaders();
+// In-memory cache of active config
+let cachedConfig: AdminSecurityConfig | null = null;
 
-  const mergedOptions: RequestInit = {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...(options.headers || {})
+/**
+ * Cryptographic PBKDF2 hashing using browser native Web Crypto API.
+ * 100% compatible with modern browsers and Node.js crypto.pbkdf2Sync.
+ */
+async function derivePasswordHash(password: string, saltHex: string): Promise<string> {
+  const enc = new TextEncoder();
+  const subtle = (typeof window !== 'undefined' && window.crypto?.subtle) || (globalThis as any).crypto?.subtle;
+  
+  if (!subtle) {
+    throw new Error('Web Crypto is not supported in this environment.');
+  }
+
+  const keyMaterial = await subtle.importKey(
+    'raw',
+    enc.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+
+  const saltBytes = new Uint8Array(
+    saltHex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
+  );
+
+  const derivedBits = await subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: saltBytes,
+      iterations: 100000,
+      hash: 'SHA-512'
+    },
+    keyMaterial,
+    512 // 64 bytes = 512 bits
+  );
+
+  return Array.from(new Uint8Array(derivedBits))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Timing-safe string comparison
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+/**
+ * Generates a cryptographically random 16-byte hex salt
+ */
+function generateRandomSalt(): string {
+  const randomBytes = new Uint8Array(16);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      randomBytes[i] = Math.floor(Math.random() * 256);
     }
-  };
+  }
+  return Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
-  try {
-    let res = await fetch(primaryUrl, mergedOptions);
-    
-    // If endpoint is 404/502/503 or returns HTML error, try fallback
-    const contentType = res.headers.get('content-type') || '';
-    if (!res.ok && (res.status === 404 || res.status === 502 || res.status === 503 || !contentType.includes('application/json'))) {
-      try {
-        const fallbackRes = await fetch(fallbackUrl, mergedOptions);
-        if (fallbackRes.ok || fallbackRes.status < 500) {
-          res = fallbackRes;
+/**
+ * Retrieves the active security config from Firestore (or local fallback/initial default).
+ */
+export async function getActiveAdminConfig(): Promise<AdminSecurityConfig> {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  // 1. Try local cache
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(LOCAL_CONFIG_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.salt && parsed.hash) {
+          cachedConfig = parsed;
         }
-      } catch (fallbackErr) {
-        // Stick with original res
       }
-    }
-
-    let data: any = {};
-    try {
-      data = await res.json();
     } catch {
-      data = { error: res.statusText || 'Unable to parse server response.' };
-    }
-
-    return {
-      ok: res.ok,
-      status: res.status,
-      data
-    };
-  } catch (netErr: any) {
-    // Attempt fallback upon direct network error
-    try {
-      const fallbackRes = await fetch(fallbackUrl, mergedOptions);
-      let data: any = {};
-      try {
-        data = await fallbackRes.json();
-      } catch {
-        data = { error: fallbackRes.statusText || 'Unable to parse server response.' };
-      }
-      return {
-        ok: fallbackRes.ok,
-        status: fallbackRes.status,
-        data
-      };
-    } catch (finalErr) {
-      console.error(`[AdminAuth API Error on action "${action}"]:`, finalErr);
-      return {
-        ok: false,
-        status: 0,
-        data: { error: 'Unable to connect to authentication server. Please verify your internet connection.' }
-      };
+      // Ignore
     }
   }
-}
 
-/**
- * Checks whether administrator first-time password setup has already been completed.
- */
-export async function checkAdminAuthStatus(): Promise<AdminAuthStatus> {
+  // 2. Try Firestore `settings/admin_security`
   try {
-    const result = await callAdminApi('status', { method: 'GET' });
-    if (result.ok && result.data) {
-      return {
-        isSetup: Boolean(result.data.isSetup),
-        mode: result.data.mode || 'password_only'
-      };
+    const fetchPromise = getDoc(doc(db, 'settings', 'admin_security'));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+    const snap = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+    if (snap && snap.exists && snap.exists()) {
+      const data = snap.data() as any;
+      if (data && data.salt && data.hash) {
+        cachedConfig = {
+          salt: data.salt,
+          hash: data.hash,
+          updatedAt: data.updatedAt || new Date().toISOString()
+        };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_CONFIG_KEY, JSON.stringify(cachedConfig));
+        }
+        return cachedConfig;
+      }
     }
-    return { isSetup: false, mode: 'password_only' };
   } catch (err) {
-    return { isSetup: false, mode: 'password_only' };
+    // Graceful fallback to initial default or cached config
   }
+
+  if (!cachedConfig) {
+    cachedConfig = INITIAL_ADMIN_CONFIG;
+  }
+  return cachedConfig;
 }
 
 /**
- * Performs first-time administrator password configuration.
- */
-export async function setupFirstTimeAdmin(password: string, confirmPassword: string): Promise<AdminAuthResult> {
-  if (!password || !password.trim()) {
-    return {
-      success: false,
-      error: 'Please enter a password.'
-    };
-  }
-
-  if (password.length < 8) {
-    return {
-      success: false,
-      error: 'Password must be at least 8 characters long.'
-    };
-  }
-
-  if (password !== confirmPassword) {
-    return {
-      success: false,
-      error: 'Passwords do not match.'
-    };
-  }
-
-  try {
-    const result = await callAdminApi('setup', {
-      method: 'POST',
-      body: JSON.stringify({ password, confirmPassword })
-    });
-
-    if (result.ok && result.data.success) {
-      if (result.data.token && typeof window !== 'undefined') {
-        localStorage.setItem(TOKEN_KEY, result.data.token);
-      }
-      return {
-        success: true,
-        role: result.data.role || 'admin'
-      };
-    }
-
-    return {
-      success: false,
-      error: result.data.error || 'Failed to setup administrator password.'
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: 'Unable to connect to authentication server. Please try again.'
-    };
-  }
-}
-
-/**
- * Authenticates the administrator using server-side password verification.
- * Zero client-side credential exposure.
+ * Authenticates administrator using the single master password.
+ * Checks against the customized Firestore hash or the initial password hash.
  */
 export async function authenticateAdmin(password: string): Promise<AdminAuthResult> {
   if (!password || !password.trim()) {
@@ -191,25 +165,33 @@ export async function authenticateAdmin(password: string): Promise<AdminAuthResu
   }
 
   try {
-    const result = await callAdminApi('login', {
-      method: 'POST',
-      body: JSON.stringify({ password })
-    });
+    const config = await getActiveAdminConfig();
+    
+    // Check against active config
+    const computedHash = await derivePasswordHash(password.trim(), config.salt);
+    let isMatch = safeEqual(computedHash, config.hash);
 
-    if (result.ok && result.data.success) {
-      if (result.data.token && typeof window !== 'undefined') {
-        localStorage.setItem(TOKEN_KEY, result.data.token);
+    // Also check raw password without trimming in case trailing spaces were intentional
+    if (!isMatch && password !== password.trim()) {
+      const rawHash = await derivePasswordHash(password, config.salt);
+      isMatch = safeEqual(rawHash, config.hash);
+    }
+
+    if (isMatch) {
+      if (typeof window !== 'undefined') {
+        const sessionToken = `admin_sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+        sessionStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+        localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
       }
       return {
         success: true,
-        role: result.data.role || 'admin'
+        role: 'admin'
       };
     }
 
     return {
       success: false,
-      needsSetup: Boolean(result.data.needsSetup),
-      error: result.data.error || 'Incorrect administrator password. Please try again.'
+      error: 'Incorrect administrator password. Please try again.'
     };
   } catch (err: any) {
     return {
@@ -220,22 +202,27 @@ export async function authenticateAdmin(password: string): Promise<AdminAuthResu
 }
 
 /**
- * Verifies if the current administrator session is valid.
+ * Verifies if an active administrator session is currently present.
  */
 export async function verifyAdminSession(): Promise<boolean> {
-  try {
-    const result = await callAdminApi('verify', { method: 'GET' });
-    if (result.ok && result.data) {
-      return Boolean(result.data.authenticated);
-    }
-    return false;
-  } catch (err) {
-    return false;
+  if (typeof window === 'undefined') return false;
+  const inSession = sessionStorage.getItem(SESSION_TOKEN_KEY);
+  if (inSession) return true;
+  const inLocal = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (inLocal) {
+    sessionStorage.setItem(SESSION_TOKEN_KEY, inLocal);
+    return true;
   }
+  return false;
 }
 
 /**
- * Changes administrator password securely via server-side cryptographic update.
+ * Changes administrator password:
+ * - Validates current password against active hash
+ * - Validates new password (minimum 8 chars)
+ * - Cryptographically hashes new password
+ * - Persists new credentials to Firestore `settings/admin_security`
+ * - Immediately invalidates old password and activates new password
  */
 export async function changeAdminPassword(
   currentPassword: string,
@@ -256,71 +243,63 @@ export async function changeAdminPassword(
   }
 
   try {
-    const result = await callAdminApi('change-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        currentPassword,
-        newPassword
-      })
-    });
+    const config = await getActiveAdminConfig();
+    const currentHash = await derivePasswordHash(currentPassword.trim(), config.salt);
+    const isCurrentValid = safeEqual(currentHash, config.hash);
 
-    if (result.ok && result.data.success) {
+    if (!isCurrentValid) {
       return {
-        success: true,
-        message: result.data.message || 'Administrator password updated successfully.'
+        success: false,
+        error: 'Incorrect current administrator password.'
       };
     }
 
+    // Generate new cryptographic salt and hash for new password
+    const newSalt = generateRandomSalt();
+    const newHash = await derivePasswordHash(newPassword.trim(), newSalt);
+    const nowIso = new Date().toISOString();
+
+    const newConfig: AdminSecurityConfig = {
+      salt: newSalt,
+      hash: newHash,
+      updatedAt: nowIso
+    };
+
+    // Save to Firestore
+    try {
+      const docRef = doc(db, 'settings', 'admin_security');
+      await setDoc(docRef, newConfig, { merge: true });
+    } catch (saveErr) {
+      console.warn('[AdminAuth] Firestore write notice (saving to local store):', saveErr);
+    }
+
+    // Update in-memory and local cache
+    cachedConfig = newConfig;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_CONFIG_KEY, JSON.stringify(newConfig));
+      const newSessionToken = `admin_sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+      sessionStorage.setItem(SESSION_TOKEN_KEY, newSessionToken);
+      localStorage.setItem(SESSION_TOKEN_KEY, newSessionToken);
+    }
+
     return {
-      success: false,
-      error: result.data.error || 'Failed to update administrator password.'
+      success: true,
+      message: 'Administrator password changed successfully.'
     };
   } catch (err: any) {
     return {
       success: false,
-      error: 'Unable to connect to server to update password. Please try again.'
+      error: 'Failed to update administrator password. Please try again.'
     };
   }
 }
 
 /**
- * Signs out administrator and destroys active session server-side.
+ * Signs out administrator and removes active session token.
  */
 export async function logoutAdminSession(): Promise<void> {
-  const token = getAdminToken();
   if (typeof window !== 'undefined') {
-    localStorage.removeItem(TOKEN_KEY);
-  }
-
-  try {
-    await callAdminApi('logout', {
-      method: 'POST',
-      body: JSON.stringify({ token })
-    });
-  } catch (err) {
-    // Non-blocking
-  }
-}
-
-/**
- * Resets administrator authentication state (returns system to First-Time Setup).
- * Requires active admin session or secret resetKey.
- */
-export async function resetAdminSetup(resetKey?: string): Promise<{ success: boolean; error?: string; message?: string }> {
-  try {
-    const result = await callAdminApi('reset', {
-      method: 'POST',
-      body: JSON.stringify({ resetKey })
-    });
-
-    if (result.ok && result.data.success) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(TOKEN_KEY);
-      }
-      return { success: true, message: result.data.message };
-    }
-    return { success: false, error: result.data.error || 'Failed to reset admin setup.' };
-  } catch (err: any) {
-    return { success: false, error: 'Unable to connect to server.' };
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
   }
 }

@@ -260,7 +260,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
           <form onSubmit={handlePasswordLogin} className="space-y-4 animate-fadeIn">
             <div className="space-y-1.5">
               <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                Password
+                PASSWORD
               </label>
               <div className="relative">
                 <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -268,7 +268,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   type={showPassword ? 'text' : 'password'}
                   required
                   autoFocus
-                  placeholder="Enter Admin Password"
+                  placeholder="Enter administrator password"
                   value={passwordInput}
                   onChange={(e) => {
                     setPasswordInput(e.target.value);

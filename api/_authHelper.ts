@@ -16,7 +16,7 @@ export interface StoredAuthConfig {
 // Generated using PBKDF2 (100,000 iterations, SHA-512, 64-byte key)
 export const DEFAULT_ADMIN_AUTH_CONFIG: StoredAuthConfig = {
   salt: '9f8b4a2c1d3e5f7a0b2c4d6e8f1a3b5c',
-  hash: '30f43d88fd8772688894aad01cef1844a713947619d8a7680d172d081126b11f58f24da2033f521a5d192fe87f2ab3bff3d06cbb65fec5e13fea39808bad36a2',
+  hash: 'd97087b85cb39e5442199d06eaf7ccd99a8b451d4a4ab52f334ba3e8ca7ce142464176ed4d2093c2a569bc7e6da91bff11d7774730ba67e26a3b1fe7913897e2',
   updatedAt: '2026-08-28T00:00:00.000Z'
 };
 
@@ -71,7 +71,12 @@ export function resetRateLimit(ip: string) {
 }
 
 export function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  try {
+    const saltBuffer = Buffer.from(salt, 'hex');
+    return crypto.pbkdf2Sync(password, saltBuffer, 100000, 64, 'sha512').toString('hex');
+  } catch {
+    return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  }
 }
 
 export function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
