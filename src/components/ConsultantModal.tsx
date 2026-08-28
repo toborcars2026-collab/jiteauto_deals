@@ -77,6 +77,15 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
     const url = getWhatsAppLink(textMessage, businessSettings?.whatsAppNumber);
     setWhatsappUrl(url);
     setIsSubmitted(true);
+
+    // Open WhatsApp directly on submission
+    if (typeof window !== 'undefined') {
+      try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        console.warn('Could not open WhatsApp popup directly, fallback available on screen:', err);
+      }
+    }
   };
 
   const handleReset = () => {
@@ -215,6 +224,7 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
               <div className="pt-2">
                 <button
                   type="submit"
+                  id="consultant_modal_submit_button"
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md cursor-pointer"
                 >
                   <MessageSquare size={16} />
