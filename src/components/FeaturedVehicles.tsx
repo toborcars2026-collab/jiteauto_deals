@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Vehicle } from '../types';
 import VehicleCard from './VehicleCard';
+import { isVehicleActive } from '../utils';
 
 interface FeaturedVehiclesProps {
   vehicles: Vehicle[];
@@ -23,9 +24,9 @@ export default function FeaturedVehicles({
   const handleViewAll = onBrowseAll || onViewAllCars || (() => {});
   const handleConsult = onConsultVehicle || onAskAboutCar || (() => {});
 
-  // Select top 6 active vehicles
+  // Select top 6 active & available vehicles
   const featuredList = vehicles
-    .filter((v) => !v.status || v.status === 'Active')
+    .filter((v) => isVehicleActive(v) && v.status !== 'Sold')
     .slice(0, 6);
 
   return (

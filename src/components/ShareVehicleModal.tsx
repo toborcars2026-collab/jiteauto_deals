@@ -175,13 +175,13 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
               </div>
             </div>
 
-            {/* Inactive Notice if vehicle is inactive */}
+            {/* Notice if vehicle is marked hidden or inactive */}
             {!isActive && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs">
-                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-amber-900 text-xs">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-600" />
                 <div>
-                  <strong className="font-bold block">Vehicle is Currently Inactive / Hidden</strong>
-                  <span>This car is set to inactive/sold in your catalog. Mark it as active in "Modify Specs" before sharing publicly with buyers.</span>
+                  <strong className="font-bold block">Vehicle is Currently Marked as Hidden / Inactive</strong>
+                  <span>This car is hidden from public search catalog. You can still share this link directly with buyers anytime.</span>
                 </div>
               </div>
             )}
@@ -204,12 +204,9 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="copy_share_url_btn"
                   onClick={handleCopyLink}
-                  disabled={!isActive}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
                     copied
                       ? 'bg-emerald-600 text-white shadow-sm'
-                      : !isActive
-                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                       : 'bg-slate-900 hover:bg-slate-800 text-white active:scale-95'
                   }`}
                 >
@@ -236,12 +233,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="share_whatsapp_btn"
                   onClick={handleWhatsAppShare}
-                  disabled={!isActive}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group ${
-                    !isActive
-                      ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200'
-                      : 'bg-[#25D366]/10 hover:bg-[#25D366]/20 border-[#25D366]/30 text-emerald-800 hover:border-[#25D366] active:scale-95'
-                  }`}
+                  className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group bg-[#25D366]/10 hover:bg-[#25D366]/20 border-[#25D366]/30 text-emerald-800 hover:border-[#25D366] active:scale-95 cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center mb-1.5 shadow-sm group-hover:scale-110 transition-transform">
                     <MessageCircle size={16} />
@@ -254,12 +246,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="share_facebook_btn"
                   onClick={handleFacebookShare}
-                  disabled={!isActive}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group ${
-                    !isActive
-                      ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200'
-                      : 'bg-[#1877F2]/10 hover:bg-[#1877F2]/20 border-[#1877F2]/30 text-blue-800 hover:border-[#1877F2] active:scale-95'
-                  }`}
+                  className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group bg-[#1877F2]/10 hover:bg-[#1877F2]/20 border-[#1877F2]/30 text-blue-800 hover:border-[#1877F2] active:scale-95 cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#1877F2] text-white flex items-center justify-center mb-1.5 shadow-sm group-hover:scale-110 transition-transform">
                     <span className="font-bold font-sans text-sm">f</span>
@@ -272,12 +259,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="share_twitter_btn"
                   onClick={handleTwitterShare}
-                  disabled={!isActive}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group ${
-                    !isActive
-                      ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200'
-                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-900 hover:border-slate-400 active:scale-95'
-                  }`}
+                  className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-900 hover:border-slate-400 active:scale-95 cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center mb-1.5 shadow-sm group-hover:scale-110 transition-transform">
                     <span className="font-bold text-xs">𝕏</span>
@@ -290,12 +272,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="share_telegram_btn"
                   onClick={handleTelegramShare}
-                  disabled={!isActive}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group ${
-                    !isActive
-                      ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200'
-                      : 'bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border-[#229ED9]/30 text-[#0088cc] hover:border-[#229ED9] active:scale-95'
-                  }`}
+                  className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all text-center group bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border-[#229ED9]/30 text-[#0088cc] hover:border-[#229ED9] active:scale-95 cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#229ED9] text-white flex items-center justify-center mb-1.5 shadow-sm group-hover:scale-110 transition-transform">
                     <Send size={14} className="translate-x-[-1px] translate-y-[1px]" />
@@ -311,12 +288,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                   <button
                     id="share_native_sheet_btn"
                     onClick={handleNativeShare}
-                    disabled={!isActive}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
-                      !isActive
-                        ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
-                        : 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 active:scale-98'
-                    }`}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 active:scale-98 cursor-pointer"
                   >
                     <Smartphone size={15} className="text-amber-600" />
                     <span>Open Phone Share Sheet (More Apps)</span>
@@ -326,7 +298,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
                 <button
                   id="test_open_vehicle_btn"
                   onClick={handleOpenPage}
-                  className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                 >
                   <Globe size={15} />
                   <span>Test Open Vehicle Page</span>

@@ -322,7 +322,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   // KPI Calculations
   const totalVehicles = vehicles.length;
-  const availableVehicles = vehicles.filter((v) => v.status === 'Available' || !v.status).length;
+  const availableVehicles = vehicles.filter((v) => v.status === 'Available' || v.status === 'Active' || !v.status).length;
   const reservedVehicles = vehicles.filter((v) => v.status === 'Reserved').length;
   const soldVehicles = vehicles.filter((v) => v.status === 'Sold').length;
   const featuredCount = vehicles.filter((v) => v.isFeatured).length;

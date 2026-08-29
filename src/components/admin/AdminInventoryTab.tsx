@@ -203,6 +203,8 @@ export default function AdminInventoryTab({
         ? true
         : statusFilter === 'Hidden'
         ? car.status === 'Hidden' || car.status === 'Inactive'
+        : statusFilter === 'Available'
+        ? car.status === 'Available' || car.status === 'Active' || !car.status
         : car.status === statusFilter;
 
     const matchesFeatured =

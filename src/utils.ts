@@ -33,9 +33,15 @@ export function formatMileage(km: number): string {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
-// Check if a vehicle is active (defaulting to true if status is undefined or 'Active')
-export function isVehicleActive(v: Vehicle): boolean {
-  return !v.status || v.status === 'Active';
+// Check if a vehicle is active (defaulting to true for all uploaded/available vehicles until explicitly marked as 'Hidden' or 'Inactive')
+export function isVehicleActive(v: Vehicle | null | undefined): boolean {
+  if (!v) return false;
+  if (!v.status) return true;
+  const status = String(v.status).trim().toLowerCase();
+  if (status === 'hidden' || status === 'inactive') {
+    return false;
+  }
+  return true;
 }
 
 /**

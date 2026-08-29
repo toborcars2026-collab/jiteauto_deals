@@ -143,7 +143,7 @@ export default function BrowseCarsPage({
       .filter((v) => {
         // Status filter:
         if (selectedStatus === 'Available') {
-          if (v.status === 'Sold' || v.status === 'Reserved' || v.status === 'Inactive') return false;
+          if (v.status === 'Sold' || v.status === 'Reserved' || v.status === 'Inactive' || v.status === 'Hidden') return false;
         } else if (selectedStatus === 'Reserved') {
           if (v.status !== 'Reserved') return false;
         } else if (selectedStatus === 'Sold') {
