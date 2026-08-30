@@ -137,7 +137,7 @@ export function getVehicleSocialShareLinks(vehicle: Vehicle) {
     title,
     price,
     text,
-    whatsappUrl: `https://wa.me/?text=${encodeURIComponent(text)}`,
+    whatsappUrl: `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
     facebookUrl: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     twitterUrl: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out this ${title} for ${price} on Jite Auto Deals!`)}&url=${encodeURIComponent(url)}`,
     telegramUrl: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`✨ ${title} - ${price} on Jite Auto Deals`)}`
@@ -1013,7 +1013,8 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
   const normalized = normalizeVehicleData(vehicle);
   try {
     const docRef = doc(db, 'vehicles', normalized.id);
-    await setDoc(docRef, normalized);
+    const payload = cleanFirestoreData(normalized);
+    await setDoc(docRef, payload);
 
     // Verify document write directly on Firestore
     const verifySnap = await getDoc(docRef);
@@ -1244,6 +1245,26 @@ export function getLeads(): Lead[] {
 }
 
 /**
+ * Recursively cleans an object by stripping out all `undefined` values,
+ * which Firestore strictly forbids in setDoc, updateDoc, and addDoc.
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Record<string, any> {
+  if (!obj || typeof obj !== 'object') return obj;
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = (obj as any)[key];
+    if (val !== undefined) {
+      if (val !== null && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
+        cleaned[key] = cleanFirestoreData(val);
+      } else {
+        cleaned[key] = val;
+      }
+    }
+  }
+  return cleaned;
+}
+
+/**
  * Saves a new lead to Cloud Firestore.
  */
 export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead {
@@ -1260,8 +1281,9 @@ export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead 
     localStorage.setItem(LEADS_KEY, JSON.stringify(current));
   } catch {}
 
-  // Write to Cloud Firestore
-  setDoc(doc(db, 'leads', newLead.id), newLead).catch((err) => {
+  // Write to Cloud Firestore safely stripping undefined properties
+  const payload = cleanFirestoreData(newLead);
+  setDoc(doc(db, 'leads', newLead.id), payload).catch((err) => {
     console.warn('[Firestore] Error saving lead to Firestore:', err);
   });
 
@@ -1279,9 +1301,12 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
   } catch {}
 
   // Update in Cloud Firestore
-  updateDoc(doc(db, 'leads', leadId), updates).catch((err) => {
-    console.warn('[Firestore] Error updating lead in Firestore:', err);
-  });
+  const payload = cleanFirestoreData(updates);
+  if (Object.keys(payload).length > 0) {
+    updateDoc(doc(db, 'leads', leadId), payload).catch((err) => {
+      console.warn('[Firestore] Error updating lead in Firestore:', err);
+    });
+  }
 
   return updated;
 }
@@ -1366,8 +1391,9 @@ export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'
     localStorage.setItem(INQUIRIES_KEY, JSON.stringify(current));
   } catch {}
 
-  // Write to Cloud Firestore
-  setDoc(doc(db, 'inquiries', newInquiry.id), newInquiry).catch((err) => {
+  // Write to Cloud Firestore safely stripping undefined properties
+  const payload = cleanFirestoreData(newInquiry);
+  setDoc(doc(db, 'inquiries', newInquiry.id), payload).catch((err) => {
     console.warn('[Firestore] Error saving inquiry to Firestore:', err);
   });
 
@@ -1385,9 +1411,12 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
   } catch {}
 
   // Update in Cloud Firestore
-  updateDoc(doc(db, 'inquiries', inquiryId), updates).catch((err) => {
-    console.warn('[Firestore] Error updating inquiry in Firestore:', err);
-  });
+  const payload = cleanFirestoreData(updates);
+  if (Object.keys(payload).length > 0) {
+    updateDoc(doc(db, 'inquiries', inquiryId), payload).catch((err) => {
+      console.warn('[Firestore] Error updating inquiry in Firestore:', err);
+    });
+  }
 
   return updated;
 }
@@ -1500,7 +1529,8 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
 
   try {
     const docRef = doc(db, 'settings', 'business');
-    await setDoc(docRef, updated, { merge: true });
+    const payload = cleanFirestoreData(updated);
+    await setDoc(docRef, payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'settings/business');
     throw error;
@@ -1746,6 +1776,43 @@ export function getBusinessPhoneCallUrl(customSettings?: BusinessSettings): stri
 }
 
 /**
+ * Robustly normalizes any phone input into a valid international WhatsApp phone number.
+ * Handles Nigerian local numbers (e.g. 08180823197 -> 2348180823197),
+ * 10-digit formats (e.g. 8180823197 -> 2348180823197),
+ * and existing international formats (e.g. +2348180823197 -> 2348180823197).
+ */
+export function normalizeWhatsAppNumber(rawPhone?: string): string {
+  if (!rawPhone || typeof rawPhone !== 'string' || !rawPhone.trim()) {
+    return OFFICIAL_WHATSAPP_NUMBER;
+  }
+  let digits = rawPhone.replace(/\D/g, '');
+  if (!digits) return OFFICIAL_WHATSAPP_NUMBER;
+
+  // If local Nigerian 11-digit number starting with 0 (e.g., 08180823197 -> 2348180823197)
+  if (digits.startsWith('0') && digits.length === 11) {
+    return '234' + digits.slice(1);
+  }
+  // If 10-digit Nigerian number without leading zero (e.g., 8180823197 -> 2348180823197)
+  if (
+    digits.length === 10 &&
+    (digits.startsWith('80') ||
+      digits.startsWith('81') ||
+      digits.startsWith('70') ||
+      digits.startsWith('90') ||
+      digits.startsWith('91') ||
+      digits.startsWith('71') ||
+      digits.startsWith('82'))
+  ) {
+    return '234' + digits;
+  }
+  // If already starts with 234 (e.g., 2348180823197)
+  if (digits.startsWith('234')) {
+    return digits;
+  }
+  return digits;
+}
+
+/**
  * Generates an official WhatsApp chat URL, defaulting dynamically to the central business settings.
  */
 export function getWhatsAppLink(message?: string, customPhone?: string): string {
@@ -1759,11 +1826,38 @@ export function getWhatsAppLink(message?: string, customPhone?: string): string 
     }
   }
 
-  const cleanPhone = (targetPhone || OFFICIAL_WHATSAPP_NUMBER).replace(/\D/g, '');
+  const cleanPhone = normalizeWhatsAppNumber(targetPhone);
   if (!message || !message.trim()) {
     return `https://wa.me/${cleanPhone}`;
   }
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message.trim())}`;
+}
+
+/**
+ * Safely opens a WhatsApp URL or external link, handling iframe sandboxing and popup blockers gracefully.
+ */
+export function safeOpenWhatsApp(url: string): void {
+  if (!url || typeof window === 'undefined') return;
+  try {
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try {
+          document.body.removeChild(a);
+        } catch {}
+      }, 300);
+    }
+  } catch (err) {
+    try {
+      window.location.href = url;
+    } catch {}
+  }
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   saveLead,
   getHelpMeFindCarMessage,
   getWhatsAppLink,
+  safeOpenWhatsApp,
   getBusinessPhoneDisplay,
   getBusinessPhoneCallUrl,
 } from '../utils';
@@ -210,6 +211,7 @@ export default function FindMyCarPage({ onGoHome, onBrowseCars, businessSettings
     const directUrl = getWhatsAppLink(msg, businessSettings?.whatsAppNumber);
     setWhatsappUrl(directUrl);
     setIsSubmitted(true);
+    safeOpenWhatsApp(directUrl);
   };
 
   return (

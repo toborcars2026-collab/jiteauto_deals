@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, Phone, MessageSquare, CheckCircle, ShieldCheck } from 'lucide-react';
 import { Vehicle } from '../types';
-import { formatCurrency, getWhatsAppLink, getLeadQualificationMessage, saveInquiry, OFFICIAL_PHONE_CALL_URL } from '../utils';
+import { formatCurrency, getWhatsAppLink, safeOpenWhatsApp, getLeadQualificationMessage, saveInquiry, OFFICIAL_PHONE_CALL_URL } from '../utils';
 
 interface LeadQualifierModalProps {
   vehicle: Vehicle | null;
@@ -90,8 +90,7 @@ export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenCon
     );
 
     const waLink = getWhatsAppLink(waText);
-    window.open(waLink, '_blank', 'noopener,noreferrer');
-    onClose();
+    safeOpenWhatsApp(waLink);
   };
 
   const handleCallOption = () => {

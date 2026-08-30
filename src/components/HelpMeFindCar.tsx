@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageSquare, ShieldCheck, CheckCircle, Send } from 'lucide-react';
-import { saveLead, getWhatsAppLink, getHelpMeFindCarMessage, formatCurrency } from '../utils';
+import { saveLead, getWhatsAppLink, safeOpenWhatsApp, getHelpMeFindCarMessage, formatCurrency } from '../utils';
 
 interface HelpMeFindCarProps {
   onOpenConsultantModal?: (customMsg?: string) => void;
@@ -64,9 +64,7 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
       onOpenConsultantModal(msg);
     } else {
       const waLink = getWhatsAppLink(msg);
-      setTimeout(() => {
-        window.open(waLink, '_blank', 'noopener,noreferrer');
-      }, 1000);
+      safeOpenWhatsApp(waLink);
     }
   };
 

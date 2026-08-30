@@ -6,6 +6,7 @@ import {
   saveInquiry,
   formatCurrency,
   getWhatsAppLink,
+  safeOpenWhatsApp,
   getVehicleInquiryMessage,
   getGeneralConsultationMessage,
   getBusinessPhoneDisplay,
@@ -34,19 +35,20 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !phone.trim()) return;
+    const effectiveName = fullName.trim() || 'Interested Buyer';
+    const effectivePhone = phone.trim() || 'Contact via WhatsApp';
 
     // Save inquiry to Firestore / LocalStorage
     saveInquiry({
-      name: fullName.trim(),
-      phone: phone.trim(),
+      name: effectiveName,
+      phone: effectivePhone,
       vehicleId: vehicle ? vehicle.id : 'general_consultation',
       vehicleName: vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'General Consultation',
-      budget: vehicle ? vehicle.price : undefined,
+      ...(vehicle?.price ? { budget: vehicle.price } : {}),
       paymentMethod: paymentPreference,
       readyToBuy: 'Immediate / Active',
       preferredContact: 'WhatsApp',
-      message: message.trim(),
+      message: message.trim() || 'Direct consultation request from website',
     });
 
     let textMessage = '';
@@ -58,8 +60,8 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
         `💰 *Price:* ${formatCurrency(vehicle.price)}\n` +
         `🛡️ *Condition:* ${vehicle.condition}\n` +
         `📍 *Location:* ${vehicle.location}\n\n` +
-        `👤 *My Name:* ${fullName.trim()}\n` +
-        `📞 *Phone:* ${phone.trim()}\n` +
+        `👤 *My Name:* ${effectiveName}\n` +
+        `📞 *Phone:* ${effectivePhone}\n` +
         `💳 *Purchase Route:* ${paymentPreference === 'Financing' ? 'Vehicle Finance' : 'Outright Purchase'}\n` +
         (message.trim() ? `💬 *Note:* ${message.trim()}\n` : '') +
         `\nPlease let me know availability and how we can arrange an inspection.`;
@@ -67,8 +69,8 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
       textMessage =
         `*VEHICLE CONSULTATION INQUIRY* 🚗\n` +
         `Hello Jite Auto Deals! I would like to speak with a vehicle consultant.\n\n` +
-        `👤 *Name:* ${fullName.trim()}\n` +
-        `📞 *Phone:* ${phone.trim()}\n` +
+        `👤 *Name:* ${effectiveName}\n` +
+        `📞 *Phone:* ${effectivePhone}\n` +
         `💳 *Purchase Preference:* ${paymentPreference === 'Financing' ? 'Vehicle Finance' : 'Outright Purchase'}\n` +
         (message.trim() ? `💬 *Message:* ${message.trim()}\n` : '') +
         `\nPlease connect with me to discuss options!`;
@@ -78,14 +80,8 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
     setWhatsappUrl(url);
     setIsSubmitted(true);
 
-    // Open WhatsApp directly on submission
-    if (typeof window !== 'undefined') {
-      try {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      } catch (err) {
-        console.warn('Could not open WhatsApp popup directly, fallback available on screen:', err);
-      }
-    }
+    // Launch WhatsApp safely
+    safeOpenWhatsApp(url);
   };
 
   const handleReset = () => {
@@ -149,10 +145,10 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Full Name *
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Full Name <span className="text-emerald-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -160,13 +156,13 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. Ibrahim Lawal"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-amber-500 focus:outline-none"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Phone / WhatsApp Number *
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Phone / WhatsApp Number <span className="text-emerald-600">*</span>
                 </label>
                 <input
                   type="tel"
@@ -174,12 +170,12 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="e.g. 0818 082 3197"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-amber-500 focus:outline-none"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Purchase Preference
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -188,7 +184,7 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                     onClick={() => setPaymentPreference('Cash')}
                     className={`py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
                       paymentPreference === 'Cash'
-                        ? 'bg-slate-950 text-white'
+                        ? 'bg-slate-950 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -199,7 +195,7 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                     onClick={() => setPaymentPreference('Financing')}
                     className={`py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
                       paymentPreference === 'Financing'
-                        ? 'bg-slate-950 text-white'
+                        ? 'bg-slate-950 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -209,7 +205,7 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Message or Specific Question (Optional)
                 </label>
                 <textarea
@@ -217,7 +213,7 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="e.g. Is this vehicle currently in Abuja or Lagos? Can I inspect tomorrow?"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-amber-500 focus:outline-none"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
                 />
               </div>
 
@@ -225,14 +221,14 @@ export default function ConsultantModal({ isOpen, onClose, vehicle, businessSett
                 <button
                   type="submit"
                   id="consultant_modal_submit_button"
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold rounded-2xl text-base shadow-lg shadow-emerald-950/20 transition-all cursor-pointer group"
                 >
-                  <MessageSquare size={16} />
+                  <MessageSquare size={18} className="group-hover:scale-110 transition-transform" />
                   <span>Start Consultation on WhatsApp</span>
                 </button>
               </div>
 
-              <div className="text-center pt-2">
+              <div className="text-center pt-1">
                 <a
                   href={phoneCallUrl}
                   id="consultant_modal_direct_call_link"

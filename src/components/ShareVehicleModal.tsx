@@ -19,7 +19,8 @@ import {
   getVehicleShareUrl,
   getVehicleSocialShareLinks,
   isVehicleActive,
-  getImageUrl
+  getImageUrl,
+  safeOpenWhatsApp
 } from '../utils';
 
 interface ShareVehicleModalProps {
@@ -88,7 +89,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
   };
 
   const handleWhatsAppShare = () => {
-    window.open(shareDetails.whatsappUrl, '_blank');
+    safeOpenWhatsApp(shareDetails.whatsappUrl);
   };
 
   const handleTelegramShare = () => {

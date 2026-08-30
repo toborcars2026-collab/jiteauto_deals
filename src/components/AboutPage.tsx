@@ -160,7 +160,22 @@ export default function AboutPage({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono pt-2">
+            <a
+              href={getWhatsAppLink(getGeneralConsultationMessage(), businessSettings?.whatsAppNumber)}
+              target="_blank"
+              rel="noopener noreferrer"
+              id="about_page_whatsapp_card"
+              className="p-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 hover:border-emerald-400 transition-all group block cursor-pointer"
+              title="Chat on WhatsApp"
+            >
+              <div className="flex items-center gap-2 mb-1 text-emerald-400">
+                <MessageSquare size={14} />
+                <span className="text-emerald-300 group-hover:text-emerald-200 transition-colors">WhatsApp Desk:</span>
+              </div>
+              <span className="text-white font-bold text-sm group-hover:text-emerald-300 transition-colors block">0818 082 3197</span>
+            </a>
+
             <a
               href={phoneCallUrl}
               id="about_page_call_card"
@@ -184,14 +199,24 @@ export default function AboutPage({
           </div>
 
           <div className="pt-4 flex flex-col sm:flex-row gap-3">
+            <a
+              href={getWhatsAppLink(getGeneralConsultationMessage(), businessSettings?.whatsAppNumber)}
+              target="_blank"
+              rel="noopener noreferrer"
+              id="about_page_direct_whatsapp_btn"
+              className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md cursor-pointer"
+            >
+              <MessageSquare size={16} />
+              <span>Chat on WhatsApp (0818 082 3197)</span>
+            </a>
+
             <button
               type="button"
               id="about_page_talk_consultant_btn"
               onClick={onTalkToConsultant}
-              className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-extrabold rounded-xl text-sm transition-all shadow-md cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-extrabold rounded-xl text-sm transition-all shadow-md cursor-pointer"
             >
-              <MessageSquare size={16} />
-              <span>Talk to a Consultant</span>
+              <span>Consultant Intake Form</span>
             </button>
 
             <button
