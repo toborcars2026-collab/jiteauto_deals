@@ -44,7 +44,8 @@ import {
   fetchInquiries,
   subscribeToInquiries,
   subscribeToVehicles,
-  resetFirestoreVehiclesToDefault,
+  syncVehiclesFromFirestore,
+  fetchVehicles,
   getBusinessSettings,
   fetchBusinessSettings,
   subscribeToBusinessSettings,
@@ -197,20 +198,14 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     setIsShareModalOpen(true);
   };
 
-  // Handle Emergency Reset of Database
-  const handleResetDatabase = async () => {
-    if (
-      confirm(
-        '⚠️ DANGER: Are you sure you want to reset the Cloud Firestore inventory back to the verified default vehicles?'
-      )
-    ) {
-      try {
-        const fresh = await resetFirestoreVehiclesToDefault();
-        setVehicles(fresh);
-        alert('Database restored with official default vehicles.');
-      } catch (err: any) {
-        alert(`Reset failed: ${err?.message || err}`);
-      }
+  // Handle live Firestore sync refresh
+  const handleSyncCloudCatalog = async () => {
+    try {
+      const fresh = await syncVehiclesFromFirestore();
+      setVehicles(fresh);
+      alert(`Cloud Firestore sync complete. ${fresh.length} live vehicles loaded from database.`);
+    } catch (err: any) {
+      alert(`Sync failed: ${err?.message || err}`);
     }
   };
 
@@ -368,12 +363,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
             <button
               type="button"
-              onClick={handleResetDatabase}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 text-xs font-mono flex items-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
-              title="Reset inventory to verified default records"
+              onClick={handleSyncCloudCatalog}
+              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 text-xs font-mono flex items-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
+              title="Refresh inventory directly from Cloud Firestore"
             >
               <RotateCcw size={13} />
-              <span>Reset Defaults</span>
+              <span>Sync Cloud DB</span>
             </button>
 
             <button

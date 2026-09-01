@@ -2,22 +2,12 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnaps
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
-import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
 const VEHICLES_KEY = 'jite_vehicles_v14';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 const SETTINGS_KEY = 'jite_business_settings_v1';
-
-
-// Global tombstone blacklist of permanently removed vehicle IDs
-export const PERMANENTLY_DELETED_VEHICLE_IDS = new Set<string>([
-  'toyota-corolla-s-2015-silver-few-months-used',
-  'lexus-rx350-2015-silver-duty-paid',
-  'toyota-highlander-xle-2017-brown-foreign-used',
-  'toyota-corolla-le-2015-silver-direct-belgium'
-]);
 
 // Format Currency to Nigerian Naira (₦)
 export function formatCurrency(amount: number): string {
@@ -578,33 +568,6 @@ export function getImageUrl(url: string | undefined | null): string {
 // CLOUD FIRESTORE INTEGRATION & REAL-TIME SYNC
 // ============================================================================
 
-let hasSeededFirestore = false;
-
-/**
- * Seeds initial vehicles into Cloud Firestore if the collection is empty.
- */
-async function seedInitialVehiclesIfEmpty(existingVehiclesCount: number): Promise<void> {
-  if (hasSeededFirestore || existingVehiclesCount > 0) return;
-  hasSeededFirestore = true;
-
-  try {
-    const batch = writeBatch(db);
-    const normalizedSeed = INITIAL_VEHICLES
-      .map(normalizeVehicleData)
-      .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-
-    normalizedSeed.forEach((vehicle) => {
-      const docRef = doc(db, 'vehicles', vehicle.id);
-      batch.set(docRef, vehicle);
-    });
-
-    await batch.commit();
-    console.log(`[Firestore] Successfully seeded ${normalizedSeed.length} initial vehicles to Cloud Firestore.`);
-  } catch (error) {
-    console.warn('[Firestore] Seed check skipped or failed:', error);
-  }
-}
-
 /**
  * Subscribes in real-time to the Cloud Firestore `vehicles` collection.
  * Any update (add, edit, delete) anywhere immediately updates all connected devices.
@@ -616,18 +579,6 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
     const unsubscribe = onSnapshot(
       vehiclesCol,
       (snapshot) => {
-        if (snapshot.empty) {
-          // If Firestore is completely empty on initial startup, seed initial catalog once
-          seedInitialVehiclesIfEmpty(0).then(() => {
-            const seed = INITIAL_VEHICLES.map(normalizeVehicleData).filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-            try {
-              localStorage.setItem(VEHICLES_KEY, JSON.stringify(seed));
-            } catch {}
-            onUpdate(seed);
-          });
-          return;
-        }
-
         const list: Vehicle[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as Vehicle;
@@ -635,12 +586,10 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
             ...data,
             id: docSnap.id || data.id,
           });
-          if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
-            list.push(normalized);
-          }
+          list.push(normalized);
         });
 
-        // Save fresh data into local cache
+        // Save authoritative live data into local cache
         try {
           localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
         } catch {}
@@ -674,11 +623,6 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     const vehiclesCol = collection(db, 'vehicles');
     const snapshot = await getDocs(vehiclesCol);
 
-    if (snapshot.empty) {
-      await seedInitialVehiclesIfEmpty(0);
-      return getVehicles();
-    }
-
     const list: Vehicle[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as Vehicle;
@@ -686,9 +630,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
         ...data,
         id: docSnap.id || data.id,
       });
-      if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
-        list.push(normalized);
-      }
+      list.push(normalized);
     });
 
     try {
@@ -715,14 +657,7 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
   const clean = decodeURIComponent(identifier).toLowerCase().trim().replace(/^\/vehicles\/?/, '').replace(/\/$/, '');
   if (!clean) return null;
 
-  // 1. Instant check from local in-memory/localStorage cache
-  const cachedList = getVehicles();
-  const cachedMatch = findVehicleBySlugOrId(cachedList, clean);
-  if (cachedMatch) {
-    return cachedMatch;
-  }
-
-  // 2. Direct Firestore single document lookup by document ID
+  // 1. Direct Firestore single document lookup by document ID
   try {
     const docRef = doc(db, 'vehicles', clean);
     const docSnap = await getDoc(docRef);
@@ -732,25 +667,19 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
         ...data,
         id: docSnap.id || data.id,
       });
-      if (!PERMANENTLY_DELETED_VEHICLE_IDS.has(normalized.id)) {
-        // Update local cache
-        const updated = [normalized, ...cachedList.filter(v => v.id !== normalized.id)];
-        try {
-          localStorage.setItem(VEHICLES_KEY, JSON.stringify(updated));
-        } catch {}
-        return normalized;
-      }
+      return normalized;
     }
   } catch (e) {
     console.warn('[Firestore] Direct doc get error, falling back to query:', e);
   }
 
-  // 3. Fallback: fetch full list if slug differs from Firestore ID
+  // 2. Fetch fresh catalog from Firestore to match slug
   try {
     const all = await fetchVehicles();
     return findVehicleBySlugOrId(all, clean) || null;
   } catch {
-    return null;
+    const cachedList = getVehicles();
+    return findVehicleBySlugOrId(cachedList, clean) || null;
   }
 }
 
@@ -810,29 +739,17 @@ export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: bo
 }
 
 /**
- * Gets cached vehicles from localStorage or fallback seed data.
+ * Gets cached vehicles from localStorage. Returns empty array if no cache exists.
  */
 export function getVehicles(): Vehicle[] {
-  const normalizedSeed = INITIAL_VEHICLES
-    .map(normalizeVehicleData)
-    .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
-
   try {
     const data = localStorage.getItem(VEHICLES_KEY);
-    if (!data) {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
-      return normalizedSeed;
-    }
+    if (!data) return [];
     const parsed = JSON.parse(data) as Vehicle[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalizedSeed));
-      return normalizedSeed;
-    }
-    return parsed
-      .map(normalizeVehicleData)
-      .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeVehicleData);
   } catch (e) {
-    return normalizedSeed;
+    return [];
   }
 }
 
@@ -1086,7 +1003,6 @@ export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
  * Deletes a single vehicle directly from Cloud Firestore.
  */
 export async function deleteVehicleFromFirestore(id: string): Promise<void> {
-  PERMANENTLY_DELETED_VEHICLE_IDS.add(id);
   try {
     const docRef = doc(db, 'vehicles', id);
     await deleteDoc(docRef);
@@ -1105,39 +1021,24 @@ export async function deleteVehicleFromFirestore(id: string): Promise<void> {
 }
 
 /**
- * Resets all vehicles in Cloud Firestore back to default curated inventory.
+ * Refreshes local catalog cache directly from live Cloud Firestore.
  */
-export async function resetFirestoreVehiclesToDefault(): Promise<void> {
-  try {
-    // 1. Delete all existing documents in vehicles collection
-    const snapshot = await getDocs(collection(db, 'vehicles'));
-    const deleteBatch = writeBatch(db);
-    snapshot.forEach((d) => {
-      deleteBatch.delete(d.ref);
-    });
-    await deleteBatch.commit();
+export async function syncVehiclesFromFirestore(): Promise<Vehicle[]> {
+  return fetchVehicles();
+}
 
-    // 2. Repopulate with initial vehicles
-    const addBatch = writeBatch(db);
-    INITIAL_VEHICLES.map(normalizeVehicleData).forEach((v) => {
-      const docRef = doc(db, 'vehicles', v.id);
-      addBatch.set(docRef, v);
-    });
-    await addBatch.commit();
-
-    localStorage.removeItem(VEHICLES_KEY);
-  } catch (error) {
-    console.error('[Firestore] Failed to reset default vehicles:', error);
-  }
+/**
+ * Legacy reset method: alias to syncVehiclesFromFirestore to ensure no mock data is ever re-seeded.
+ */
+export async function resetFirestoreVehiclesToDefault(): Promise<Vehicle[]> {
+  return fetchVehicles();
 }
 
 /**
  * Synchronizes an array of vehicles to Firestore and LocalStorage (backward compatible).
  */
 export function saveVehicles(vehicles: Vehicle[]): void {
-  const normalized = vehicles
-    .map(normalizeVehicleData)
-    .filter(v => !PERMANENTLY_DELETED_VEHICLE_IDS.has(v.id));
+  const normalized = vehicles.map(normalizeVehicleData);
 
   try {
     localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));

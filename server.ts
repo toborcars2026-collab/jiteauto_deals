@@ -4,7 +4,6 @@ import fs from "fs";
 import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
-import { INITIAL_VEHICLES } from "./src/data";
 import { resolveRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
 import {
   getAdminAuthConfig,
@@ -318,45 +317,24 @@ function normalizeVehicle(v: any): any {
 // Helper functions for reading and writing JSON storage
 function readVehiclesStore() {
   ensureDataDir();
-  const deletedSet = readDeletedIdsStore();
-  const normalizedInitial = INITIAL_VEHICLES
-    .map(normalizeVehicle)
-    .filter(v => !deletedSet.has(v.id));
-
   if (!fs.existsSync(VEHICLES_FILE)) {
-    fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalizedInitial, null, 2), "utf-8");
-    return normalizedInitial;
+    return [];
   }
   try {
     const raw = fs.readFileSync(VEHICLES_FILE, "utf-8");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
-      const normalizedData = data
-        .map(normalizeVehicle)
-        .filter(v => !deletedSet.has(v.id));
-      const existingIds = new Set(normalizedData.map((v: any) => v.id));
-      const missingInitial = normalizedInitial.filter((v: any) => !existingIds.has(v.id) && !deletedSet.has(v.id));
-      
-      let finalVehicles = normalizedData;
-      if (missingInitial.length > 0) {
-        finalVehicles = [...missingInitial, ...normalizedData];
-      }
-      fs.writeFileSync(VEHICLES_FILE, JSON.stringify(finalVehicles, null, 2), "utf-8");
-      return finalVehicles;
+      return data.map(normalizeVehicle);
     }
   } catch (e) {
-    console.error("Failed to parse vehicles.json, falling back to seed data", e);
+    console.error("Failed to parse vehicles.json", e);
   }
-  fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalizedInitial, null, 2), "utf-8");
-  return normalizedInitial;
+  return [];
 }
 
 function saveVehiclesStore(vehicles: any[]) {
   ensureDataDir();
-  const deletedSet = readDeletedIdsStore();
-  const normalized = vehicles
-    .map(normalizeVehicle)
-    .filter(v => !deletedSet.has(v.id));
+  const normalized = Array.isArray(vehicles) ? vehicles.map(normalizeVehicle) : [];
   fs.writeFileSync(VEHICLES_FILE, JSON.stringify(normalized, null, 2), "utf-8");
   return normalized;
 }
@@ -465,8 +443,8 @@ app.post("/api/vehicles/delete", requireAdminSession, (req, res) => {
 });
 
 app.post("/api/vehicles/reset", requireAdminSession, (req, res) => {
-  saveVehiclesStore(INITIAL_VEHICLES);
-  res.json({ success: true, vehicles: INITIAL_VEHICLES });
+  const current = readVehiclesStore();
+  res.json({ success: true, vehicles: current });
 });
 
 app.get("/api/leads", (req, res) => {
