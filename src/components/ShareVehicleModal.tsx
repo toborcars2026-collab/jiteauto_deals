@@ -71,7 +71,7 @@ export default function ShareVehicleModal({ vehicle, isOpen, onClose }: ShareVeh
     try {
       await navigator.share({
         title: shareDetails.title,
-        text: `${shareDetails.title} (${formatCurrency(vehicle.price)}) - Verified listing on Jite Auto Deals Nigeria`,
+        text: shareDetails.text,
         url: shareDetails.url
       });
     } catch (e) {

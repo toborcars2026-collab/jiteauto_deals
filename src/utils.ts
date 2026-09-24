@@ -62,7 +62,7 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
     return `${origin}/vehicles/${encodeURIComponent(slug)}`;
   }
   
-  return `https://jiteautodeals-sable.vercel.app/vehicles/${encodeURIComponent(slug)}`;
+  return `https://jiteautodealss.vercel.app/vehicles/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -73,7 +73,7 @@ export function getVehiclePathUrl(vehicle: Vehicle): string {
   const slug = getVehicleSlug(vehicle);
   const origin = typeof window !== 'undefined' && window.location.origin
     ? window.location.origin
-    : 'https://jiteautodeals-sable.vercel.app';
+    : 'https://jiteautodealss.vercel.app';
   return `${origin}/vehicles/${slug}`;
 }
 
@@ -107,20 +107,59 @@ export function findVehicleBySlugOrId(vehicles: Vehicle[], identifier: string): 
 }
 
 /**
+ * Formats a clean title with Model Year, Make, Model, and Trim/Variant if present.
+ */
+export function getVehicleFormattedTitle(vehicle: Vehicle): string {
+  if (!vehicle) return '';
+  const year = vehicle.year ? String(vehicle.year) : '';
+  const make = (vehicle.make || '').trim();
+  const modelStr = (vehicle.model || '').trim();
+  const trimCandidate = ((vehicle as any).trim || (vehicle as any).variant || '').toString().trim();
+  const modelWithTrim = trimCandidate && !modelStr.toLowerCase().includes(trimCandidate.toLowerCase())
+    ? `${modelStr} ${trimCandidate}`
+    : modelStr;
+
+  return [year, make, modelWithTrim].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Generates the official concise vehicle share caption for Jite Auto Deals.
+ * Format:
+ * ✨ [MODEL YEAR] [MAKE] [MODEL] [TRIM/VARIANT] ✨
+ * 💰 [PRICE]
+ * 🛡️ [CONDITION] | 📍 [LOCATION] | 🚗 [TRANSMISSION]
+ * 
+ * 🔎 Interested? View the Full Vehicle Profile & Details:
+ * [VEHICLE PROFILE URL]
+ * 
+ * 🚘 Jite Auto Deals — Your Trusted Vehicle Consultant
+ */
+export function generateVehicleShareCaption(vehicle: Vehicle): string {
+  const url = getVehicleShareUrl(vehicle);
+  const formattedTitle = getVehicleFormattedTitle(vehicle);
+  const price = formatCurrency(vehicle.price);
+  const condition = vehicle.condition || 'Foreign Used';
+  const location = vehicle.location || 'Abuja';
+  const transmission = vehicle.transmission || 'Automatic';
+
+  return (
+    `✨ ${formattedTitle} ✨\n` +
+    `💰 ${price}\n` +
+    `🛡️ ${condition} | 📍 ${location} | 🚗 ${transmission}\n\n` +
+    `🔎 Interested? View the Full Vehicle Profile & Details:\n` +
+    `${url}\n\n` +
+    `🚘 Jite Auto Deals — Your Trusted Vehicle Consultant`
+  );
+}
+
+/**
  * Generates formatted social share links and text for a vehicle.
  */
 export function getVehicleSocialShareLinks(vehicle: Vehicle) {
   const url = getVehicleShareUrl(vehicle);
-  const title = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+  const title = getVehicleFormattedTitle(vehicle);
   const price = formatCurrency(vehicle.price);
-  
-  const text = 
-    `✨ *${title}* ✨\n` +
-    `💰 *Price:* ${price}\n` +
-    `🛡️ *Condition:* ${vehicle.condition}\n` +
-    `📍 *Location:* ${vehicle.location}\n` +
-    `🚗 *Transmission:* ${vehicle.transmission}\n\n` +
-    `🔗 *View Full Specs & HD Photos on Jite Auto Deals:*\n${url}`;
+  const text = generateVehicleShareCaption(vehicle);
 
   return {
     url,
@@ -129,8 +168,8 @@ export function getVehicleSocialShareLinks(vehicle: Vehicle) {
     text,
     whatsappUrl: `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
     facebookUrl: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-    twitterUrl: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out this ${title} for ${price} on Jite Auto Deals!`)}&url=${encodeURIComponent(url)}`,
-    telegramUrl: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`✨ ${title} - ${price} on Jite Auto Deals`)}`
+    twitterUrl: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
+    telegramUrl: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
   };
 }
 
