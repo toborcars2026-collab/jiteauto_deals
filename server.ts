@@ -817,7 +817,7 @@ async function startServer() {
 
     try {
       const vehicles = readVehiclesStore();
-      const host = req.get("host") || "jiteautodeals-sable.vercel.app";
+      const host = req.get("host") || "jiteautodeals.vercel.app";
       const protocol = req.protocol || "https";
       const origin = `${protocol}://${host}`;
       const originalUrl = req.originalUrl || req.url || "/";

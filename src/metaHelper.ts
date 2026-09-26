@@ -18,10 +18,10 @@ export interface PageMetadata {
   vehicle?: Vehicle | null;
 }
 
-export const DEFAULT_BRAND_IMAGE = 'https://i.ibb.co/3LhGjDm/IMG-20260824-WA0035.jpg';
+export const DEFAULT_BRAND_IMAGE = 'https://res.cloudinary.com/xh0efm5e/image/upload/v1790383197/file_0000000027a0820ab2f330a2beabcbe9.png';
 export const DEFAULT_SITE_NAME = 'Jite Auto Deals';
 export const DEFAULT_LOCALE = 'en_NG';
-export const DEFAULT_BASE_URL = 'https://jiteautodeals-sable.vercel.app';
+export const DEFAULT_BASE_URL = 'https://jiteautodeals.vercel.app';
 
 /**
  * Generates dynamic Open Graph and Twitter metadata for an individual vehicle listing.
@@ -187,7 +187,7 @@ export function generateTabMetadata(
       return {
         title,
         description,
-        image: 'https://i.ibb.co/3LhGjDm/IMG-20260824-WA0035.jpg',
+        image: DEFAULT_BRAND_IMAGE,
         url,
         type: 'website',
         siteName: DEFAULT_SITE_NAME,
@@ -195,7 +195,7 @@ export function generateTabMetadata(
         twitterCard: 'summary_large_image',
         twitterTitle: title,
         twitterDescription: description,
-        twitterImage: 'https://i.ibb.co/3LhGjDm/IMG-20260824-WA0035.jpg',
+        twitterImage: DEFAULT_BRAND_IMAGE,
         canonicalUrl: `${cleanBase}/about`,
         keywords: 'Tobor Jite, vehicle consultant Nigeria, automotive sourcing consultant Lagos Abuja, Jite Auto Deals founder',
       };
@@ -370,16 +370,13 @@ export function injectMetadataIntoHtml(html: string, meta: PageMetadata): string
     <meta property="og:title" content="${safeTitle}" />
     <meta property="og:description" content="${safeDesc}" />
     <meta property="og:image" content="${safeImage}" />
-    <meta property="og:image:secure_url" content="${safeImage}" />
-    <meta property="og:image:alt" content="${safeTitle}" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="${meta.twitterCard || 'summary_large_image'}" />
     <meta name="twitter:url" content="${safeUrl}" />
     <meta name="twitter:title" content="${escapeAttr(meta.twitterTitle || meta.title)}" />
     <meta name="twitter:description" content="${escapeAttr(meta.twitterDescription || meta.description)}" />
-    <meta name="twitter:image" content="${escapeAttr(meta.twitterImage || meta.image)}" />
-    <meta name="twitter:image:alt" content="${safeTitle}" />`;
+    <meta name="twitter:image" content="${escapeAttr(meta.twitterImage || meta.image)}" />`;
 
   // Remove existing title, canonical, and conflicting og/twitter tags in the HTML
   let cleaned = html
@@ -434,7 +431,6 @@ export function updateClientMeta(meta: PageMetadata): void {
   setOrCreateMeta('meta[property="og:title"]', 'property', 'og:title', meta.title);
   setOrCreateMeta('meta[property="og:description"]', 'property', 'og:description', meta.description);
   setOrCreateMeta('meta[property="og:image"]', 'property', 'og:image', meta.image);
-  setOrCreateMeta('meta[property="og:image:secure_url"]', 'property', 'og:image:secure_url', meta.image);
   setOrCreateMeta('meta[property="og:url"]', 'property', 'og:url', meta.url);
   setOrCreateMeta('meta[property="og:type"]', 'property', 'og:type', meta.type || 'website');
   setOrCreateMeta('meta[property="og:site_name"]', 'property', 'og:site_name', meta.siteName || DEFAULT_SITE_NAME);
