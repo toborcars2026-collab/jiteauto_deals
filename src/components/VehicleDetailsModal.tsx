@@ -38,6 +38,8 @@ interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
   isOpen: boolean;
   isLoading?: boolean;
+  hasError?: boolean;
+  onRetry?: () => void;
   onClose: () => void;
   onOpenQualifier: (vehicle: Vehicle) => void;
   onOpenConsultantModal?: (vehicle: Vehicle, channel?: 'whatsapp' | 'call') => void;
@@ -48,6 +50,8 @@ export default function VehicleDetailsModal({
   vehicle,
   isOpen,
   isLoading = false,
+  hasError = false,
+  onRetry,
   onClose,
   onOpenQualifier,
   onOpenConsultantModal,
@@ -250,7 +254,75 @@ export default function VehicleDetailsModal({
     );
   }
 
-  // 2. High-contrast, helpful "Vehicle Not Found" state if vehicle does not exist or was removed
+  // 2. Professional temporary error state if Firestore connection temporarily failed
+  if (!vehicle && hasError) {
+    const handleSourceWhatsapp = () => {
+      const msg =
+        `Hello Tobor Jite! I am trying to view a vehicle on Jite Auto Deals (${window.location.href}) and would like to get the full details directly.`;
+      safeOpenWhatsApp(getWhatsAppLink(msg, businessSettings?.whatsAppNumber));
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+        <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 text-center">
+          <button
+            id="temp_error_close_btn"
+            onClick={onClose}
+            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={32} />
+          </div>
+
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 block mb-1">
+            Temporary Connection Issue
+          </span>
+          <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-950 mb-2">
+            Unable to Load Vehicle Right Now
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-light max-w-md mx-auto mb-6">
+            We experienced a brief network interruption while retrieving this vehicle profile. Please tap below to retry or browse our available vehicles.
+          </p>
+
+          <div className="space-y-3">
+            {onRetry && (
+              <button
+                id="temp_error_retry_btn"
+                onClick={onRetry}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-5 bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-slate-950 font-bold rounded-2xl text-sm shadow-md transition-all cursor-pointer"
+              >
+                <span>Try Again</span>
+              </button>
+            )}
+
+            <button
+              id="temp_error_browse_catalog_btn"
+              onClick={onClose}
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-5 bg-slate-950 hover:bg-slate-800 active:scale-[0.98] text-white font-bold rounded-2xl text-sm shadow-md transition-all cursor-pointer"
+            >
+              <Car size={16} className="text-amber-400" />
+              <span>Browse Available Vehicles</span>
+            </button>
+
+            <button
+              id="temp_error_whatsapp_btn"
+              onClick={handleSourceWhatsapp}
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold rounded-2xl text-sm shadow-md transition-all cursor-pointer"
+            >
+              <MessageSquare size={16} />
+              <span>Chat with Tobor Jite on WhatsApp</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. High-contrast, helpful "Vehicle Not Found" state if vehicle does not exist or was removed
   if (!vehicle) {
     const handleSourceWhatsapp = () => {
       const msg =

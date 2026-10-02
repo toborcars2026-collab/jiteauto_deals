@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
@@ -34,12 +34,27 @@ export function isVehicleActive(v: Vehicle | null | undefined): boolean {
   return true;
 }
 
-/**
- * Generates a clean, SEO-friendly, permanent slug for a vehicle.
- * E.g. "2014-bmw-328i"
- */
-export function getVehicleSlug(vehicle: Vehicle): string {
+let activeVehiclesCache: Vehicle[] = [];
+
+export function safeDecodeURIComponent(str: string | undefined | null): string {
+  if (!str || typeof str !== 'string') return '';
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
+export function getBaseVehicleSlug(vehicle: Vehicle): string {
   if (!vehicle) return '';
+  const explicitSlug = (vehicle as any).slug;
+  if (typeof explicitSlug === 'string' && explicitSlug.trim()) {
+    return explicitSlug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
   const make = (vehicle.make || '').toLowerCase().trim();
   const model = (vehicle.model || '').toLowerCase().trim();
   const year = vehicle.year || '';
@@ -47,7 +62,62 @@ export function getVehicleSlug(vehicle: Vehicle): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return base || vehicle.id || 'car';
+  return base || (vehicle.id || 'car').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+export function computeDisambiguatedVehicleSlug(vehicle: Vehicle, duplicateIndex = 1): string {
+  const base = getBaseVehicleSlug(vehicle);
+  if (!base) return '';
+  const cleanId = (vehicle.id || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (cleanId && cleanId.startsWith(`${base}-`) && cleanId.length > base.length + 1) {
+    return cleanId;
+  }
+
+  const baseTokens = new Set(base.split('-').filter(Boolean));
+  const idTokens = cleanId ? cleanId.split('-').filter(Boolean) : [];
+  const extraTokens = idTokens.filter((t) => !baseTokens.has(t));
+  if (extraTokens.length > 0) {
+    return `${base}-${extraTokens.slice(0, 3).join('-')}`;
+  }
+
+  const cleanColor = (vehicle.color || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (cleanColor) {
+    return `${base}-${cleanColor}`;
+  }
+
+  return `${base}-${duplicateIndex + 1}`;
+}
+
+/**
+ * Generates a clean, SEO-friendly, permanent unique slug for a vehicle.
+ * E.g. "2013-dodge-charger" (and disambiguates if two vehicles share the exact same year/make/model).
+ */
+export function getVehicleSlug(vehicle: Vehicle, allVehicles: Vehicle[] = activeVehiclesCache): string {
+  if (!vehicle) return '';
+  const base = getBaseVehicleSlug(vehicle);
+  if (!allVehicles || allVehicles.length <= 1) {
+    return base;
+  }
+  const siblings = allVehicles
+    .filter((v) => v && getBaseVehicleSlug(v) === base)
+    .sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+  if (siblings.length <= 1) {
+    return base;
+  }
+  const idx = siblings.findIndex((v) => v.id === vehicle.id);
+  if (idx <= 0) {
+    return base;
+  }
+  return computeDisambiguatedVehicleSlug(vehicle, idx);
 }
 
 /**
@@ -56,7 +126,7 @@ export function getVehicleSlug(vehicle: Vehicle): string {
 export function getVehicleShareUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  return `https://jiteautodealss.vercel.app/vehicles/${encodeURIComponent(slug)}`;
+  return `https://jiteautodeals.vercel.app/vehicles/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -65,15 +135,16 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
 export function getVehiclePathUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  return `https://jiteautodealss.vercel.app/vehicles/${slug}`;
+  return `https://jiteautodeals.vercel.app/vehicles/${slug}`;
 }
 
 /**
- * Locates a vehicle from an array by exact ID, exact slug, or normalized make-model-year.
+ * Locates a vehicle from an array by exact ID, unique slug, base slug, or normalized make-model-year.
  */
 export function findVehicleBySlugOrId(vehicles: Vehicle[], identifier: string): Vehicle | undefined {
   if (!identifier || !Array.isArray(vehicles) || vehicles.length === 0) return undefined;
-  const clean = decodeURIComponent(identifier)
+  const sortedVehicles = [...vehicles].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''));
+  const clean = safeDecodeURIComponent(identifier)
     .toLowerCase()
     .trim()
     .replace(/^\/?(vehicles|car|v)\/?/, '')
@@ -81,39 +152,76 @@ export function findVehicleBySlugOrId(vehicles: Vehicle[], identifier: string): 
   if (!clean) return undefined;
 
   // 1. Exact ID match (case-insensitive)
-  const byId = vehicles.find(v => v && v.id && v.id.toLowerCase().trim() === clean);
+  const byId = sortedVehicles.find((v) => v && v.id && v.id.toLowerCase().trim() === clean);
   if (byId) return byId;
 
-  // 2. Exact generated slug match
-  const bySlug = vehicles.find(v => v && getVehicleSlug(v) === clean);
+  // 2. Exact unique/disambiguated slug match
+  const byUniqueSlug = sortedVehicles.find(
+    (v) => v && (getVehicleSlug(v, sortedVehicles) === clean || computeDisambiguatedVehicleSlug(v) === clean)
+  );
+  if (byUniqueSlug) return byUniqueSlug;
+
+  // 3. Exact base slug match
+  const bySlug = sortedVehicles.find((v) => v && getBaseVehicleSlug(v) === clean);
   if (bySlug) return bySlug;
 
-  // 3. Exact alphanumeric match on ID or slug
+  // 4. Exact alphanumeric match on ID or slug
   const cleanAlphaNum = clean.replace(/[^a-z0-9]/g, '');
   if (!cleanAlphaNum || cleanAlphaNum.length < 3) return undefined;
 
-  const byAlphaId = vehicles.find(
-    v => v && (v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphaNum
+  const byAlphaId = sortedVehicles.find(
+    (v) => v && (v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphaNum
   );
   if (byAlphaId) return byAlphaId;
 
-  const byAlphaSlug = vehicles.find(
-    v => v && getVehicleSlug(v).replace(/[^a-z0-9]/g, '') === cleanAlphaNum
+  const byAlphaSlug = sortedVehicles.find(
+    (v) =>
+      v &&
+      (getVehicleSlug(v, sortedVehicles).replace(/[^a-z0-9]/g, '') === cleanAlphaNum ||
+        getBaseVehicleSlug(v).replace(/[^a-z0-9]/g, '') === cleanAlphaNum)
   );
   if (byAlphaSlug) return byAlphaSlug;
 
-  // 4. Prefix match where Firestore ID has a generated suffix
-  const byPrefixId = vehicles.find(v => {
+  // 5. Prefix match where Firestore ID or trim has a suffix
+  const byPrefixId = sortedVehicles.find((v) => {
     if (!v) return false;
     const vId = (v.id || '').toLowerCase().trim();
-    const slug = getVehicleSlug(v);
+    const baseSlug = getBaseVehicleSlug(v);
     return (
-      (vId.startsWith(`${clean}-`) && vId.length <= clean.length + 12) ||
-      (slug && clean.startsWith(`${slug}-`) && clean.length <= slug.length + 12)
+      (vId.startsWith(`${clean}-`) && vId.length <= clean.length + 18) ||
+      (baseSlug.startsWith(`${clean}-`) && baseSlug.length <= clean.length + 18) ||
+      (baseSlug && clean.startsWith(`${baseSlug}-`) && clean.length <= baseSlug.length + 18)
     );
   });
+  if (byPrefixId) return byPrefixId;
 
-  return byPrefixId;
+  // 6. Normalized make/model match within the same model year (e.g. "2016-mercedes-glc300" -> "2016 Mercedes-Benz GLC 300")
+  const yearMatch = clean.match(/\b(19[89]\d|20[0-3]\d)\b/);
+  if (yearMatch) {
+    const targetYear = parseInt(yearMatch[1], 10);
+    const normalizeMakeModel = (str: string) =>
+      str
+        .toLowerCase()
+        .replace(/\b(19[89]\d|20[0-3]\d)\b/g, '')
+        .replace(/mercedes[-\s]?benz/g, 'mercedes')
+        .replace(/[^a-z0-9]/g, '');
+
+    const targetMakeModel = normalizeMakeModel(clean);
+    if (targetMakeModel.length >= 4) {
+      const byNormalizedYearMakeModel = sortedVehicles.find((v) => {
+        if (!v || Number(v.year) !== targetYear) return false;
+        const candidateMakeModel = normalizeMakeModel(`${v.make || ''} ${v.model || ''}`);
+        return (
+          candidateMakeModel === targetMakeModel ||
+          (candidateMakeModel.startsWith(targetMakeModel) &&
+            candidateMakeModel.length <= targetMakeModel.length + 12)
+        );
+      });
+      if (byNormalizedYearMakeModel) return byNormalizedYearMakeModel;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -639,6 +747,7 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
         });
 
         // Save authoritative live data into local cache
+        activeVehiclesCache = list;
         try {
           localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
         } catch {}
@@ -682,6 +791,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       list.push(normalized);
     });
 
+    activeVehiclesCache = list;
     try {
       localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
     } catch {}
@@ -699,36 +809,166 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 
 /**
  * Fast targeted fetch for a single vehicle by slug or ID directly from Firestore.
- * Prioritizes opening a direct vehicle link in milliseconds without needing to read the entire catalogue first.
+ * Queries only the vehicle required by the current slug/ID (by exact ID, ID prefix, or model year)
+ * without downloading the entire catalogue unless needed.
  */
 export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | null> {
   if (!identifier) return null;
-  const clean = decodeURIComponent(identifier).toLowerCase().trim().replace(/^\/vehicles\/?/, '').replace(/\/$/, '');
+  const clean = safeDecodeURIComponent(identifier)
+    .toLowerCase()
+    .trim()
+    .replace(/^\/?(vehicles|car|v)\/?/, '')
+    .replace(/\/+$/, '');
   if (!clean) return null;
 
-  // 1. Direct Firestore single document lookup by document ID
+  let hadQueryError = false;
+  let lastError: unknown = null;
+
+  // 1. Direct Firestore single document lookup by document ID (O(1))
   try {
     const docRef = doc(db, 'vehicles', clean);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as Vehicle;
-      const normalized = normalizeVehicleData({
+      return normalizeVehicleData({
         ...data,
         id: docSnap.id || data.id,
       });
-      return normalized;
     }
   } catch (e) {
-    console.warn('[Firestore] Direct doc get error, falling back to query:', e);
+    hadQueryError = true;
+    lastError = e;
   }
 
-  // 2. Fetch fresh catalog from Firestore to match slug
+  // 2. Targeted Firestore prefix query on `id` (e.g. "2013-dodge-charger" -> "2013-dodge-charger-munh8e3k" in 1 read)
   try {
-    const all = await fetchVehicles();
-    return findVehicleBySlugOrId(all, clean) || null;
+    const prefixQuery = query(
+      collection(db, 'vehicles'),
+      where('id', '>=', clean),
+      where('id', '<=', `${clean}\uf8ff`),
+      limit(10)
+    );
+    const prefixSnap = await getDocs(prefixQuery);
+    if (!prefixSnap.empty) {
+      const candidates: Vehicle[] = [];
+      prefixSnap.forEach((docSnap) => {
+        const data = docSnap.data() as Vehicle;
+        candidates.push(
+          normalizeVehicleData({
+            ...data,
+            id: docSnap.id || data.id,
+          })
+        );
+      });
+      if (candidates.length === 1) {
+        const only = candidates[0];
+        if (
+          (only.id || '').toLowerCase().trim() === clean ||
+          getBaseVehicleSlug(only) === clean
+        ) {
+          return only;
+        }
+      }
+      const yearMatchInPrefix = clean.match(/\b(19[89]\d|20[0-3]\d)\b/);
+      if (!yearMatchInPrefix) {
+        const matched = findVehicleBySlugOrId(candidates, clean);
+        if (matched) return matched;
+      }
+    }
+    hadQueryError = false;
+  } catch (e) {
+    hadQueryError = true;
+    lastError = e;
+  }
+
+  // 3. Targeted Firestore query by model year (reads only the few vehicles of that year, e.g. 2013 or 2019)
+  const yearMatch = clean.match(/\b(19[89]\d|20[0-3]\d)\b/);
+  if (yearMatch) {
+    const yearNum = parseInt(yearMatch[1], 10);
+    try {
+      const yearQuery = query(collection(db, 'vehicles'), where('year', '==', yearNum));
+      const yearSnap = await getDocs(yearQuery);
+      if (!yearSnap.empty) {
+        const yearVehicles: Vehicle[] = [];
+        yearSnap.forEach((docSnap) => {
+          const data = docSnap.data() as Vehicle;
+          yearVehicles.push(
+            normalizeVehicleData({
+              ...data,
+              id: docSnap.id || data.id,
+            })
+          );
+        });
+        const matched = findVehicleBySlugOrId(yearVehicles, clean);
+        if (matched) return matched;
+      }
+      hadQueryError = false;
+    } catch (e) {
+      hadQueryError = true;
+      lastError = e;
+    }
+  }
+
+  // 4. Check in-memory or localStorage cache before doing a full collection fallback
+  const cachedList = activeVehiclesCache.length > 0 ? activeVehiclesCache : getVehicles();
+  if (cachedList.length > 0) {
+    const fromCache = findVehicleBySlugOrId(cachedList, clean);
+    if (fromCache) return fromCache;
+  }
+
+  if (hadQueryError && lastError) {
+    throw lastError;
+  }
+
+  // 5. Final fallback for slugs where the year in the slug does not match the vehicle's year field
+  try {
+    const vehiclesCol = collection(db, 'vehicles');
+    const snapshot = await getDocs(vehiclesCol);
+    const list: Vehicle[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Vehicle;
+      list.push(
+        normalizeVehicleData({
+          ...data,
+          id: docSnap.id || data.id,
+        })
+      );
+    });
+    if (list.length > 0) {
+      activeVehiclesCache = list;
+    }
+    return findVehicleBySlugOrId(list, clean) || null;
+  } catch (e) {
+    if (cachedList.length > 0) {
+      return findVehicleBySlugOrId(cachedList, clean) || null;
+    }
+    throw e;
+  }
+}
+
+export interface InitialServerRoutePayload {
+  slugOrId: string | null;
+  status: 'found' | 'not_found' | 'error' | null;
+  vehicle: Vehicle | null;
+}
+
+/**
+ * Reads the server-injected __JITE_INITIAL_ROUTE__ script payload if the page was rendered by /api/render or server.ts.
+ */
+export function getInitialServerRouteData(): InitialServerRoutePayload | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const el = document.getElementById('__JITE_INITIAL_ROUTE__');
+    if (!el || !el.textContent) return null;
+    const parsed = JSON.parse(el.textContent);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      slugOrId: typeof parsed.slugOrId === 'string' ? parsed.slugOrId : null,
+      status: parsed.status || null,
+      vehicle: parsed.vehicle ? normalizeVehicleData(parsed.vehicle) : null,
+    };
   } catch {
-    const cachedList = getVehicles();
-    return findVehicleBySlugOrId(cachedList, clean) || null;
+    return null;
   }
 }
 
@@ -784,7 +1024,10 @@ export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: bo
   }
 
   const qualify = searchParams.get('qualify') === '1' || searchParams.get('qualify') === 'true';
-  return { slugOrId: initialSlugOrId, qualify };
+  return {
+    slugOrId: initialSlugOrId ? safeDecodeURIComponent(initialSlugOrId).replace(/\/+$/, '').trim() : null,
+    qualify,
+  };
 }
 
 /**
@@ -796,7 +1039,11 @@ export function getVehicles(): Vehicle[] {
     if (!data) return [];
     const parsed = JSON.parse(data) as Vehicle[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeVehicleData);
+    const list = parsed.map(normalizeVehicleData);
+    if (list.length > 0 && activeVehiclesCache.length === 0) {
+      activeVehiclesCache = list;
+    }
+    return list;
   } catch (e) {
     return [];
   }

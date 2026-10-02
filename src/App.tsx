@@ -41,6 +41,7 @@ import {
   getBusinessPhoneCallUrl,
   preloadPrimaryImage,
   getInitialVehicleRoute,
+  getInitialServerRouteData,
 } from './utils';
 import { generateVehicleMetadata, generateTabMetadata, updateClientMeta } from './metaHelper';
 
@@ -63,12 +64,13 @@ export interface AppHistoryState {
   vehicleSlug?: string | null;
 }
 
-// Extract initial route & preload high-priority image immediately on module execution
+// Extract initial route, server-hydrated vehicle (if rendered by /api/render or server.ts), & local cache
 const initialRoute = getInitialVehicleRoute();
+const initialServerData = getInitialServerRouteData();
 const initialVehiclesList = getVehicles();
-const initialMatchedVehicle = initialRoute.slugOrId
-  ? findVehicleBySlugOrId(initialVehiclesList, initialRoute.slugOrId) || null
-  : null;
+const initialMatchedVehicle =
+  initialServerData?.vehicle ||
+  (initialRoute.slugOrId ? findVehicleBySlugOrId(initialVehiclesList, initialRoute.slugOrId) || null : null);
 
 if (initialMatchedVehicle?.images?.[0]) {
   preloadPrimaryImage(initialMatchedVehicle.images[0]);
@@ -90,8 +92,12 @@ export default function App() {
     return Boolean(initialRoute.slugOrId && !initialRoute.qualify);
   });
   const [isVehicleLoading, setIsVehicleLoading] = useState<boolean>(() => {
-    return Boolean(initialRoute.slugOrId && !initialMatchedVehicle && !initialRoute.qualify);
+    if (!initialRoute.slugOrId || initialRoute.qualify) return false;
+    if (initialMatchedVehicle) return false;
+    if (initialServerData?.status === 'not_found') return false;
+    return true;
   });
+  const [vehicleFetchError, setVehicleFetchError] = useState<boolean>(false);
 
   const [isConsultantOpen, setIsConsultantOpen] = useState(false);
   const [consultantVehicle, setConsultantVehicle] = useState<Vehicle | null>(null);
@@ -163,6 +169,7 @@ export default function App() {
 
     setSelectedVehicle(vehicle);
     setIsVehicleLoading(false);
+    setVehicleFetchError(false);
     setIsDetailsOpen(true);
     
     // Dynamic vehicle metadata update
@@ -176,6 +183,7 @@ export default function App() {
     setIsDetailsOpen(false);
     setSelectedVehicle(null);
     setIsVehicleLoading(false);
+    setVehicleFetchError(false);
     const targetTab = currentTab || 'home';
     const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
 
@@ -269,13 +277,6 @@ export default function App() {
     // Direct entry navigation state management
     try {
       if (route.slugOrId) {
-        const baseNavState: AppHistoryState = {
-          tab: initialTab,
-          modal: null,
-        };
-        const baseNavUrl = initialTab === 'home' ? '/' : `/?tab=${initialTab}`;
-        window.history.replaceState(baseNavState, '', baseNavUrl);
-
         const vehicleState: AppHistoryState = {
           tab: initialTab,
           modal: route.qualify ? 'qualifier' : 'details',
@@ -284,7 +285,7 @@ export default function App() {
         const vehicleUrl = route.qualify
           ? `/vehicles/${encodeURIComponent(route.slugOrId)}?qualify=1`
           : `/vehicles/${encodeURIComponent(route.slugOrId)}`;
-        window.history.pushState(vehicleState, '', vehicleUrl);
+        window.history.replaceState(vehicleState, '', vehicleUrl);
       } else {
         const initialNavState: AppHistoryState = {
           tab: initialTab,
@@ -295,26 +296,47 @@ export default function App() {
       }
     } catch {}
 
-    // Priority 1: If user requested a direct vehicle link, fetch that single document immediately
+    // Priority 1: If user requested a direct vehicle link, resolve that single vehicle immediately
     if (route.slugOrId) {
-      fetchSingleVehicle(route.slugOrId).then((matched) => {
-        if (matched) {
-          preloadPrimaryImage(matched.images?.[0]);
-          if (route.qualify) {
-            setQualifierVehicle(matched);
-            setIsQualifierOpen(true);
-          } else {
-            setSelectedVehicle(matched);
-            setIsDetailsOpen(true);
-            const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-            const meta = generateVehicleMetadata(matched, origin, `/vehicles/${encodeURIComponent(route.slugOrId!)}`);
-            updateClientMeta(meta);
-          }
-        }
+      if (initialMatchedVehicle) {
+        preloadPrimaryImage(initialMatchedVehicle.images?.[0]);
+        const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+        const meta = generateVehicleMetadata(
+          initialMatchedVehicle,
+          origin,
+          `/vehicles/${encodeURIComponent(route.slugOrId)}`
+        );
+        updateClientMeta(meta);
         setIsVehicleLoading(false);
-      }).catch(() => {
-        setIsVehicleLoading(false);
-      });
+        setVehicleFetchError(false);
+      } else {
+        fetchSingleVehicle(route.slugOrId)
+          .then((matched) => {
+            if (matched) {
+              preloadPrimaryImage(matched.images?.[0]);
+              if (route.qualify) {
+                setQualifierVehicle(matched);
+                setIsQualifierOpen(true);
+              } else {
+                setSelectedVehicle(matched);
+                setIsDetailsOpen(true);
+                const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+                const meta = generateVehicleMetadata(
+                  matched,
+                  origin,
+                  `/vehicles/${encodeURIComponent(route.slugOrId!)}`
+                );
+                updateClientMeta(meta);
+              }
+            }
+            setVehicleFetchError(false);
+            setIsVehicleLoading(false);
+          })
+          .catch(() => {
+            setVehicleFetchError(true);
+            setIsVehicleLoading(false);
+          });
+      }
     }
 
     // Priority 2: Deferred background sync of the remaining catalogue and business settings
@@ -562,6 +584,29 @@ export default function App() {
         vehicle={selectedVehicle}
         isOpen={isDetailsOpen}
         isLoading={isVehicleLoading}
+        hasError={vehicleFetchError}
+        onRetry={() => {
+          const currentRoute = getInitialVehicleRoute();
+          const targetSlug = currentRoute.slugOrId || initialRoute.slugOrId;
+          if (!targetSlug) return;
+          setIsVehicleLoading(true);
+          setVehicleFetchError(false);
+          fetchSingleVehicle(targetSlug)
+            .then((matched) => {
+              if (matched) {
+                setSelectedVehicle(matched);
+                const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+                const meta = generateVehicleMetadata(matched, origin, `/vehicles/${encodeURIComponent(targetSlug)}`);
+                updateClientMeta(meta);
+              }
+              setVehicleFetchError(false);
+              setIsVehicleLoading(false);
+            })
+            .catch(() => {
+              setVehicleFetchError(true);
+              setIsVehicleLoading(false);
+            });
+        }}
         onClose={handleCloseDetails}
         onOpenQualifier={handleOpenQualifier}
         businessSettings={businessSettings}

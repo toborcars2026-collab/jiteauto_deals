@@ -27,6 +27,8 @@ export interface PageMetadata {
   canonicalUrl: string;
   keywords?: string;
   vehicle?: Vehicle | null;
+  requestedVehicleSlug?: string | null;
+  vehicleLookupStatus?: 'found' | 'not_found' | 'error';
 }
 
 export const DEFAULT_BRAND_IMAGE =
@@ -38,7 +40,7 @@ export const DEFAULT_BRAND_IMAGE_ALT = 'Jite Auto Deals — Trusted Vehicle Cons
 
 export const DEFAULT_SITE_NAME = 'Jite Auto Deals';
 export const DEFAULT_LOCALE = 'en_NG';
-export const DEFAULT_BASE_URL = 'https://jiteautodealss.vercel.app';
+export const DEFAULT_BASE_URL = 'https://jiteautodeals.vercel.app';
 
 export const FIREBASE_PROJECT_ID = 'gen-lang-client-0327661147';
 export const FIRESTORE_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
@@ -420,8 +422,25 @@ export function inferImageMimeType(imageUrl: string | undefined | null): string 
   return undefined;
 }
 
-export function getVehicleSlug(vehicle: Vehicle): string {
+export function safeDecodeURIComponent(str: string | undefined | null): string {
+  if (!str || typeof str !== 'string') return '';
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
+export function getBaseVehicleSlug(vehicle: Vehicle): string {
   if (!vehicle) return '';
+  const explicitSlug = (vehicle as any).slug;
+  if (typeof explicitSlug === 'string' && explicitSlug.trim()) {
+    return explicitSlug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
   const make = (vehicle.make || '').toLowerCase().trim();
   const model = (vehicle.model || '').toLowerCase().trim();
   const year = vehicle.year || '';
@@ -429,16 +448,68 @@ export function getVehicleSlug(vehicle: Vehicle): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return base || vehicle.id || 'car';
+  return base || (vehicle.id || 'car').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+export function computeDisambiguatedVehicleSlug(vehicle: Vehicle, duplicateIndex = 1): string {
+  const base = getBaseVehicleSlug(vehicle);
+  if (!base) return '';
+  const cleanId = (vehicle.id || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (cleanId && cleanId.startsWith(`${base}-`) && cleanId.length > base.length + 1) {
+    return cleanId;
+  }
+
+  const baseTokens = new Set(base.split('-').filter(Boolean));
+  const idTokens = cleanId ? cleanId.split('-').filter(Boolean) : [];
+  const extraTokens = idTokens.filter((t) => !baseTokens.has(t));
+  if (extraTokens.length > 0) {
+    return `${base}-${extraTokens.slice(0, 3).join('-')}`;
+  }
+
+  const cleanColor = (vehicle.color || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (cleanColor) {
+    return `${base}-${cleanColor}`;
+  }
+
+  return `${base}-${duplicateIndex + 1}`;
+}
+
+export function getVehicleSlug(vehicle: Vehicle, allVehicles?: Vehicle[]): string {
+  if (!vehicle) return '';
+  const base = getBaseVehicleSlug(vehicle);
+  if (!allVehicles || allVehicles.length <= 1) {
+    return base;
+  }
+  const siblings = allVehicles
+    .filter((v) => v && getBaseVehicleSlug(v) === base)
+    .sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+  if (siblings.length <= 1) {
+    return base;
+  }
+  const idx = siblings.findIndex((v) => v.id === vehicle.id);
+  if (idx <= 0) {
+    return base;
+  }
+  return computeDisambiguatedVehicleSlug(vehicle, idx);
 }
 
 /**
- * Multi-pass prioritized vehicle lookup by exact ID, exact slug, or normalized ID/slug.
+ * Multi-pass prioritized vehicle lookup by exact ID, unique slug, base slug, or normalized make/model/year.
  * Never guesses an unrelated vehicle when the identifier does not match.
  */
 export function findVehicleInList(vehicles: Vehicle[], identifier: string): Vehicle | undefined {
   if (!identifier || !Array.isArray(vehicles) || vehicles.length === 0) return undefined;
-  const cleanId = decodeURIComponent(identifier)
+  const sortedVehicles = [...vehicles].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''));
+  const cleanId = safeDecodeURIComponent(identifier)
     .toLowerCase()
     .trim()
     .replace(/^\/?(vehicles|car|v)\/?/, '')
@@ -446,39 +517,77 @@ export function findVehicleInList(vehicles: Vehicle[], identifier: string): Vehi
   if (!cleanId) return undefined;
 
   // Pass 1: Exact vehicle ID match
-  const byExactId = vehicles.find((v) => v && (v.id || '').toLowerCase().trim() === cleanId);
+  const byExactId = sortedVehicles.find((v) => v && (v.id || '').toLowerCase().trim() === cleanId);
   if (byExactId) return byExactId;
 
-  // Pass 2: Exact generated slug match
-  const byExactSlug = vehicles.find((v) => v && getVehicleSlug(v) === cleanId);
+  // Pass 2: Exact disambiguated slug match (when duplicates exist)
+  const byUniqueSlug = sortedVehicles.find(
+    (v) => v && (getVehicleSlug(v, sortedVehicles) === cleanId || computeDisambiguatedVehicleSlug(v) === cleanId)
+  );
+  if (byUniqueSlug) return byUniqueSlug;
+
+  // Pass 3: Exact base slug match
+  const byExactSlug = sortedVehicles.find((v) => v && getBaseVehicleSlug(v) === cleanId);
   if (byExactSlug) return byExactSlug;
 
   const cleanIdNoDash = cleanId.replace(/[^a-z0-9]/g, '');
   if (!cleanIdNoDash || cleanIdNoDash.length < 3) return undefined;
 
-  // Pass 3: Exact alphanumeric vehicle ID match
-  const byAlphaId = vehicles.find(
+  // Pass 4: Exact alphanumeric vehicle ID match
+  const byAlphaId = sortedVehicles.find(
     (v) => v && (v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanIdNoDash
   );
   if (byAlphaId) return byAlphaId;
 
-  // Pass 4: Exact alphanumeric vehicle slug match
-  const byAlphaSlug = vehicles.find(
-    (v) => v && getVehicleSlug(v).replace(/[^a-z0-9]/g, '') === cleanIdNoDash
+  // Pass 5: Exact alphanumeric vehicle slug match
+  const byAlphaSlug = sortedVehicles.find(
+    (v) =>
+      v &&
+      (getVehicleSlug(v, sortedVehicles).replace(/[^a-z0-9]/g, '') === cleanIdNoDash ||
+        getBaseVehicleSlug(v).replace(/[^a-z0-9]/g, '') === cleanIdNoDash)
   );
   if (byAlphaSlug) return byAlphaSlug;
 
-  // Pass 5: Prefix match where Firestore ID has a generated suffix (e.g., slug + "-" + suffix)
-  const byPrefixId = vehicles.find((v) => {
+  // Pass 6: Prefix match where Firestore ID or model trim has a suffix (e.g., slug + "-" + suffix)
+  const byPrefix = sortedVehicles.find((v) => {
     if (!v) return false;
     const vId = (v.id || '').toLowerCase().trim();
-    const slug = getVehicleSlug(v);
+    const baseSlug = getBaseVehicleSlug(v);
     return (
-      (vId.startsWith(`${cleanId}-`) && vId.length <= cleanId.length + 12) ||
-      (slug && cleanId.startsWith(`${slug}-`) && cleanId.length <= slug.length + 12)
+      (vId.startsWith(`${cleanId}-`) && vId.length <= cleanId.length + 18) ||
+      (baseSlug.startsWith(`${cleanId}-`) && baseSlug.length <= cleanId.length + 18) ||
+      (baseSlug && cleanId.startsWith(`${baseSlug}-`) && cleanId.length <= baseSlug.length + 18)
     );
   });
-  return byPrefixId;
+  if (byPrefix) return byPrefix;
+
+  // Pass 7: Normalized make/model match within the same model year (e.g. "2016-mercedes-glc300" -> "2016 Mercedes-Benz GLC 300")
+  const yearMatch = cleanId.match(/\b(19[89]\d|20[0-3]\d)\b/);
+  if (yearMatch) {
+    const targetYear = parseInt(yearMatch[1], 10);
+    const normalizeMakeModel = (str: string) =>
+      str
+        .toLowerCase()
+        .replace(/\b(19[89]\d|20[0-3]\d)\b/g, '')
+        .replace(/mercedes[-\s]?benz/g, 'mercedes')
+        .replace(/[^a-z0-9]/g, '');
+
+    const targetMakeModel = normalizeMakeModel(cleanId);
+    if (targetMakeModel.length >= 4) {
+      const byNormalizedYearMakeModel = sortedVehicles.find((v) => {
+        if (!v || Number(v.year) !== targetYear) return false;
+        const candidateMakeModel = normalizeMakeModel(`${v.make || ''} ${v.model || ''}`);
+        return (
+          candidateMakeModel === targetMakeModel ||
+          (candidateMakeModel.startsWith(targetMakeModel) &&
+            candidateMakeModel.length <= targetMakeModel.length + 12)
+        );
+      });
+      if (byNormalizedYearMakeModel) return byNormalizedYearMakeModel;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -490,7 +599,11 @@ export function extractVehicleIdentifierFromUrl(urlOrPath: string): string | nul
   try {
     parsedUrl = new URL(urlOrPath, DEFAULT_BASE_URL);
   } catch {
-    parsedUrl = new URL(`/${urlOrPath.replace(/^\/+/, '')}`, DEFAULT_BASE_URL);
+    try {
+      parsedUrl = new URL(`/${urlOrPath.replace(/^\/+/, '')}`, DEFAULT_BASE_URL);
+    } catch {
+      return null;
+    }
   }
 
   const pathname = parsedUrl.pathname;
@@ -498,18 +611,18 @@ export function extractVehicleIdentifierFromUrl(urlOrPath: string): string | nul
 
   if (pathname.startsWith('/vehicles/')) {
     const id = pathname.replace(/^\/vehicles\/?/, '').replace(/\/+$/, '').trim();
-    if (id) return decodeURIComponent(id);
+    if (id) return safeDecodeURIComponent(id);
   } else if (pathname.startsWith('/car/')) {
     const id = pathname.replace(/^\/car\/?/, '').replace(/\/+$/, '').trim();
-    if (id) return decodeURIComponent(id);
+    if (id) return safeDecodeURIComponent(id);
   } else if (pathname.startsWith('/v/')) {
     const id = pathname.replace(/^\/v\/?/, '').replace(/\/+$/, '').trim();
-    if (id) return decodeURIComponent(id);
+    if (id) return safeDecodeURIComponent(id);
   }
 
   const queryVehicle = searchParams.get('vehicle') || searchParams.get('v');
   if (queryVehicle && queryVehicle.trim()) {
-    return queryVehicle.trim();
+    return safeDecodeURIComponent(queryVehicle.trim());
   }
 
   return null;
@@ -1059,9 +1172,164 @@ export async function probeImageMetadata(imageUrl: string): Promise<ImageDimensi
   return info;
 }
 
+export async function queryVehiclesByIdPrefixFromFirestoreRest(prefix: string): Promise<Vehicle[]> {
+  if (!prefix) return [];
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'vehicles' }],
+          where: {
+            compositeFilter: {
+              op: 'AND',
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'id' },
+                    op: 'GREATER_THAN_OR_EQUAL',
+                    value: { stringValue: prefix },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: 'id' },
+                    op: 'LESS_THAN_OR_EQUAL',
+                    value: { stringValue: `${prefix}\uf8ff` },
+                  },
+                },
+              ],
+            },
+          },
+          limit: 10,
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return [];
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return [];
+    const vehicles: Vehicle[] = [];
+    for (const row of rows) {
+      if (row && row.document) {
+        const parsed = parseFirestoreRestDocument(row.document);
+        if (parsed) vehicles.push(parsed);
+      }
+    }
+    return vehicles;
+  } catch {
+    return [];
+  }
+}
+
+export async function queryVehiclesByYearFromFirestoreRest(year: number): Promise<Vehicle[]> {
+  if (!year || isNaN(year)) return [];
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'vehicles' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'year' },
+              op: 'EQUAL',
+              value: { integerValue: String(year) },
+            },
+          },
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return [];
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return [];
+    const vehicles: Vehicle[] = [];
+    for (const row of rows) {
+      if (row && row.document) {
+        const parsed = parseFirestoreRestDocument(row.document);
+        if (parsed) vehicles.push(parsed);
+      }
+    }
+    return vehicles;
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Server-side route metadata resolver that queries live Cloud Firestore (with local store fallback)
- * and resolves real Open Graph image metadata for individual vehicle pages.
+ * Targeted single-vehicle lookup from Firestore REST API.
+ * Queries only the required vehicle (by exact/prefix ID or model year) without fetching the entire inventory unless needed.
+ */
+export async function fetchSingleVehicleFromFirestoreRest(
+  identifier: string,
+  fallbackVehicles: Vehicle[] = []
+): Promise<Vehicle | null> {
+  const cleanId = safeDecodeURIComponent(identifier)
+    .toLowerCase()
+    .trim()
+    .replace(/^\/?(vehicles|car|v)\/?/, '')
+    .replace(/\/+$/, '');
+  if (!cleanId) return null;
+
+  // 1. Fast targeted prefix range query on `id` (covers exact IDs and modern slug-suffixed IDs like "2013-dodge-charger-munh8e3k" in 1 query)
+  const prefixMatches = await queryVehiclesByIdPrefixFromFirestoreRest(cleanId);
+  if (prefixMatches.length === 1) {
+    const only = prefixMatches[0];
+    if (
+      (only.id || '').toLowerCase().trim() === cleanId ||
+      getBaseVehicleSlug(only) === cleanId
+    ) {
+      return only;
+    }
+  }
+
+  // 2. Targeted single-year query if the slug contains a 4-digit model year (covers legacy IDs and disambiguates same-year duplicates)
+  const yearMatch = cleanId.match(/\b(19[89]\d|20[0-3]\d)\b/);
+  if (yearMatch) {
+    const yearNum = parseInt(yearMatch[1], 10);
+    const yearVehicles = await queryVehiclesByYearFromFirestoreRest(yearNum);
+    if (yearVehicles.length > 0) {
+      const matched = findVehicleInList(yearVehicles, cleanId);
+      if (matched) return matched;
+    }
+  }
+
+  if (prefixMatches.length > 0) {
+    const matched = findVehicleInList(prefixMatches, cleanId);
+    if (matched) return matched;
+  }
+
+  // 3. Direct document ID fetch if not already matched
+  const directDoc = await fetchVehicleByIdFromFirestoreRest(cleanId);
+  if (directDoc) return directDoc;
+
+  // 4. Fallback to full collection only if neither targeted prefix nor year query matched
+  const liveVehicles = await fetchAllVehiclesFromFirestoreRest();
+  const mergedMap = new Map<string, Vehicle>();
+  for (const v of fallbackVehicles) {
+    if (v && v.id) mergedMap.set(v.id, v);
+  }
+  for (const v of liveVehicles) {
+    if (v && v.id) mergedMap.set(v.id, v);
+  }
+  const combined = Array.from(mergedMap.values());
+  return findVehicleInList(combined, cleanId) || null;
+}
+
+/**
+ * Server-side route metadata resolver that queries live Cloud Firestore using targeted queries
+ * and resolves Open Graph metadata for individual vehicle pages.
  */
 export async function resolveServerRouteMetadata(
   urlOrPath: string,
@@ -1070,45 +1338,57 @@ export async function resolveServerRouteMetadata(
   const vehicleIdentifier = extractVehicleIdentifierFromUrl(urlOrPath);
 
   if (vehicleIdentifier) {
-    const cleanId = decodeURIComponent(vehicleIdentifier)
+    const cleanId = safeDecodeURIComponent(vehicleIdentifier)
       .toLowerCase()
       .trim()
       .replace(/^\/?(vehicles|car|v)\/?/, '')
       .replace(/\/+$/, '');
 
-    // 1. Try direct Firestore document lookup by ID first
-    let matched: Vehicle | undefined | null = await fetchVehicleByIdFromFirestoreRest(cleanId);
-
-    // 2. If not found by exact document ID, query live Firestore catalog + merge fallback vehicles
-    if (!matched) {
-      const liveVehicles = await fetchAllVehiclesFromFirestoreRest();
-      const mergedMap = new Map<string, Vehicle>();
-      for (const v of fallbackVehicles) {
-        if (v && v.id) mergedMap.set(v.id, v);
+    try {
+      const matched = await fetchSingleVehicleFromFirestoreRest(cleanId, fallbackVehicles);
+      if (matched) {
+        const primaryImg = getPrimaryVehicleImage(matched) || DEFAULT_BRAND_IMAGE;
+        const inferredMime = inferImageMimeType(primaryImg);
+        const meta = generateVehicleMetadata(
+          matched,
+          DEFAULT_BASE_URL,
+          urlOrPath,
+          inferredMime ? { type: inferredMime } : undefined
+        );
+        meta.requestedVehicleSlug = cleanId;
+        meta.vehicleLookupStatus = 'found';
+        return meta;
       }
-      for (const v of liveVehicles) {
-        if (v && v.id) mergedMap.set(v.id, v);
-      }
-      const combined = Array.from(mergedMap.values());
-      matched = findVehicleInList(combined, cleanId);
-    }
 
-    if (matched) {
-      const primaryImg = getPrimaryVehicleImage(matched) || DEFAULT_BRAND_IMAGE;
-      const imgDimensions = await probeImageMetadata(primaryImg);
-      return generateVehicleMetadata(matched, DEFAULT_BASE_URL, urlOrPath, imgDimensions);
+      // Vehicle does not exist -> return clean Not Found metadata without crashing
+      const homeMeta = generateTabMetadata('home', DEFAULT_BASE_URL);
+      return {
+        ...homeMeta,
+        title: `Vehicle Not Found | ${DEFAULT_SITE_NAME}`,
+        twitterTitle: `Vehicle Not Found | ${DEFAULT_SITE_NAME}`,
+        url: `${DEFAULT_BASE_URL}/vehicles/${encodeURIComponent(cleanId)}`,
+        canonicalUrl: `${DEFAULT_BASE_URL}/vehicles/${encodeURIComponent(cleanId)}`,
+        vehicle: null,
+        requestedVehicleSlug: cleanId,
+        vehicleLookupStatus: 'not_found',
+      };
+    } catch {
+      const homeMeta = generateTabMetadata('home', DEFAULT_BASE_URL);
+      return {
+        ...homeMeta,
+        vehicle: null,
+        requestedVehicleSlug: cleanId,
+        vehicleLookupStatus: 'error',
+      };
     }
-
-    // Vehicle could not be resolved -> fall back to homepage metadata without misleading vehicle tags
-    return generateTabMetadata('home', DEFAULT_BASE_URL);
   }
 
   return resolveRouteMetadata(urlOrPath, fallbackVehicles, DEFAULT_BASE_URL);
 }
 
 /**
- * Injects Open Graph, Twitter, and canonical metadata tags cleanly into the HTML head,
- * eliminating duplicates or stale tags.
+ * Injects Open Graph, Twitter, canonical metadata tags, and initial route hydration payload
+ * cleanly into the HTML head, eliminating duplicates or stale tags.
  */
 export function injectMetadataIntoHtml(html: string, meta: PageMetadata): string {
   if (!html) return html;
@@ -1149,6 +1429,16 @@ export function injectMetadataIntoHtml(html: string, meta: PageMetadata): string
     .filter(Boolean)
     .join('\n    ');
 
+  let hydrationScriptTag = '';
+  if (meta.requestedVehicleSlug) {
+    const payload = JSON.stringify({
+      slugOrId: meta.requestedVehicleSlug,
+      status: meta.vehicleLookupStatus || (meta.vehicle ? 'found' : 'not_found'),
+      vehicle: meta.vehicle || null,
+    }).replace(/</g, '\\u003c');
+    hydrationScriptTag = `\n    <script id="__JITE_INITIAL_ROUTE__" type="application/json">${payload}</script>`;
+  }
+
   const newMetaBlock = `
     <!-- Primary SEO Meta Tags -->
     <title>${safeTitle}</title>
@@ -1173,9 +1463,9 @@ export function injectMetadataIntoHtml(html: string, meta: PageMetadata): string
     <meta name="twitter:title" content="${safeTwitterTitle}" />
     <meta name="twitter:description" content="${safeTwitterDesc}" />
     <meta name="twitter:image" content="${safeTwitterImage}" />
-    <meta name="twitter:image:alt" content="${safeTwitterImageAlt}" />`;
+    <meta name="twitter:image:alt" content="${safeTwitterImageAlt}" />${hydrationScriptTag}`;
 
-  // Remove existing title, canonical, and conflicting og/twitter tags in the HTML
+  // Remove existing title, canonical, conflicting og/twitter tags, and prior hydration script in the HTML
   const cleaned = html
     .replace(/<title>[\s\S]*?<\/title>/gi, '')
     .replace(/<meta\s+name=["']title["'][\s\S]*?>/gi, '')
@@ -1183,7 +1473,8 @@ export function injectMetadataIntoHtml(html: string, meta: PageMetadata): string
     .replace(/<meta\s+name=["']keywords["'][\s\S]*?>/gi, '')
     .replace(/<meta\s+property=["']og:[^"']+["'][\s\S]*?>/gi, '')
     .replace(/<meta\s+name=["']twitter:[^"']+["'][\s\S]*?>/gi, '')
-    .replace(/<link\s+rel=["']canonical["'][\s\S]*?>/gi, '');
+    .replace(/<link\s+rel=["']canonical["'][\s\S]*?>/gi, '')
+    .replace(/<script\s+id=["']__JITE_INITIAL_ROUTE__["'][\s\S]*?<\/script>/gi, '');
 
   if (cleaned.includes('<head>')) {
     return cleaned.replace('<head>', `<head>${newMetaBlock}`);
