@@ -802,7 +802,7 @@ export function generateTabMetadata(
     default: {
       const title = 'Jite Auto Deals | Trusted Vehicle Consultant';
       const description =
-        'Connect with trusted car companies and verified dealerships in Nigeria. Find quality vehicles, get expert guidance, and buy with confidence.';
+        'Buying a car in Nigeria shouldn’t feel like a gamble. Avoid untrusted sellers, hidden faults and costly mistakes. Jite Auto Deals helps you find, source and choose the right vehicle with greater confidence.';
       const canonicalUrl = `${cleanBase}/`;
       return {
         title,

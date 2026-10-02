@@ -1,6 +1,6 @@
 {
   "name": "Jite Auto Deals",
-  "description": "Vehicle Consultant in Nigeria helping serious buyers find, source, and navigate vehicle purchases with confidence through trusted automotive relationships.",
+  "description": "Buying a car in Nigeria shouldn’t feel like a gamble. Avoid untrusted sellers, hidden faults and costly mistakes. Jite Auto Deals helps you find, source and choose the right vehicle with greater confidence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
