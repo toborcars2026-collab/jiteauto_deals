@@ -5,13 +5,12 @@ import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
 import { resolveServerRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
-import {
+import adminAuthHandler, {
   getAdminAuthConfig,
   saveAdminAuthConfig,
   clearAdminAuthConfig
-} from "./api/_authHelper";
-import adminAuthHandler from "./api/admin-auth";
-import renderPageHandler from "./api/render";
+} from "./api/admin-auth.js";
+import renderPageHandler from "./api/render.js";
 
 const app = express();
 const PORT = 3000;

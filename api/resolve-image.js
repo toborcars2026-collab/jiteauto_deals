@@ -1,6 +1,4 @@
-import type { IncomingMessage, ServerResponse } from 'http';
-
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export default async function handler(req, res) {
   const urlObj = new URL(req.url || '/', 'http://localhost');
   const targetUrl = urlObj.searchParams.get('url');
 
@@ -26,7 +24,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ resolvedUrl: targetUrl }));
-  } catch (err) {
+  } catch {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ resolvedUrl: targetUrl }));

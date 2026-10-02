@@ -352,6 +352,9 @@ export default function App() {
               setQualifierVehicle((prev) => prev || matched);
             } else {
               setSelectedVehicle((prev) => prev || matched);
+              setIsDetailsOpen(true);
+              setIsVehicleLoading(false);
+              setVehicleFetchError(false);
             }
           }
         }
@@ -364,8 +367,14 @@ export default function App() {
       if (route.slugOrId) {
         const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
         if (matched) {
-          setSelectedVehicle((prev) => (prev ? matched : prev));
-          setQualifierVehicle((prev) => (prev ? matched : prev));
+          if (route.qualify) {
+            setQualifierVehicle((prev) => prev || matched);
+          } else {
+            setSelectedVehicle((prev) => prev || matched);
+            setIsDetailsOpen(true);
+            setIsVehicleLoading(false);
+            setVehicleFetchError(false);
+          }
         }
       }
     });

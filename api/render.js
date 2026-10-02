@@ -1,56 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import type { IncomingMessage, ServerResponse } from 'http';
-
-interface VehicleRecord {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  price: number;
-  mileage?: number;
-  transmission: string;
-  fuelType: string;
-  bodyType: string;
-  location: string;
-  dealership: string;
-  images: string[];
-  description: string;
-  engine: string;
-  color: string;
-  condition: string;
-  isFeatured: boolean;
-  inSlideshow?: boolean;
-  slideshowOrder?: number;
-  status: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface PageMetadata {
-  title: string;
-  description: string;
-  image: string;
-  imageSecureUrl?: string;
-  imageType?: string;
-  imageWidth?: number;
-  imageHeight?: number;
-  imageAlt: string;
-  url: string;
-  type: string;
-  siteName: string;
-  locale: string;
-  twitterCard: 'summary_large_image' | 'summary';
-  twitterTitle: string;
-  twitterDescription: string;
-  twitterImage: string;
-  twitterImageAlt: string;
-  canonicalUrl: string;
-  keywords?: string;
-  vehicle?: VehicleRecord | null;
-  requestedVehicleSlug?: string | null;
-  vehicleLookupStatus?: 'found' | 'not_found' | 'error';
-}
 
 const DEFAULT_BRAND_IMAGE =
   'https://res.cloudinary.com/xh0efm5e/image/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/v1790903435/wide_cinematic_high_contrast_promotional_banner.jpg';
@@ -68,16 +17,16 @@ const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-cl
 const FIRESTORE_DATABASE_ID =
   process.env.VITE_FIRESTORE_DATABASE_ID || 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
 
-let cachedBaseHtml: string | null = null;
+let cachedBaseHtml = null;
 let cachedBaseHtmlTime = 0;
 const BASE_HTML_TTL_MS = 60 * 1000;
 
-let cachedFallbackVehicles: VehicleRecord[] | null = null;
-let firestoreVehiclesCache: VehicleRecord[] | null = null;
+let cachedFallbackVehicles = null;
+let firestoreVehiclesCache = null;
 let firestoreVehiclesCacheTime = 0;
 const FIRESTORE_CACHE_TTL_MS = 15 * 1000;
 
-function safeDecodeURIComponent(str: string | undefined | null): string {
+function safeDecodeURIComponent(str) {
   if (!str || typeof str !== 'string') return '';
   try {
     return decodeURIComponent(str);
@@ -86,7 +35,7 @@ function safeDecodeURIComponent(str: string | undefined | null): string {
   }
 }
 
-function decodeUnicodeEscapes(str: string | undefined | null): string {
+function decodeUnicodeEscapes(str) {
   if (!str || typeof str !== 'string') return '';
   let res = str;
   res = res.replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, (_, hex) => {
@@ -111,7 +60,7 @@ function decodeUnicodeEscapes(str: string | undefined | null): string {
   return res;
 }
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount) {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
@@ -119,11 +68,11 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function formatMileage(km: number): string {
+function formatMileage(km) {
   return new Intl.NumberFormat('en-US').format(km) + ' km';
 }
 
-function normalizeImageUrlForMeta(url: string | undefined | null): string {
+function normalizeImageUrlForMeta(url) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
   if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
@@ -147,9 +96,9 @@ function normalizeImageUrlForMeta(url: string | undefined | null): string {
   return trimmed;
 }
 
-function getPrimaryVehicleImage(vehicle: VehicleRecord | null | undefined): string {
+function getPrimaryVehicleImage(vehicle) {
   if (!vehicle) return '';
-  const explicitPrimary = (vehicle as any).primaryImage;
+  const explicitPrimary = vehicle.primaryImage;
   if (typeof explicitPrimary === 'string' && explicitPrimary.trim()) {
     const normalized = normalizeImageUrlForMeta(explicitPrimary);
     if (normalized) return normalized;
@@ -163,7 +112,7 @@ function getPrimaryVehicleImage(vehicle: VehicleRecord | null | undefined): stri
   return '';
 }
 
-function inferImageMimeType(imageUrl: string | undefined | null): string | undefined {
+function inferImageMimeType(imageUrl) {
   if (!imageUrl || typeof imageUrl !== 'string') return undefined;
   const cleanUrl = imageUrl.split('?')[0].split('#')[0].toLowerCase();
   if (cleanUrl.endsWith('.png')) return 'image/png';
@@ -173,9 +122,9 @@ function inferImageMimeType(imageUrl: string | undefined | null): string | undef
   return undefined;
 }
 
-function getBaseVehicleSlug(vehicle: VehicleRecord): string {
+function getBaseVehicleSlug(vehicle) {
   if (!vehicle) return '';
-  const explicitSlug = (vehicle as any).slug;
+  const explicitSlug = vehicle.slug;
   if (typeof explicitSlug === 'string' && explicitSlug.trim()) {
     return explicitSlug
       .toLowerCase()
@@ -193,7 +142,7 @@ function getBaseVehicleSlug(vehicle: VehicleRecord): string {
   return base || (vehicle.id || 'car').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-function computeDisambiguatedVehicleSlug(vehicle: VehicleRecord, duplicateIndex = 1): string {
+function computeDisambiguatedVehicleSlug(vehicle, duplicateIndex = 1) {
   const base = getBaseVehicleSlug(vehicle);
   if (!base) return '';
   const cleanId = (vehicle.id || '')
@@ -225,7 +174,7 @@ function computeDisambiguatedVehicleSlug(vehicle: VehicleRecord, duplicateIndex 
   return `${base}-${duplicateIndex + 1}`;
 }
 
-function getVehicleSlug(vehicle: VehicleRecord, allVehicles?: VehicleRecord[]): string {
+function getVehicleSlug(vehicle, allVehicles) {
   if (!vehicle) return '';
   const base = getBaseVehicleSlug(vehicle);
   if (!allVehicles || allVehicles.length <= 1) {
@@ -244,7 +193,7 @@ function getVehicleSlug(vehicle: VehicleRecord, allVehicles?: VehicleRecord[]): 
   return computeDisambiguatedVehicleSlug(vehicle, idx);
 }
 
-function findVehicleInList(vehicles: VehicleRecord[], identifier: string): VehicleRecord | undefined {
+function findVehicleInList(vehicles, identifier) {
   if (!identifier || !Array.isArray(vehicles) || vehicles.length === 0) return undefined;
   const sortedVehicles = [...vehicles].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''));
   const cleanId = safeDecodeURIComponent(identifier)
@@ -303,7 +252,7 @@ function findVehicleInList(vehicles: VehicleRecord[], identifier: string): Vehic
   const yearMatch = cleanId.match(/\b(19[89]\d|20[0-3]\d)\b/);
   if (yearMatch) {
     const targetYear = parseInt(yearMatch[1], 10);
-    const normalizeMakeModel = (str: string) =>
+    const normalizeMakeModel = (str) =>
       str
         .toLowerCase()
         .replace(/\b(19[89]\d|20[0-3]\d)\b/g, '')
@@ -328,9 +277,9 @@ function findVehicleInList(vehicles: VehicleRecord[], identifier: string): Vehic
   return undefined;
 }
 
-function extractVehicleIdentifierFromUrl(urlOrPath: string): string | null {
+function extractVehicleIdentifierFromUrl(urlOrPath) {
   if (!urlOrPath) return null;
-  let parsedUrl: URL;
+  let parsedUrl;
   try {
     parsedUrl = new URL(urlOrPath, DEFAULT_BASE_URL);
   } catch {
@@ -355,7 +304,7 @@ function extractVehicleIdentifierFromUrl(urlOrPath: string): string | null {
     if (id) return safeDecodeURIComponent(id);
   }
 
-  const queryVehicle = searchParams.get('vehicle') || searchParams.get('v');
+  const queryVehicle = searchParams.get('vehicle') || searchParams.get('v') || searchParams.get('slug');
   if (queryVehicle && queryVehicle.trim()) {
     return safeDecodeURIComponent(queryVehicle.trim());
   }
@@ -363,13 +312,13 @@ function extractVehicleIdentifierFromUrl(urlOrPath: string): string | null {
   return null;
 }
 
-function generateVehicleMetadata(vehicle: VehicleRecord, requestUrl?: string): PageMetadata {
+function generateVehicleMetadata(vehicle, requestUrl) {
   const cleanBase = DEFAULT_BASE_URL;
   const slug = getBaseVehicleSlug(vehicle);
 
   const make = decodeUnicodeEscapes(vehicle.make || '').trim();
   const modelStr = decodeUnicodeEscapes(vehicle.model || '').trim();
-  const trimCandidate = decodeUnicodeEscapes(((vehicle as any).trim || (vehicle as any).variant || '').toString()).trim();
+  const trimCandidate = decodeUnicodeEscapes((vehicle.trim || vehicle.variant || '').toString()).trim();
   const modelWithTrim =
     trimCandidate && !modelStr.toLowerCase().includes(trimCandidate.toLowerCase())
       ? `${modelStr} ${trimCandidate}`.trim()
@@ -383,7 +332,7 @@ function generateVehicleMetadata(vehicle: VehicleRecord, requestUrl?: string): P
     ? `${makeModelYear} | ${DEFAULT_SITE_NAME}`
     : `Vehicle Details | ${DEFAULT_SITE_NAME}`;
 
-  const specParts: string[] = [];
+  const specParts = [];
   const transmission = decodeUnicodeEscapes(vehicle.transmission || '').trim();
   if (transmission) {
     specParts.push(
@@ -464,7 +413,7 @@ function generateVehicleMetadata(vehicle: VehicleRecord, requestUrl?: string): P
   };
 }
 
-function generateTabMetadata(tab: string): PageMetadata {
+function generateTabMetadata(tab) {
   const cleanBase = DEFAULT_BASE_URL;
   const cleanTab = (tab || 'home').toLowerCase().replace(/^\/+/, '').replace(/\/+$/, '');
 
@@ -620,30 +569,30 @@ function generateTabMetadata(tab: string): PageMetadata {
   }
 }
 
-function parseFirestoreRestDocument(docObj: any): VehicleRecord | null {
+function parseFirestoreRestDocument(docObj) {
   if (!docObj || !docObj.fields) return null;
   const f = docObj.fields;
   const docName = typeof docObj.name === 'string' ? docObj.name : '';
   const docIdFromPath = docName.split('/').pop() || '';
 
-  const getStr = (key: string, fallback = ''): string => {
+  const getStr = (key, fallback = '') => {
     const val = f[key]?.stringValue;
     return typeof val === 'string' ? decodeUnicodeEscapes(val) : fallback;
   };
 
-  const getNum = (key: string, fallback = 0): number => {
+  const getNum = (key, fallback = 0) => {
     if (f[key]?.integerValue !== undefined) return Number(f[key].integerValue) || fallback;
     if (f[key]?.doubleValue !== undefined) return Number(f[key].doubleValue) || fallback;
     if (f[key]?.stringValue !== undefined) return Number(f[key].stringValue) || fallback;
     return fallback;
   };
 
-  const getBool = (key: string, fallback = false): boolean => {
+  const getBool = (key, fallback = false) => {
     if (typeof f[key]?.booleanValue === 'boolean') return f[key].booleanValue;
     return fallback;
   };
 
-  const images: string[] = [];
+  const images = [];
   const rawValues = f.images?.arrayValue?.values;
   if (Array.isArray(rawValues)) {
     for (const item of rawValues) {
@@ -686,7 +635,7 @@ function parseFirestoreRestDocument(docObj: any): VehicleRecord | null {
   };
 }
 
-async function queryVehiclesByIdPrefix(prefix: string): Promise<VehicleRecord[]> {
+async function queryVehiclesByIdPrefix(prefix) {
   if (!prefix) return [];
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`;
   try {
@@ -728,7 +677,7 @@ async function queryVehiclesByIdPrefix(prefix: string): Promise<VehicleRecord[]>
     if (!res.ok) return [];
     const rows = await res.json();
     if (!Array.isArray(rows)) return [];
-    const vehicles: VehicleRecord[] = [];
+    const vehicles = [];
     for (const row of rows) {
       if (row && row.document) {
         const parsed = parseFirestoreRestDocument(row.document);
@@ -741,7 +690,7 @@ async function queryVehiclesByIdPrefix(prefix: string): Promise<VehicleRecord[]>
   }
 }
 
-async function queryVehiclesByYear(year: number): Promise<VehicleRecord[]> {
+async function queryVehiclesByYear(year) {
   if (!year || isNaN(year)) return [];
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery`;
   try {
@@ -768,7 +717,7 @@ async function queryVehiclesByYear(year: number): Promise<VehicleRecord[]> {
     if (!res.ok) return [];
     const rows = await res.json();
     if (!Array.isArray(rows)) return [];
-    const vehicles: VehicleRecord[] = [];
+    const vehicles = [];
     for (const row of rows) {
       if (row && row.document) {
         const parsed = parseFirestoreRestDocument(row.document);
@@ -781,7 +730,7 @@ async function queryVehiclesByYear(year: number): Promise<VehicleRecord[]> {
   }
 }
 
-async function fetchVehicleById(docId: string): Promise<VehicleRecord | null> {
+async function fetchVehicleById(docId) {
   if (!docId) return null;
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/vehicles/${encodeURIComponent(docId)}`;
   try {
@@ -801,7 +750,7 @@ async function fetchVehicleById(docId: string): Promise<VehicleRecord | null> {
   }
 }
 
-async function fetchAllVehicles(): Promise<VehicleRecord[]> {
+async function fetchAllVehicles() {
   const now = Date.now();
   if (firestoreVehiclesCache && now - firestoreVehiclesCacheTime < FIRESTORE_CACHE_TTL_MS) {
     return firestoreVehiclesCache;
@@ -824,7 +773,7 @@ async function fetchAllVehicles(): Promise<VehicleRecord[]> {
     if (!res.ok) return firestoreVehiclesCache || [];
     const rows = await res.json();
     if (!Array.isArray(rows)) return firestoreVehiclesCache || [];
-    const vehicles: VehicleRecord[] = [];
+    const vehicles = [];
     for (const row of rows) {
       if (row && row.document) {
         const parsed = parseFirestoreRestDocument(row.document);
@@ -841,10 +790,7 @@ async function fetchAllVehicles(): Promise<VehicleRecord[]> {
   }
 }
 
-async function fetchSingleVehicle(
-  cleanId: string,
-  fallbackVehicles: VehicleRecord[] = []
-): Promise<VehicleRecord | null> {
+async function fetchSingleVehicle(cleanId, fallbackVehicles = []) {
   if (!cleanId) return null;
 
   // 1. Targeted prefix range query on `id`
@@ -881,7 +827,7 @@ async function fetchSingleVehicle(
 
   // 4. Fallback to full collection + local store
   const liveVehicles = await fetchAllVehicles();
-  const mergedMap = new Map<string, VehicleRecord>();
+  const mergedMap = new Map();
   for (const v of fallbackVehicles) {
     if (v && v.id) mergedMap.set(v.id, v);
   }
@@ -892,7 +838,7 @@ async function fetchSingleVehicle(
   return findVehicleInList(combined, cleanId) || null;
 }
 
-function loadFallbackVehicles(): VehicleRecord[] {
+function loadFallbackVehicles() {
   if (cachedFallbackVehicles) return cachedFallbackVehicles;
   try {
     const vehiclesPath = path.join(process.cwd(), 'data_store', 'vehicles.json');
@@ -908,10 +854,7 @@ function loadFallbackVehicles(): VehicleRecord[] {
   return [];
 }
 
-async function resolveRouteMetadata(
-  urlOrPath: string,
-  fallbackVehicles: VehicleRecord[] = []
-): Promise<PageMetadata> {
+async function resolveRouteMetadata(urlOrPath, fallbackVehicles = []) {
   const vehicleIdentifier = extractVehicleIdentifierFromUrl(urlOrPath);
 
   if (vehicleIdentifier) {
@@ -952,7 +895,7 @@ async function resolveRouteMetadata(
     }
   }
 
-  let parsedUrl: URL;
+  let parsedUrl;
   try {
     parsedUrl = new URL(urlOrPath, DEFAULT_BASE_URL);
   } catch {
@@ -972,12 +915,12 @@ async function resolveRouteMetadata(
   return generateTabMetadata('home');
 }
 
-function injectMetadataIntoHtml(html: string, meta: PageMetadata): string {
+function injectMetadataIntoHtml(html, meta) {
   if (!html) return html;
 
-  const escapeAttr = (str: string | undefined | null) => {
+  const escapeAttr = (str) => {
     if (!str) return '';
-    return str
+    return String(str)
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
@@ -1070,7 +1013,7 @@ function injectMetadataIntoHtml(html: string, meta: PageMetadata): string {
   return `${newMetaBlock}\n${cleaned}`;
 }
 
-async function loadBaseHtml(req: IncomingMessage): Promise<string> {
+async function loadBaseHtml(req) {
   const now = Date.now();
   if (cachedBaseHtml && now - cachedBaseHtmlTime < BASE_HTML_TTL_MS) {
     return cachedBaseHtml;
@@ -1091,9 +1034,9 @@ async function loadBaseHtml(req: IncomingMessage): Promise<string> {
 
   // 2. Fetch deployed static /index.html from Vercel CDN edge (contains production hashed JS/CSS bundles)
   const rawHost = req.headers['x-forwarded-host'] || req.headers.host || 'jiteautodeals.vercel.app';
-  const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+  const host = String(Array.isArray(rawHost) ? rawHost[0] : rawHost).split(',')[0].trim();
   const rawProto = req.headers['x-forwarded-proto'] || 'https';
-  const proto = Array.isArray(rawProto) ? rawProto[0] : rawProto;
+  const proto = String(Array.isArray(rawProto) ? rawProto[0] : rawProto).split(',')[0].trim();
   const originsToTry = Array.from(new Set([`${proto}://${host}`, DEFAULT_BASE_URL]));
 
   for (const origin of originsToTry) {
@@ -1139,10 +1082,10 @@ async function loadBaseHtml(req: IncomingMessage): Promise<string> {
 </html>`;
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export default async function handler(req, res) {
   try {
     const rawUrl = req.url || '/';
-    let parsedReqUrl: URL;
+    let parsedReqUrl;
     try {
       parsedReqUrl = new URL(rawUrl, DEFAULT_BASE_URL);
     } catch {
