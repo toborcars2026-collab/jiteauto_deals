@@ -4,13 +4,14 @@ import fs from "fs";
 import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
-import { resolveRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
+import { resolveServerRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
 import {
   getAdminAuthConfig,
   saveAdminAuthConfig,
   clearAdminAuthConfig
 } from "./api/_authHelper";
 import adminAuthHandler from "./api/admin-auth";
+import renderPageHandler from "./api/render";
 
 const app = express();
 const PORT = 3000;
@@ -478,6 +479,10 @@ app.all("/api/admin-auth", async (req, res) => {
   return adminAuthHandler(req, res);
 });
 
+app.get("/api/render", async (req, res) => {
+  return renderPageHandler(req, res);
+});
+
 app.get("/api/admin/auth/status", async (req, res) => {
   try {
     const config = await getAdminAuthConfig();
@@ -817,13 +822,10 @@ async function startServer() {
 
     try {
       const vehicles = readVehiclesStore();
-      const host = req.get("host") || "jiteautodeals.vercel.app";
-      const protocol = req.protocol || "https";
-      const origin = `${protocol}://${host}`;
       const originalUrl = req.originalUrl || req.url || "/";
 
-      // Resolve metadata dynamically based on route and query
-      const meta = resolveRouteMetadata(originalUrl, vehicles, origin);
+      // Resolve metadata dynamically from live Cloud Firestore + local fallback based on route and query
+      const meta = await resolveServerRouteMetadata(originalUrl, vehicles);
 
       let baseHtml = "";
       if (process.env.NODE_ENV !== "production" && vite) {

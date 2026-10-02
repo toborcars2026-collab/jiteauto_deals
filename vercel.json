@@ -6,7 +6,7 @@
       "destination": "/$1/:match*"
     },
     {
-      "source": "/(.*\\.(?:js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|json|webmanifest|txt|xml))",
+      "source": "/(.*\\.(?:html|js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|json|webmanifest|txt|xml))",
       "destination": "/$1"
     },
     {
@@ -16,6 +16,52 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
+    },
+    {
+      "source": "/vehicles/:slug*",
+      "destination": "/api/render?path=/vehicles/:slug*"
+    },
+    {
+      "source": "/car/:slug*",
+      "destination": "/api/render?path=/car/:slug*"
+    },
+    {
+      "source": "/v/:slug*",
+      "destination": "/api/render?path=/v/:slug*"
+    },
+    {
+      "source": "/(browse|inventory|catalog|cars|find-car|find-my-car|source-car|source-a-car|how-it-works|about|admin)",
+      "destination": "/api/render?path=/$1"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "vehicle"
+        }
+      ],
+      "destination": "/api/render"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "v"
+        }
+      ],
+      "destination": "/api/render"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "tab"
+        }
+      ],
+      "destination": "/api/render"
     },
     {
       "source": "/(.*)",

@@ -155,7 +155,7 @@ export default function App() {
       vehicleId: vehicle.id,
       vehicleSlug: slug,
     };
-    const newUrl = `/?vehicle=${encodeURIComponent(slug)}`;
+    const newUrl = `/vehicles/${encodeURIComponent(slug)}`;
 
     try {
       window.history.pushState(newState, '', newUrl);
@@ -167,7 +167,7 @@ export default function App() {
     
     // Dynamic vehicle metadata update
     const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-    const meta = generateVehicleMetadata(vehicle, origin);
+    const meta = generateVehicleMetadata(vehicle, origin, newUrl);
     updateClientMeta(meta);
   };
 
@@ -282,8 +282,8 @@ export default function App() {
           vehicleSlug: route.slugOrId,
         };
         const vehicleUrl = route.qualify
-          ? `/?vehicle=${encodeURIComponent(route.slugOrId)}&qualify=1`
-          : `/?vehicle=${encodeURIComponent(route.slugOrId)}`;
+          ? `/vehicles/${encodeURIComponent(route.slugOrId)}?qualify=1`
+          : `/vehicles/${encodeURIComponent(route.slugOrId)}`;
         window.history.pushState(vehicleState, '', vehicleUrl);
       } else {
         const initialNavState: AppHistoryState = {
@@ -307,7 +307,7 @@ export default function App() {
             setSelectedVehicle(matched);
             setIsDetailsOpen(true);
             const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-            const meta = generateVehicleMetadata(matched, origin);
+            const meta = generateVehicleMetadata(matched, origin, `/vehicles/${encodeURIComponent(route.slugOrId!)}`);
             updateClientMeta(meta);
           }
         }

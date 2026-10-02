@@ -56,13 +56,7 @@ export function getVehicleSlug(vehicle: Vehicle): string {
 export function getVehicleShareUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  
-  if (typeof window !== 'undefined' && window.location) {
-    const origin = window.location.origin;
-    return `${origin}/vehicles/${encodeURIComponent(slug)}`;
-  }
-  
-  return `https://jiteautodealss.vercel.app/vehicles/${encodeURIComponent(slug)}`;
+  return `https://jiteautodeals.vercel.app/vehicles/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -71,10 +65,7 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
 export function getVehiclePathUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  const origin = typeof window !== 'undefined' && window.location.origin
-    ? window.location.origin
-    : 'https://jiteautodealss.vercel.app';
-  return `${origin}/vehicles/${slug}`;
+  return `https://jiteautodeals.vercel.app/vehicles/${slug}`;
 }
 
 /**
@@ -82,28 +73,47 @@ export function getVehiclePathUrl(vehicle: Vehicle): string {
  */
 export function findVehicleBySlugOrId(vehicles: Vehicle[], identifier: string): Vehicle | undefined {
   if (!identifier || !Array.isArray(vehicles) || vehicles.length === 0) return undefined;
-  const clean = decodeURIComponent(identifier).toLowerCase().trim().replace(/^\/vehicles\/?/, '').replace(/\/$/, '');
+  const clean = decodeURIComponent(identifier)
+    .toLowerCase()
+    .trim()
+    .replace(/^\/?(vehicles|car|v)\/?/, '')
+    .replace(/\/+$/, '');
   if (!clean) return undefined;
 
   // 1. Exact ID match (case-insensitive)
-  const byId = vehicles.find(v => v.id && v.id.toLowerCase() === clean);
+  const byId = vehicles.find(v => v && v.id && v.id.toLowerCase().trim() === clean);
   if (byId) return byId;
 
   // 2. Exact generated slug match
-  const bySlug = vehicles.find(v => getVehicleSlug(v) === clean);
+  const bySlug = vehicles.find(v => v && getVehicleSlug(v) === clean);
   if (bySlug) return bySlug;
 
-  // 3. Fallback matching without special characters
+  // 3. Exact alphanumeric match on ID or slug
   const cleanAlphaNum = clean.replace(/[^a-z0-9]/g, '');
-  const byFuzzy = vehicles.find(v => {
-    const sAlpha = getVehicleSlug(v).replace(/[^a-z0-9]/g, '');
-    if (sAlpha === cleanAlphaNum) return true;
-    const modelAlpha = (v.model || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const makeAlpha = (v.make || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    return cleanAlphaNum.includes(modelAlpha) && cleanAlphaNum.includes(makeAlpha);
+  if (!cleanAlphaNum || cleanAlphaNum.length < 3) return undefined;
+
+  const byAlphaId = vehicles.find(
+    v => v && (v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphaNum
+  );
+  if (byAlphaId) return byAlphaId;
+
+  const byAlphaSlug = vehicles.find(
+    v => v && getVehicleSlug(v).replace(/[^a-z0-9]/g, '') === cleanAlphaNum
+  );
+  if (byAlphaSlug) return byAlphaSlug;
+
+  // 4. Prefix match where Firestore ID has a generated suffix
+  const byPrefixId = vehicles.find(v => {
+    if (!v) return false;
+    const vId = (v.id || '').toLowerCase().trim();
+    const slug = getVehicleSlug(v);
+    return (
+      (vId.startsWith(`${clean}-`) && vId.length <= clean.length + 12) ||
+      (slug && clean.startsWith(`${slug}-`) && clean.length <= slug.length + 12)
+    );
   });
 
-  return byFuzzy;
+  return byPrefixId;
 }
 
 /**
