@@ -46,7 +46,7 @@ async function loadBaseHtml(req: IncomingMessage): Promise<string> {
 
   // 2. Fetch deployed static /index.html from Vercel CDN edge (contains production hashed JS/CSS bundles)
   try {
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'jiteautodeals.vercel.app';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'jiteautodealss.vercel.app';
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const origin = `${proto}://${host}`;
     const controller = new AbortController();

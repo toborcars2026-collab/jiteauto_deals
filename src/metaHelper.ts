@@ -30,15 +30,15 @@ export interface PageMetadata {
 }
 
 export const DEFAULT_BRAND_IMAGE =
-  'https://res.cloudinary.com/xh0efm5e/image/upload/v1790903435/wide_cinematic_high_contrast_promotional_banner.png';
-export const DEFAULT_BRAND_IMAGE_TYPE = 'image/png';
-export const DEFAULT_BRAND_IMAGE_WIDTH = 1672;
-export const DEFAULT_BRAND_IMAGE_HEIGHT = 941;
+  'https://res.cloudinary.com/xh0efm5e/image/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/v1790903435/wide_cinematic_high_contrast_promotional_banner.jpg';
+export const DEFAULT_BRAND_IMAGE_TYPE = 'image/jpeg';
+export const DEFAULT_BRAND_IMAGE_WIDTH = 1200;
+export const DEFAULT_BRAND_IMAGE_HEIGHT = 630;
 export const DEFAULT_BRAND_IMAGE_ALT = 'Jite Auto Deals — Trusted Vehicle Consultant in Nigeria';
 
 export const DEFAULT_SITE_NAME = 'Jite Auto Deals';
 export const DEFAULT_LOCALE = 'en_NG';
-export const DEFAULT_BASE_URL = 'https://jiteautodeals.vercel.app';
+export const DEFAULT_BASE_URL = 'https://jiteautodealss.vercel.app';
 
 export const FIREBASE_PROJECT_ID = 'gen-lang-client-0327661147';
 export const FIRESTORE_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';

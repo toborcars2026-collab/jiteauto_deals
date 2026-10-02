@@ -56,7 +56,7 @@ export function getVehicleSlug(vehicle: Vehicle): string {
 export function getVehicleShareUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  return `https://jiteautodeals.vercel.app/vehicles/${encodeURIComponent(slug)}`;
+  return `https://jiteautodealss.vercel.app/vehicles/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -65,7 +65,7 @@ export function getVehicleShareUrl(vehicle: Vehicle): string {
 export function getVehiclePathUrl(vehicle: Vehicle): string {
   if (!vehicle) return '';
   const slug = getVehicleSlug(vehicle);
-  return `https://jiteautodeals.vercel.app/vehicles/${slug}`;
+  return `https://jiteautodealss.vercel.app/vehicles/${slug}`;
 }
 
 /**
