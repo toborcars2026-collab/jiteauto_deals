@@ -25,11 +25,9 @@ import Footer from './components/Footer';
 import { Vehicle, NavigationTab, BusinessSettings } from './types';
 import {
   getVehicles,
-  fetchVehicles,
   fetchSingleVehicle,
   subscribeToVehicles,
   getBusinessSettings,
-  fetchBusinessSettings,
   subscribeToBusinessSettings,
   formatCurrency,
   getWhatsAppLink,
@@ -339,13 +337,12 @@ export default function App() {
       }
     }
 
-    // Priority 2: Deferred background sync of the remaining catalogue and business settings
-    fetchVehicles().then((loadedVehicles) => {
-      if (loadedVehicles && loadedVehicles.length > 0) {
-        setVehicles(loadedVehicles);
-
+    // Priority 2: Single real-time Firestore sync (eliminates duplicate parallel getDocs query overhead)
+    const unsubscribeVehicles = subscribeToVehicles((updatedVehicles) => {
+      if (updatedVehicles && updatedVehicles.length > 0) {
+        setVehicles(updatedVehicles);
         if (route.slugOrId) {
-          const matched = findVehicleBySlugOrId(loadedVehicles, route.slugOrId);
+          const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
           if (matched) {
             preloadPrimaryImage(matched.images?.[0]);
             if (route.qualify) {
@@ -361,31 +358,7 @@ export default function App() {
       }
     });
 
-    // Real-time Firestore sync for vehicles
-    const unsubscribeVehicles = subscribeToVehicles((updatedVehicles) => {
-      setVehicles(updatedVehicles);
-      if (route.slugOrId) {
-        const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
-        if (matched) {
-          if (route.qualify) {
-            setQualifierVehicle((prev) => prev || matched);
-          } else {
-            setSelectedVehicle((prev) => prev || matched);
-            setIsDetailsOpen(true);
-            setIsVehicleLoading(false);
-            setVehicleFetchError(false);
-          }
-        }
-      }
-    });
-
     // Real-time Firestore sync for business settings
-    fetchBusinessSettings().then((loadedSettings) => {
-      if (loadedSettings) {
-        setBusinessSettings(loadedSettings);
-      }
-    });
-
     const unsubscribeSettings = subscribeToBusinessSettings((updatedSettings) => {
       if (updatedSettings) {
         setBusinessSettings(updatedSettings);
@@ -491,7 +464,7 @@ export default function App() {
               vehicles={vehicles}
               onViewDetails={handleViewDetails}
               onBrowseAll={() => handleTabChange('browse')}
-              onConsultVehicle={(car) => handleOpenConsultant(car)}
+              onBookInspection={handleOpenQualifier}
             />
 
             <WhyChooseUs
@@ -517,7 +490,7 @@ export default function App() {
             <BrowseCarsPage
               vehicles={vehicles}
               onViewDetails={handleViewDetails}
-              onConsultVehicle={(car) => handleOpenConsultant(car)}
+              onBookInspection={handleOpenQualifier}
               onFindMyCar={() => handleTabChange('find-car')}
               onSourceCar={() => handleTabChange('source-car')}
             />
@@ -649,6 +622,7 @@ export default function App() {
             vehicle={qualifierVehicle}
             isOpen={isQualifierOpen}
             onClose={handleCloseQualifier}
+            businessSettings={businessSettings}
           />
         </Suspense>
       )}

@@ -1,399 +1,552 @@
 import React, { useState } from 'react';
-import { X, Send, Phone, MessageSquare, CheckCircle, ShieldCheck } from 'lucide-react';
-import { Vehicle } from '../types';
-import { formatCurrency, getWhatsAppLink, safeOpenWhatsApp, getLeadQualificationMessage, saveInquiry, OFFICIAL_PHONE_CALL_URL } from '../utils';
+import {
+  X,
+  MessageSquare,
+  CheckCircle2,
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  MapPin,
+  Car,
+  AlertCircle,
+  ExternalLink,
+} from 'lucide-react';
+import { Vehicle, BusinessSettings } from '../types';
+import {
+  formatCurrency,
+  getWhatsAppLink,
+  safeOpenWhatsApp,
+  getVehicleInspectionMessage,
+  formatInspectionDate,
+  saveInquiry,
+  getImageUrl,
+} from '../utils';
 
 interface LeadQualifierModalProps {
   vehicle: Vehicle | null;
   isOpen: boolean;
   onClose: () => void;
+  businessSettings?: BusinessSettings;
   onOpenConsultantModal?: (vehicle: Vehicle, customMsg?: string) => void;
 }
 
-export default function LeadQualifierModal({ vehicle, isOpen, onClose, onOpenConsultantModal }: LeadQualifierModalProps) {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    budget: vehicle?.price || 0,
-    paymentMethod: 'Cash' as 'Cash' | 'Financing',
-    readyToBuy: 'Immediately' as 'Immediately' | 'Within 2 Weeks' | 'Within a Month' | 'Just Researching',
-  });
-  const [isDone, setIsDone] = useState(false);
+export default function LeadQualifierModal({
+  vehicle,
+  isOpen,
+  onClose,
+  businessSettings,
+}: LeadQualifierModalProps) {
+  // Required customer inputs
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
-  // Sync budget when vehicle is selected or loaded
-  React.useEffect(() => {
-    if (vehicle?.price) {
-      setFormData((prev) => ({
-        ...prev,
-        budget: prev.budget || vehicle.price,
-      }));
-    }
-  }, [vehicle]);
+  // Default inspection date to tomorrow (or today if desired)
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  const [inspectionDate, setInspectionDate] = useState(tomorrowStr);
+  const [preferredTime, setPreferredTime] = useState('10:00 AM');
+  const [customTimeActive, setCustomTimeActive] = useState(false);
+
+  // Validation & status states
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+  const [lastWhatsAppUrl, setLastWhatsAppUrl] = useState('');
 
   if (!isOpen || !vehicle) return null;
 
-  const totalSteps = 4;
+  // Phone validation: strip non-digits, ensure at least 10 digits
+  const validatePhone = (num: string): boolean => {
+    const digits = num.replace(/\D/g, '');
+    return digits.length >= 10 && digits.length <= 15;
+  };
 
-  const handleNextStep = () => {
-    if (step === 1 && (!formData.name || !formData.phone)) {
-      alert('Please fill in your Name and Phone Number to proceed.');
+  const quickTimes = ['10:00 AM', '12:00 PM', '2:00 PM', '4:00 PM'];
+
+  const handleTimeSelect = (t: string) => {
+    setPreferredTime(t);
+    setCustomTimeActive(false);
+    if (errors.time) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.time;
+        return next;
+      });
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vehicle) return;
+
+    const newErrors: { [key: string]: string } = {};
+
+    if (!name.trim()) {
+      newErrors.name = 'Please enter your full name.';
+    } else if (name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters.';
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = 'Please enter your WhatsApp number.';
+    } else if (!validatePhone(phone)) {
+      newErrors.phone = 'Please enter a valid phone number (e.g. 0818 082 3197).';
+    }
+
+    if (!inspectionDate) {
+      newErrors.date = 'Please select an inspection date.';
+    }
+
+    if (!preferredTime.trim()) {
+      newErrors.time = 'Please select or enter your preferred time.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
-    if (step === 2) {
-      if (!formData.budget || formData.budget < 3000000) {
-        alert('Minimum budget must be at least ₦3,000,000 (3 Million Naira). Please enter an amount within this range.');
-        return;
-      }
-      if (formData.budget > 1000000000) {
-        alert('Maximum budget limit is ₦1,000,000,000 (1 Billion Naira). Please enter an amount within this limit.');
-        return;
-      }
-    }
-    if (step < totalSteps) {
-      setStep(step + 1);
-    } else {
-      handleSubmit();
-    }
-  };
 
-  const handlePrevStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
+    setIsSubmitting(true);
 
-  const handleSubmit = () => {
-    if (!vehicle) return;
-    // Save Inquiry to database/localStorage
-    saveInquiry({
-      name: formData.name,
-      phone: formData.phone,
-      vehicleId: vehicle.id,
-      vehicleName: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      budget: formData.budget,
-      paymentMethod: formData.paymentMethod,
-      readyToBuy: formData.readyToBuy,
-      preferredContact: 'WhatsApp',
+    const formattedDate = formatInspectionDate(inspectionDate) || inspectionDate;
+    const cleanTime = preferredTime.trim();
+
+    // 1. Build the official dynamic inspection message with the exact vehicle and customer details
+    const waText = getVehicleInspectionMessage(vehicle, {
+      name: name.trim(),
+      phone: phone.trim(),
+      preferredDate: formattedDate,
+      preferredTime: cleanTime,
     });
 
+    const targetWhatsAppNumber = businessSettings?.whatsAppNumber;
+    const waLink = getWhatsAppLink(waText, targetWhatsAppNumber);
+    setLastWhatsAppUrl(waLink);
+
+    // 2. Persist booking info into inquiries collection for admin visibility
+    try {
+      saveInquiry({
+        name: name.trim(),
+        phone: phone.trim(),
+        vehicleId: vehicle.id,
+        vehicleName: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+        budget: vehicle.price,
+        preferredDate: formattedDate,
+        preferredTime: cleanTime,
+        preferredContact: 'WhatsApp',
+        message: `Vehicle Inspection Booking: Date: ${formattedDate}, Time: ${cleanTime}, Location: ${vehicle.location || 'Abuja'}`,
+        type: 'inspection',
+        vehiclePrice: vehicle.price,
+        vehicleLocation: vehicle.location || 'Abuja',
+      });
+    } catch (err) {
+      console.warn('Failed to save inspection inquiry:', err);
+    }
+
+    // 3. Mark completed and automatically open WhatsApp
     setIsDone(true);
+    setIsSubmitting(false);
 
-    // Get WhatsApp prefilled message
-    const waText = getLeadQualificationMessage(
-      vehicle,
-      formData.budget,
-      formData.paymentMethod,
-      formData.readyToBuy,
-      formData.name,
-      formData.phone
-    );
-
-    const waLink = getWhatsAppLink(waText);
     safeOpenWhatsApp(waLink);
   };
 
-  const handleCallOption = () => {
-    if (!vehicle) return;
-    // Save Inquiry with PreferredContact = Call
-    saveInquiry({
-      name: formData.name,
-      phone: formData.phone,
-      vehicleId: vehicle.id,
-      vehicleName: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      budget: formData.budget,
-      paymentMethod: formData.paymentMethod,
-      readyToBuy: formData.readyToBuy,
-      preferredContact: 'Call',
-    });
-    
-    window.location.href = OFFICIAL_PHONE_CALL_URL;
+  const handleManualOpenWhatsApp = () => {
+    if (lastWhatsAppUrl) {
+      safeOpenWhatsApp(lastWhatsAppUrl);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-xl rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl overflow-hidden">
-        {/* Header decoration */}
-        <div className="h-1.5 bg-gradient-to-r from-gold-400 via-gold-500 to-gold-600" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl overflow-hidden my-4">
+        {/* Subtle gold accent top strip */}
+        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600" />
 
         {/* Close Button */}
         <button
+          type="button"
+          id="inspection_modal_close_btn"
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer z-10"
+          aria-label="Close"
+          title="Close"
         >
           <X size={20} />
         </button>
 
         {isDone ? (
-          <div className="p-8 text-center space-y-6 animate-scaleIn">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <CheckCircle size={32} />
+          /* Confirmation State After Booking */
+          <div className="p-6 sm:p-8 text-center space-y-6 animate-fadeIn">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-lg">
+              <CheckCircle2 size={36} />
             </div>
+
             <div className="space-y-2">
-              <h3 className="font-display text-xl font-bold">Qualification Completed!</h3>
-              <p className="text-sm text-slate-400 max-w-sm mx-auto">
-                Excellent! Jite Auto Deals is matching your criteria for the <span className="text-amber-500 font-semibold">{vehicle.year} {vehicle.make} {vehicle.model}</span> right now.
-              </p>
-              <div className="bg-slate-950 rounded-lg p-4 max-w-md mx-auto border border-slate-800 text-left space-y-2 text-xs text-slate-300 font-mono">
-                <div><span className="text-slate-500">Buyer:</span> {formData.name}</div>
-                <div><span className="text-slate-500">Car:</span> {vehicle.make} {vehicle.model}</div>
-                <div><span className="text-slate-500">Max Budget:</span> {formatCurrency(formData.budget)}</div>
-                <div><span className="text-slate-500">Payment:</span> {formData.paymentMethod}</div>
-                <div><span className="text-slate-500">Purchase Frame:</span> {formData.readyToBuy}</div>
-              </div>
-              <p className="text-xs text-slate-400 animate-pulse mt-4">
-                Opening WhatsApp to connect you with a Jite Auto Deals vehicle consultant...
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400 block">
+                Inspection Request Received
+              </span>
+              <h3 className="font-display text-xl sm:text-2xl font-bold text-white">
+                Booking Details Submitted
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                We'll confirm your inspection details with you before your visit.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <a
-                href={getWhatsAppLink(getLeadQualificationMessage(vehicle, formData.budget, formData.paymentMethod, formData.readyToBuy, formData.name, formData.phone))}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
+
+            {/* Submitted Booking Summary */}
+            <div className="bg-slate-950/80 rounded-xl p-4 max-w-md mx-auto border border-slate-800 text-left space-y-2 text-xs text-slate-300 font-mono">
+              <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                <span className="text-slate-400">Vehicle:</span>
+                <span className="text-amber-400 font-bold truncate max-w-[240px]">
+                  {vehicle.year} {vehicle.make} {vehicle.model}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Listed Price:</span>
+                <span className="text-white font-bold">{formatCurrency(vehicle.price)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Location:</span>
+                <span className="text-white font-bold">{vehicle.location || 'Abuja'}</span>
+              </div>
+              {vehicle.id && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Vehicle ID:</span>
+                  <span className="text-amber-400/90 font-mono text-[11px] font-bold">
+                    {vehicle.id}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Full Name:</span>
+                <span className="text-white">{name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">WhatsApp Number:</span>
+                <span className="text-white">{phone}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-800/80">
+                <span className="text-slate-400">Inspection Schedule:</span>
+                <span className="text-amber-400 font-bold">
+                  {formatInspectionDate(inspectionDate) || inspectionDate} • {preferredTime}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                id="inspection_modal_manual_wa_btn"
+                onClick={handleManualOpenWhatsApp}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white py-3.5 px-5 rounded-xl text-sm font-bold shadow-lg transition-all cursor-pointer"
               >
                 <MessageSquare size={16} />
-                <span>Open WhatsApp manually</span>
-              </a>
+                <span>Open WhatsApp to Confirm</span>
+                <ExternalLink size={14} className="opacity-70" />
+              </button>
+
               <button
+                type="button"
+                id="inspection_modal_done_close_btn"
                 onClick={onClose}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-sm font-semibold transition-colors"
+                className="w-full bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-300 py-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Close Window
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-6 sm:p-8">
-            {/* Step indicator */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase tracking-widest text-amber-500 font-bold font-mono">
-                  Sourcing Lead Funnel
-                </span>
-                <h3 className="text-lg font-bold font-display">
-                  Get The {vehicle.make} {vehicle.model}
-                </h3>
-              </div>
-              <div className="text-right text-xs text-slate-400 font-mono">
-                Step <span className="text-white font-bold">{step}</span> of {totalSteps}
-              </div>
+          /* Inspection Booking Form */
+          <div className="p-5 sm:p-7">
+            {/* Header: Title and Supporting Text */}
+            <div className="space-y-1.5 pr-8 mb-5">
+              <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                Book a Vehicle Inspection
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-normal">
+                Interested in this vehicle? Choose a convenient time and we'll arrange your inspection.
+              </p>
             </div>
 
-            {/* Progress Bar */}
-            <div className="h-1 bg-slate-800 rounded-full mb-8 overflow-hidden">
-              <div
-                className="h-full bg-amber-500 transition-all duration-300"
-                style={{ width: `${(step / totalSteps) * 100}%` }}
-              />
-            </div>
-
-            {/* Steps views */}
-            <div className="min-h-[220px] flex flex-col justify-center">
-              {/* Step 1: Name and Phone */}
-              {step === 1 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
-                    <p className="text-sm text-slate-300">Let Jite Auto Deals qualify you to avoid tedious dealer bargaining.</p>
+            {/* Selected Vehicle Card at Top of Form */}
+            <div className="bg-slate-950 rounded-xl p-3.5 border border-slate-800 mb-5 flex items-center gap-3.5">
+              <div className="relative h-16 w-20 rounded-lg overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
+                {vehicle.images && vehicle.images[0] ? (
+                  <img
+                    src={getImageUrl(vehicle.images[0])}
+                    alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                    }}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-slate-500">
+                    <Car size={20} />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold font-sans">
-                      Your Full Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Samuel Adebayo"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:border-amber-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold font-sans">
-                      Active Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="e.g. 08180823197"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:border-amber-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Budget verification */}
-              {step === 2 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
-                    <p className="text-sm text-slate-300">Enter your target budget in digits for this vehicle:</p>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold font-sans">
-                        Target Budget (₦)
-                      </label>
-                      <span className="font-mono text-xs sm:text-sm text-amber-400 font-extrabold bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                        {formatCurrency(formData.budget || 0)}
-                      </span>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
-                        ₦
-                      </div>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={3000000}
-                        max={1000000000}
-                        step={100000}
-                        placeholder={`e.g. ${vehicle.price} (Min ₦3M - Max ₦1 Billion)`}
-                        value={formData.budget || ''}
-                        onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) || 0 })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-3.5 text-base font-mono text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono px-1">
-                      <span>Min: ₦3,000,000 (3M)</span>
-                      <span>Max: ₦1,000,000,000 (1 Billion)</span>
-                    </div>
-
-                    {/* Quick presets */}
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, budget: vehicle.price })}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-950 border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors font-medium cursor-pointer"
-                      >
-                        Autofill Listed Price ({formatCurrency(vehicle.price)})
-                      </button>
-                    </div>
-
-                    <p className="text-[11px] text-slate-400 italic">
-                      Type your exact budget in digits. We negotiate directly with dealerships to match within this targeted threshold.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Payment strategy */}
-              {step === 3 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
-                    <p className="text-sm text-slate-300">What is your preferred payment methodology?</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3">
-                    {[
-                      { id: 'Cash', label: 'Outright Cash Purchase', desc: 'Ready to write cheque or transfer full amount' },
-                      { id: 'Financing', label: 'Vehicle Finance Program', desc: 'Secure installments, downpayments, or lease options' }
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, paymentMethod: item.id as any })}
-                        className={`flex items-start text-left gap-4 p-4 rounded-xl border transition-all ${
-                          formData.paymentMethod === item.id
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-400'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-850'
-                        }`}
-                      >
-                        <div className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${
-                          formData.paymentMethod === item.id ? 'border-amber-500' : 'border-slate-700'
-                        }`}>
-                          {formData.paymentMethod === item.id && (
-                            <div className="h-2 w-2 rounded-full bg-amber-500" />
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white">{item.label}</h4>
-                          <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Purchase timeline */}
-              {step === 4 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="text-center pb-2">
-                    <p className="text-sm text-slate-300">How soon do you intend to conclude this vehicle acquisition?</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: 'Immediately', label: 'Immediately', desc: 'Within 3 days' },
-                      { id: 'Within 2 Weeks', label: 'Within 2 Weeks', desc: 'Looking for prompt deals' },
-                      { id: 'Within a Month', label: 'Within a Month', desc: 'Flexible timing' },
-                      { id: 'Just Researching', label: 'Researching', desc: 'Comparing models' }
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, readyToBuy: item.id as any })}
-                        className={`flex flex-col text-left p-4 rounded-xl border transition-all ${
-                          formData.readyToBuy === item.id
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-400'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-850'
-                        }`}
-                      >
-                        <span className="text-xs uppercase tracking-wider font-extrabold font-mono text-amber-500">
-                          {item.desc}
-                        </span>
-                        <h4 className="text-sm font-bold text-white mt-1">{item.label}</h4>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-800/60">
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                disabled={step === 1}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  step === 1 ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Back
-              </button>
-
-              <div className="flex gap-2">
-                {step === totalSteps && (
-                  <button
-                    type="button"
-                    onClick={handleCallOption}
-                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-lg transition-colors"
-                  >
-                    <Phone size={14} className="text-amber-500" />
-                    <span>Call Hotline</span>
-                  </button>
                 )}
+              </div>
 
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 px-6 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-amber-500/5 transition-colors"
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-white truncate font-display">
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </h4>
+                  {vehicle.id && (
+                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0" title={`Vehicle ID: ${vehicle.id}`}>
+                      ID: {vehicle.id.length > 10 ? vehicle.id.slice(0, 8) : vehicle.id}
+                    </span>
+                  )}
+                </div>
+                <div className="font-mono font-extrabold text-amber-400 text-sm">
+                  {formatCurrency(vehicle.price)}
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                  <MapPin size={11} className="text-amber-500 shrink-0" />
+                  <span className="truncate">{vehicle.location || 'Abuja'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Short Form: Exactly the Required Customer Fields */}
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="inspection_customer_name"
+                  className="flex items-center justify-between text-xs font-semibold text-slate-300"
                 >
-                  <span>{step === totalSteps ? 'Qualify & Sourced' : 'Next Step'}</span>
-                  <Send size={14} />
+                  <span className="flex items-center gap-1.5">
+                    <User size={13} className="text-amber-400" />
+                    <span>Full Name</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400/90 font-mono uppercase">Required</span>
+                </label>
+                <input
+                  id="inspection_customer_name"
+                  type="text"
+                  required
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (errors.name) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.name;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none transition-all ${
+                    errors.name
+                      ? 'border-red-500 focus:border-red-500 ring-1 ring-red-500/30'
+                      : 'border-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30'
+                  }`}
+                  autoComplete="name"
+                />
+                {errors.name && (
+                  <p className="flex items-center gap-1 text-[11px] text-red-400 mt-1">
+                    <AlertCircle size={12} />
+                    <span>{errors.name}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* WhatsApp Number */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="inspection_customer_phone"
+                  className="flex items-center justify-between text-xs font-semibold text-slate-300"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Phone size={13} className="text-amber-400" />
+                    <span>WhatsApp Number</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400/90 font-mono uppercase">Required</span>
+                </label>
+                <input
+                  id="inspection_customer_phone"
+                  type="tel"
+                  required
+                  placeholder="e.g. 0818 082 3197"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (errors.phone) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.phone;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 font-mono focus:outline-none transition-all ${
+                    errors.phone
+                      ? 'border-red-500 focus:border-red-500 ring-1 ring-red-500/30'
+                      : 'border-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30'
+                  }`}
+                  autoComplete="tel"
+                />
+                {errors.phone && (
+                  <p className="flex items-center gap-1 text-[11px] text-red-400 mt-1">
+                    <AlertCircle size={12} />
+                    <span>{errors.phone}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Inspection Date */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="inspection_preferred_date"
+                  className="flex items-center justify-between text-xs font-semibold text-slate-300"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Calendar size={13} className="text-amber-400" />
+                    <span>Inspection Date</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400/90 font-mono uppercase">Required</span>
+                </label>
+                <input
+                  id="inspection_preferred_date"
+                  type="date"
+                  required
+                  min={todayStr}
+                  value={inspectionDate}
+                  onChange={(e) => {
+                    setInspectionDate(e.target.value);
+                    if (errors.date) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.date;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition-all font-mono ${
+                    errors.date
+                      ? 'border-red-500 focus:border-red-500 ring-1 ring-red-500/30'
+                      : 'border-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30'
+                  }`}
+                />
+                {errors.date && (
+                  <p className="flex items-center gap-1 text-[11px] text-red-400 mt-1">
+                    <AlertCircle size={12} />
+                    <span>{errors.date}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Preferred Time */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="inspection_preferred_time"
+                  className="flex items-center justify-between text-xs font-semibold text-slate-300"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={13} className="text-amber-400" />
+                    <span>Preferred Time</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400/90 font-mono uppercase">Required</span>
+                </label>
+
+                {/* Quick-Select Buttons: 10:00 AM, 12:00 PM, 2:00 PM, 4:00 PM */}
+                <div className="grid grid-cols-4 gap-2">
+                  {quickTimes.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => handleTimeSelect(t)}
+                      className={`py-2 px-1 text-xs rounded-xl font-mono font-bold transition-all cursor-pointer text-center ${
+                        preferredTime === t && !customTimeActive
+                          ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold border border-amber-400'
+                          : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Option to choose custom time */}
+                <div className="pt-1">
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCustomTimeActive((prev) => !prev)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 transition-colors font-mono cursor-pointer"
+                    >
+                      {customTimeActive ? 'Use standard time slots' : 'Choose another time'}
+                    </button>
+                    {preferredTime && (
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Selected: <strong className="text-white">{preferredTime}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {customTimeActive && (
+                    <input
+                      id="inspection_preferred_time"
+                      type="text"
+                      placeholder="e.g. 11:30 AM or 3:00 PM"
+                      value={preferredTime}
+                      onChange={(e) => {
+                        setPreferredTime(e.target.value);
+                        if (errors.time) {
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.time;
+                            return next;
+                          });
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all font-mono mt-2"
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                {errors.time && (
+                  <p className="flex items-center gap-1 text-[11px] text-red-400 mt-1">
+                    <AlertCircle size={12} />
+                    <span>{errors.time}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Primary Button: "BOOK INSPECTION" */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  id="inspection_modal_submit_btn"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-slate-950 font-extrabold uppercase tracking-wide py-3.5 px-6 rounded-xl text-sm shadow-lg shadow-amber-500/10 transition-all cursor-pointer disabled:opacity-50 select-none"
+                >
+                  <span>{isSubmitting ? 'Booking...' : 'BOOK INSPECTION'}</span>
                 </button>
               </div>
-            </div>
 
-            {/* Lead qualifier protection tag */}
-            <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-slate-500 border-t border-slate-800/30 pt-3">
-              <ShieldCheck size={12} className="text-emerald-500" />
-              <span>Jite Sourcing Protocol protects client credentials under NDAs</span>
-            </div>
+              {/* Information Below Button */}
+              <p className="text-[11px] text-slate-400 text-center leading-relaxed pt-1">
+                We'll confirm your inspection details with you before your visit.
+              </p>
+            </form>
           </div>
         )}
       </div>

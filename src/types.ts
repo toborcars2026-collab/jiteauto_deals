@@ -61,6 +61,11 @@ export interface Inquiry {
   message?: string;
   createdAt: string;
   status: LeadStatus;
+  preferredDate?: string;
+  preferredTime?: string;
+  type?: 'inspection' | 'general' | string;
+  vehiclePrice?: number;
+  vehicleLocation?: string;
 }
 
 export interface BusinessSettings {
@@ -77,6 +82,17 @@ export interface BusinessSettings {
   facebookUrl: string;
   homepageCtaText: string;
   footerText: string;
+  updatedAt?: string;
+}
+
+export interface FunnelAnalyticsData {
+  aiOpened?: number;
+  aiConversations?: number;
+  vehiclesViewed?: number;
+  enquiriesStarted?: number;
+  sourcingRequests?: number;
+  whatsAppClicks?: number;
+  vehicleSaves?: number;
   updatedAt?: string;
 }
 

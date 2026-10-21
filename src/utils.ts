@@ -713,12 +713,163 @@ export async function resolveImageLink(url: string): Promise<string> {
   return syncNormalized;
 }
 
-export function getImageUrl(url: string | undefined | null): string {
-  if (!url || typeof url !== 'string' || !url.trim()) {
-    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
+export type ImageSizePreset = 'thumb' | 'card' | 'hero' | 'zoom' | 'original';
+
+/**
+ * Returns a high-speed, CDN-optimized image URL with modern WebP/AVIF format auto-negotiation,
+ * proper dimensions, and quality compression based on usage context:
+ * - 'thumb': ~200px for thumbnail strips and preview icons
+ * - 'card': ~640px for vehicle cards in catalogue and home grids
+ * - 'hero': ~1200px for main vehicle detail modal viewer
+ * - 'zoom': ~1920px for fullscreen inspection
+ * - 'original': full original source URL
+ */
+export function getOptimizedImageUrl(
+  rawUrl: string | undefined | null,
+  size: ImageSizePreset = 'card'
+): string {
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+    if (size === 'thumb') {
+      return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=240&h=160&q=70';
+    }
+    if (size === 'card') {
+      return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=640&h=400&q=75';
+    }
+    if (size === 'hero') {
+      return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&h=900&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1920&q=85';
   }
 
-  return normalizeImageInput(url);
+  const url = normalizeImageInput(rawUrl);
+
+  if (size === 'original') {
+    return url;
+  }
+
+  // 1. Cloudinary URL Transformation (dynamic on-the-fly resizing, WebP/AVIF, intelligent quality)
+  if (url.includes('res.cloudinary.com') && url.includes('/image/upload/')) {
+    const parts = url.split('/image/upload/');
+    if (parts.length === 2) {
+      const prefix = parts[0] + '/image/upload/';
+      let rest = parts[1];
+
+      // Strip existing transformation segment if present
+      rest = rest.replace(/^(?:[a-z]_[^/]+,)*[a-z]_[^/]+\//, '');
+
+      let transform = '';
+      if (size === 'thumb') {
+        transform = 'c_fill,w_240,h_160,q_auto:good,f_auto/';
+      } else if (size === 'card') {
+        transform = 'c_fill,w_640,h_400,q_auto:good,f_auto/';
+      } else if (size === 'hero') {
+        transform = 'c_limit,w_1200,h_900,q_auto:good,f_auto/';
+      } else if (size === 'zoom') {
+        transform = 'c_limit,w_1920,q_auto:best,f_auto/';
+      }
+
+      return `${prefix}${transform}${rest}`;
+    }
+  }
+
+  // 2. Unsplash URL Transformation
+  if (url.includes('images.unsplash.com')) {
+    try {
+      const u = new URL(url);
+      u.searchParams.set('auto', 'format');
+      if (size === 'thumb') {
+        u.searchParams.set('w', '240');
+        u.searchParams.set('h', '160');
+        u.searchParams.set('fit', 'crop');
+        u.searchParams.set('q', '70');
+      } else if (size === 'card') {
+        u.searchParams.set('w', '640');
+        u.searchParams.set('h', '400');
+        u.searchParams.set('fit', 'crop');
+        u.searchParams.set('q', '75');
+      } else if (size === 'hero') {
+        u.searchParams.set('w', '1200');
+        u.searchParams.delete('h');
+        u.searchParams.delete('fit');
+        u.searchParams.set('q', '80');
+      } else if (size === 'zoom') {
+        u.searchParams.set('w', '1920');
+        u.searchParams.delete('h');
+        u.searchParams.delete('fit');
+        u.searchParams.set('q', '85');
+      }
+      return u.toString();
+    } catch {}
+  }
+
+  // 3. Google Photos / Google User Content
+  if (url.includes('lh3.googleusercontent.com')) {
+    const base = url.split('=')[0];
+    if (size === 'thumb') return `${base}=w240-h160-c-rw`;
+    if (size === 'card') return `${base}=w640-h400-c-rw`;
+    if (size === 'hero') return `${base}=w1200-rw`;
+    if (size === 'zoom') return `${base}=w1920-rw`;
+  }
+
+  return url;
+}
+
+/**
+ * Responsive srcSet generator for vehicle cards.
+ * Delivers lightweight 400px–800px images matching exact screen density.
+ */
+export function getVehicleCardSrcSet(rawUrl: string | undefined | null): string | undefined {
+  if (!rawUrl || typeof rawUrl !== 'string') return undefined;
+  const url = normalizeImageInput(rawUrl);
+
+  if (url.includes('res.cloudinary.com') && url.includes('/image/upload/')) {
+    const parts = url.split('/image/upload/');
+    if (parts.length === 2) {
+      const prefix = parts[0] + '/image/upload/';
+      const rest = parts[1].replace(/^(?:[a-z]_[^/]+,)*[a-z]_[^/]+\//, '');
+      return [
+        `${prefix}c_fill,w_400,h_250,q_auto:good,f_auto/${rest} 400w`,
+        `${prefix}c_fill,w_640,h_400,q_auto:good,f_auto/${rest} 640w`,
+        `${prefix}c_fill,w_800,h_500,q_auto:good,f_auto/${rest} 800w`,
+      ].join(', ');
+    }
+  }
+
+  if (url.includes('images.unsplash.com')) {
+    try {
+      const u1 = new URL(url);
+      u1.searchParams.set('auto', 'format');
+      u1.searchParams.set('fit', 'crop');
+      u1.searchParams.set('q', '75');
+      u1.searchParams.set('w', '400');
+      u1.searchParams.set('h', '250');
+
+      const u2 = new URL(url);
+      u2.searchParams.set('auto', 'format');
+      u2.searchParams.set('fit', 'crop');
+      u2.searchParams.set('q', '75');
+      u2.searchParams.set('w', '640');
+      u2.searchParams.set('h', '400');
+
+      const u3 = new URL(url);
+      u3.searchParams.set('auto', 'format');
+      u3.searchParams.set('fit', 'crop');
+      u3.searchParams.set('q', '75');
+      u3.searchParams.set('w', '800');
+      u3.searchParams.set('h', '500');
+
+      return `${u1.toString()} 400w, ${u2.toString()} 640w, ${u3.toString()} 800w`;
+    } catch {}
+  }
+
+  return undefined;
+}
+
+/**
+ * Universal backwards-compatible image getter. Defaults to optimized card resolution.
+ */
+export function getImageUrl(url: string | undefined | null, size: ImageSizePreset = 'card'): string {
+  return getOptimizedImageUrl(url, size);
 }
 
 // ============================================================================
@@ -975,9 +1126,9 @@ export function getInitialServerRouteData(): InitialServerRoutePayload | null {
 /**
  * Preloads the primary HD vehicle image in the browser <head> using high priority link prefetching.
  */
-export function preloadPrimaryImage(rawUrl: string | undefined | null): void {
+export function preloadPrimaryImage(rawUrl: string | undefined | null, size: ImageSizePreset = 'hero'): void {
   if (!rawUrl || typeof document === 'undefined') return;
-  const url = getImageUrl(rawUrl);
+  const url = getOptimizedImageUrl(rawUrl, size);
   if (!url) return;
 
   // Check if link already exists
@@ -1023,7 +1174,11 @@ export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: bo
     initialSlugOrId = hash.replace(/^#\/car\/?/, '');
   }
 
-  const qualify = searchParams.get('qualify') === '1' || searchParams.get('qualify') === 'true';
+  const qualify =
+    searchParams.get('qualify') === '1' ||
+    searchParams.get('qualify') === 'true' ||
+    searchParams.get('inspection') === '1' ||
+    searchParams.get('inspection') === 'true';
   return {
     slugOrId: initialSlugOrId ? safeDecodeURIComponent(initialSlugOrId).replace(/\/+$/, '').trim() : null,
     qualify,
@@ -2077,6 +2232,62 @@ export function handlePhoneCall(customPhone?: string): void {
 
 export function getGeneralConsultationMessage(): string {
   return `Hello Jite Auto Deals! I'm interested in finding a quality vehicle. I'd love to consult with a vehicle specialist to compare my options based on my budget.`;
+}
+
+/**
+ * Formats a selected date string into a clean, human-readable date.
+ * E.g., "2026-10-25" -> "25 Oct 2026"
+ */
+export function formatInspectionDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+      }
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Generates the official WhatsApp inspection booking message.
+ */
+export function getVehicleInspectionMessage(
+  vehicle: Vehicle,
+  customer: {
+    name: string;
+    phone: string;
+    preferredDate: string;
+    preferredTime: string;
+  }
+): string {
+  const vehicleTitle = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim();
+  const price = formatCurrency(vehicle.price);
+  const location = vehicle.location || 'Abuja';
+
+  return (
+    `Hello Jite Auto Deals, I would like to book a vehicle inspection.\n\n` +
+    `Vehicle: ${vehicleTitle}\n` +
+    `Price: ${price}\n` +
+    `Location: ${location}\n\n` +
+    `Name: ${customer.name.trim()}\n` +
+    `WhatsApp: ${customer.phone.trim()}\n` +
+    `Inspection Date: ${customer.preferredDate.trim()}\n` +
+    `Preferred Time: ${customer.preferredTime.trim()}\n\n` +
+    `Please confirm the inspection details.`
+  );
 }
 
 export function getVehicleInquiryMessage(vehicle: Vehicle): string {
