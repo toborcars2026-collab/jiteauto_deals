@@ -102,12 +102,6 @@ export default function AdminInquiriesTab({ inquiries, setInquiries }: AdminInqu
                       {inq.preferredContact || 'WhatsApp'} Preferred
                     </span>
 
-                    {inq.type === 'inspection' && (
-                      <span className="text-xs bg-amber-100 border border-amber-300 text-amber-900 px-2 py-0.5 rounded-md font-mono font-bold">
-                        Inspection Booking
-                      </span>
-                    )}
-
                     {/* Status Dropdown */}
                     <select
                       value={inq.status || 'New'}
@@ -146,20 +140,11 @@ export default function AdminInquiriesTab({ inquiries, setInquiries }: AdminInqu
                     Client Contact: <strong className="text-slate-800">{inq.phone}</strong> | Target Budget:{' '}
                     <strong className="text-amber-900 font-extrabold">{inq.budget ? formatCurrency(inq.budget) : 'Not specified'}</strong>
                   </p>
-                  {inq.preferredDate ? (
-                    <p className="font-mono text-slate-800 bg-amber-50/70 p-2 rounded-lg border border-amber-200/60 mt-1">
-                      📅 <strong>Preferred Inspection:</strong>{' '}
-                      <span className="text-amber-900 font-bold">{inq.preferredDate}</span> at{' '}
-                      <span className="text-amber-900 font-bold">{inq.preferredTime || 'Flexible'}</span>
-                      {inq.vehicleLocation && <span className="text-slate-600"> (Location: {inq.vehicleLocation})</span>}
-                    </p>
-                  ) : (
-                    <p className="font-mono text-slate-500">
-                      Purchase Urgency: <strong className="text-slate-800">{inq.readyToBuy || 'Immediate'}</strong> | Payment:{' '}
-                      <strong className="text-slate-800">{inq.paymentMethod || 'Outright Cash'}</strong>
-                    </p>
-                  )}
-                  {inq.message && !inq.preferredDate && (
+                  <p className="font-mono text-slate-500">
+                    Purchase Urgency: <strong className="text-slate-800">{inq.readyToBuy || 'Immediate'}</strong> | Payment:{' '}
+                    <strong className="text-slate-800">{inq.paymentMethod || 'Outright Cash'}</strong>
+                  </p>
+                  {inq.message && (
                     <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-slate-600 mt-2">
                       <span className="font-bold text-slate-800 block text-[10px] uppercase font-mono">Message:</span>
                       <p>{inq.message}</p>

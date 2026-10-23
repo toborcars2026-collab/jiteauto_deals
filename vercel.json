@@ -14,10 +14,6 @@
       "destination": "/api/resolve-image"
     },
     {
-      "source": "/api/ai/consultant",
-      "destination": "/api/ai-consultant"
-    },
-    {
       "source": "/api/admin/auth/:action*",
       "destination": "/api/admin-auth?action=:action*"
     },

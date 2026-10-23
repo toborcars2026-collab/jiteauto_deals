@@ -70,12 +70,7 @@
         "preferredContact": { "type": "string" },
         "message": { "type": "string" },
         "createdAt": { "type": "string" },
-        "status": { "type": "string", "enum": ["New", "Contacted", "In Progress", "Completed", "Closed"] },
-        "preferredDate": { "type": "string" },
-        "preferredTime": { "type": "string" },
-        "type": { "type": "string" },
-        "vehiclePrice": { "type": "number" },
-        "vehicleLocation": { "type": "string" }
+        "status": { "type": "string", "enum": ["New", "Contacted", "In Progress", "Completed", "Closed"] }
       },
       "required": ["name", "phone", "vehicleId", "vehicleName"]
     },

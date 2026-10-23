@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Car, Search, Check, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Shield, Car, Search, ArrowRight, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
-import { formatCurrency, getOptimizedImageUrl, getVehicleCardSrcSet, getSlideshowVehicles } from '../utils';
+import { formatCurrency, getImageUrl, getSlideshowVehicles } from '../utils';
 
 interface HeroProps {
   vehicles: Vehicle[];
   onBrowseCars: () => void;
   onFindMyCar: () => void;
   onViewVehicleDetails: (vehicle: Vehicle) => void;
-  onOpenAIConsultant?: (prompt?: string) => void;
 }
 
 export default function Hero({
@@ -25,14 +24,14 @@ export default function Hero({
 
   const slideshowVehicles = getSlideshowVehicles(vehicles);
 
-  // Auto-slide effect for hero preview showcase
+  // Auto slide effect
   useEffect(() => {
     if (slideshowVehicles.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
       setDirection(1);
       setCurrentSlideIdx((prev) => (prev + 1) % slideshowVehicles.length);
-    }, 5500);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [slideshowVehicles.length, isPaused]);
@@ -79,36 +78,30 @@ export default function Hero({
   };
 
   return (
-    <section
-      id="hero_section"
-      className="relative bg-slate-950 text-white overflow-hidden pt-8 pb-12 sm:pt-12 sm:pb-16 lg:pt-16 lg:pb-20 border-b border-slate-800"
-    >
+    <section id="hero_section" className="relative bg-slate-950 text-white overflow-hidden pt-8 pb-16 lg:pt-14 lg:pb-20 border-b border-slate-800">
       {/* Background glow accents */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-10 w-80 h-80 bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Left Column: Clean Headline, Supporting Text, CTAs, and Subtle Trust Line */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          {/* Left Column: Positioning, Headline & Action CTAs */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Brand Positioning Eyebrow */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-400 text-xs font-mono font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              <span>Jite Auto Deals · Your Trusted Vehicle Consultant</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-amber-400 text-xs font-mono font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>Jite Auto Deals • Vehicle Consultant</span>
             </div>
 
-            {/* Main Headline */}
             <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.15]">
-              Find Your Next Car With Confidence.
+              Looking for the right car in Nigeria?
             </h1>
 
-            {/* Supporting Copy */}
             <p className="text-slate-300 text-base sm:text-lg lg:text-xl font-light leading-relaxed max-w-2xl">
-              Browse available vehicles or tell us exactly what you're looking for. We'll help you take the next step.
+              Don't just find a car. Find one you can buy with confidence.
             </p>
 
-            {/* Primary & Secondary Action CTAs */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-1">
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
               <button
                 type="button"
                 id="hero_btn_browse_cars"
@@ -130,53 +123,46 @@ export default function Hero({
               </button>
             </div>
 
-            {/* Subtle Trust Line */}
-            <div className="pt-2 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs sm:text-sm text-slate-300 font-medium">
+            {/* Sourcing Reassurance Strip */}
+            <div className="pt-4 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-slate-400 font-mono">
               <div className="flex items-center gap-1.5">
-                <Check size={16} className="text-amber-400 stroke-[2.5]" />
-                <span>Inspection Available</span>
+                <span className="text-amber-400">✓</span>
+                <span>Physical Inspection</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Check size={16} className="text-amber-400 stroke-[2.5]" />
-                <span>Test Drive First</span>
+                <span className="text-amber-400">✓</span>
+                <span>Test-Drive First</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Check size={16} className="text-amber-400 stroke-[2.5]" />
-                <span>Buyer Guidance</span>
+              <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
+                <span className="text-amber-400">✓</span>
+                <span>Zero Online Deposit</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Live Inventory Spotlight Card */}
-          {activeVehicle && (
-            <div className="lg:col-span-5">
+          {/* Right Column: Dynamic Vehicle Slideshow */}
+          <div className="lg:col-span-5">
+            {activeVehicle && (
               <div
-                className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl group"
+                className="relative rounded-3xl overflow-hidden bg-slate-900 border-2 border-slate-800 shadow-2xl group"
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => setIsPaused(false)}
               >
-                {/* Image Slide Area */}
-                <div className="relative aspect-[16/11] overflow-hidden bg-slate-950">
+                {/* Slideshow Display Stage */}
+                <div className="relative aspect-[16/11] sm:aspect-[4/3] w-full overflow-hidden bg-slate-950 select-none">
                   <AnimatePresence initial={false} custom={direction} mode="popLayout">
-                    <motion.img
+                    <motion.div
                       key={activeVehicle.id}
                       custom={direction}
                       variants={slideVariants}
                       initial="enter"
                       animate="center"
                       exit="exit"
-                      transition={{ duration: 0.35, ease: 'easeInOut' }}
-                      src={getOptimizedImageUrl(activeVehicle.images?.[0], 'card')}
-                      srcSet={getVehicleCardSrcSet(activeVehicle.images?.[0])}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
-                      width={640}
-                      height={440}
-                      alt={`${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model}`}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                      className="w-full h-full object-cover cursor-pointer select-none"
-                      style={{ imageRendering: 'auto' }}
+                      transition={{
+                        x: { type: 'spring', stiffness: 300, damping: 30 },
+                        opacity: { duration: 0.25 },
+                      }}
+                      className="absolute inset-0 cursor-pointer"
                       drag="x"
                       dragConstraints={{ left: 0, right: 0 }}
                       dragElastic={0.2}
@@ -189,109 +175,126 @@ export default function Hero({
                           onViewVehicleDetails(activeVehicle);
                         }
                       }}
-                    />
+                    >
+                      <img
+                        src={getImageUrl(activeVehicle.images?.[0])}
+                        alt={`${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model}`}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                        }}
+                        referrerPolicy="no-referrer"
+                      />
+
+                      {/* Subtle Dark Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                    </motion.div>
                   </AnimatePresence>
 
-                  {/* Single Clean Condition Tag */}
-                  <div className="absolute top-3.5 left-3.5 z-10">
-                    <span className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md bg-slate-950/85 text-amber-300 border border-white/10 backdrop-blur-sm">
+                  {/* Top Badges */}
+                  <div className="absolute top-4 left-4 z-20 pointer-events-none flex items-center gap-2">
+                    <span className="px-3 py-1 text-xs font-extrabold uppercase tracking-wider rounded-lg bg-slate-950/90 text-amber-400 border border-amber-500/40 backdrop-blur-md shadow-md">
                       {activeVehicle.condition || 'Foreign Used'}
                     </span>
                   </div>
 
-                  {/* Navigation Arrows (if multiple slideshow items) */}
+                  {/* Manual Arrow Controls */}
                   {slideshowVehicles.length > 1 && (
-                    <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none z-10">
+                    <>
                       <button
                         type="button"
+                        id="slideshow_prev_btn"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePrev();
                         }}
-                        className="w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-sm border border-white/10 transition-transform active:scale-90"
-                        aria-label="Previous vehicle"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center border border-white/10 opacity-70 hover:opacity-100 transition-all cursor-pointer"
+                        aria-label="Previous Vehicle Slide"
                       >
-                        <ChevronLeft size={16} />
+                        <ChevronLeft size={20} />
                       </button>
+
                       <button
                         type="button"
+                        id="slideshow_next_btn"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleNext();
                         }}
-                        className="w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-sm border border-white/10 transition-transform active:scale-90"
-                        aria-label="Next vehicle"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center border border-white/10 opacity-70 hover:opacity-100 transition-all cursor-pointer"
+                        aria-label="Next Vehicle Slide"
                       >
-                        <ChevronRight size={16} />
+                        <ChevronRight size={20} />
                       </button>
-                    </div>
+                    </>
                   )}
-                </div>
 
-                {/* Card Information */}
-                <div className="p-5 bg-slate-900 border-t border-slate-800">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold block">
-                        Live Inventory Preview
-                      </span>
-                      <h3
-                        onClick={() => onViewVehicleDetails(activeVehicle)}
-                        className="font-display text-lg font-bold text-white hover:text-amber-400 transition-colors cursor-pointer"
-                      >
-                        {activeVehicle.year} {activeVehicle.make} {activeVehicle.model}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                        <span>{activeVehicle.transmission || 'Automatic'}</span>
-                        <span>·</span>
-                        <span>{activeVehicle.fuelType || 'Petrol'}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin size={11} className="text-amber-400" />
-                          {activeVehicle.location || 'Lagos'}
+                  {/* Bottom Information Overlay */}
+                  <div
+                    className="absolute bottom-0 left-0 right-0 p-5 z-20 text-white cursor-pointer"
+                    onClick={() => onViewVehicleDetails(activeVehicle)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs text-amber-400 font-mono font-semibold">
+                          <span>{activeVehicle.year}</span>
+                          <span>•</span>
+                          <span>{activeVehicle.make}</span>
+                        </div>
+                        <h3 className="font-display text-lg sm:text-xl font-extrabold tracking-tight text-white group-hover:text-amber-400 transition-colors">
+                          {activeVehicle.model}
+                        </h3>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-slate-400 block font-mono">Listed Price</span>
+                        <span className="font-mono text-base sm:text-lg font-extrabold text-amber-400">
+                          {formatCurrency(activeVehicle.price)}
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] text-slate-400 uppercase font-mono block">
-                        Asking Price
-                      </span>
-                      <span className="font-mono text-lg font-extrabold text-white">
-                        {formatCurrency(activeVehicle.price)}
+                    <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
+                      <div className="flex items-center gap-1">
+                        <MapPin size={12} className="text-amber-400" />
+                        <span>{activeVehicle.location}</span>
+                      </div>
+                      <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1 group-hover:underline">
+                        View Spec Sheet & Photos →
                       </span>
                     </div>
                   </div>
-
-                  {/* Quick Action Button */}
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => onViewVehicleDetails(activeVehicle)}
-                      className="text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                    >
-                      View Details & Inspection →
-                    </button>
-                    {slideshowVehicles.length > 1 && (
-                      <div className="flex items-center gap-1">
-                        {slideshowVehicles.map((_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setCurrentSlideIdx(i)}
-                            className={`h-1.5 rounded-full transition-all ${
-                              i === currentSlideIdx ? 'w-5 bg-amber-400' : 'w-1.5 bg-slate-700 hover:bg-slate-600'
-                            }`}
-                            aria-label={`Go to slide ${i + 1}`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
+
+                {/* Slideshow Indicator Dots */}
+                {slideshowVehicles.length > 1 && (
+                  <div className="bg-slate-950 px-4 py-2.5 flex items-center justify-between border-t border-slate-800/80">
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Featured Slideshow ({currentSlideIdx + 1}/{slideshowVehicles.length})
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      {slideshowVehicles.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setDirection(idx > currentSlideIdx ? 1 : -1);
+                            setCurrentSlideIdx(idx);
+                          }}
+                          className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                            currentSlideIdx === idx ? 'w-5 bg-amber-400' : 'w-2 bg-slate-700 hover:bg-slate-500'
+                          }`}
+                          aria-label={`Go to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </section>

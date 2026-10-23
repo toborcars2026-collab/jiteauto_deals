@@ -5,7 +5,6 @@ import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { createServer as createViteServer } from "vite";
 import { resolveServerRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
-import compression from "compression";
 import adminAuthHandler, {
   getAdminAuthConfig,
   saveAdminAuthConfig,
@@ -16,7 +15,6 @@ import renderPageHandler from "./api/render.js";
 const app = express();
 const PORT = 3000;
 
-app.use(compression());
 app.use(cookieParser());
 // Increase body limit to support high-res image uploads or base64 previews
 app.use(express.json({ limit: "50mb" }));
@@ -480,11 +478,6 @@ app.all("/api/admin-auth", async (req, res) => {
   return adminAuthHandler(req, res);
 });
 
-// AI Vehicle Consultant Endpoint (both /api/ai/consultant and /api/ai-consultant)
-app.post(["/api/ai/consultant", "/api/ai-consultant"], async (_req, res) => {
-  return res.status(404).json({ error: "AI consultant endpoint is not active." });
-});
-
 app.get("/api/render", async (req, res) => {
   return renderPageHandler(req, res);
 });
@@ -877,19 +870,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(
-      express.static(distPath, {
-        maxAge: "1y",
-        immutable: true,
-        setHeaders: (res, filePath) => {
-          if (filePath.endsWith(".html")) {
-            res.setHeader("Cache-Control", "no-cache, must-revalidate");
-          } else if (/\.(js|css|woff2|woff|ttf|png|jpg|jpeg|webp|avif|svg|ico)$/i.test(filePath)) {
-            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-          }
-        },
-      })
-    );
+    app.use(express.static(distPath));
     app.get("*", renderDynamicPage);
   }
 

@@ -28,7 +28,6 @@ import {
   safeOpenWhatsApp,
   getVehicleInquiryMessage,
   getImageUrl,
-  getOptimizedImageUrl,
   decodeUnicodeEscapes,
   getVehicleSlug,
   getBusinessPhoneDisplay,
@@ -400,16 +399,6 @@ export default function VehicleDetailsModal({
   const images = uniqueImages.length > 0 ? uniqueImages : ['https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200'];
   const currentImageIndex = activeImageIndex >= images.length ? 0 : activeImageIndex;
 
-  // Preload next gallery image in browser cache for instantaneous slide transitions
-  useEffect(() => {
-    if (images.length > 1) {
-      const nextIdx = (currentImageIndex + 1) % images.length;
-      const nextImg = new Image();
-      nextImg.decoding = 'async';
-      nextImg.src = getOptimizedImageUrl(images[nextIdx], 'hero');
-    }
-  }, [currentImageIndex, images]);
-
   const handleNextImage = () => {
     setDirection(1);
     setActiveImageIndex((prev) => (prev + 1) % images.length);
@@ -536,16 +525,11 @@ export default function VehicleDetailsModal({
                       x: { type: 'spring', stiffness: 300, damping: 30 },
                       opacity: { duration: 0.2 },
                     }}
-                    src={getOptimizedImageUrl(images[currentImageIndex], 'hero')}
-                    srcSet={`${getOptimizedImageUrl(images[currentImageIndex], 'card')} 640w, ${getOptimizedImageUrl(images[currentImageIndex], 'hero')} 1200w`}
-                    sizes="(max-width: 640px) 100vw, 600px"
-                    width={800}
-                    height={600}
+                    src={getImageUrl(images[currentImageIndex])}
                     alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
                     className="w-full h-full object-cover transition-transform cursor-grab active:cursor-grabbing"
-                    style={{ imageRendering: 'auto' }}
+                    style={{ imageRendering: '-webkit-optimize-contrast' }}
                     loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
-                    fetchPriority={currentImageIndex === 0 ? 'high' : 'auto'}
                     decoding="async"
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
@@ -560,7 +544,7 @@ export default function VehicleDetailsModal({
                       }
                     }}
                     onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=1200';
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
                     }}
                     referrerPolicy="no-referrer"
                   />
@@ -620,16 +604,14 @@ export default function VehicleDetailsModal({
                       }`}
                     >
                       <img
-                        src={getOptimizedImageUrl(img, 'thumb')}
+                        src={getImageUrl(img)}
                         alt="thumbnail"
-                        width={80}
-                        height={56}
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover"
-                        style={{ imageRendering: 'auto' }}
+                        style={{ imageRendering: '-webkit-optimize-contrast' }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=70&w=240';
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
                         }}
                         referrerPolicy="no-referrer"
                       />
@@ -715,10 +697,10 @@ export default function VehicleDetailsModal({
             
             <div className="space-y-2 relative z-10 text-center sm:text-left">
               <h4 className="font-display text-xl font-bold">
-                Interested in this vehicle?
+                Interested in this vehicle? Let Jite Auto Deals help you secure it.
               </h4>
               <p className="text-slate-400 text-xs sm:text-sm max-w-xl">
-                Book an inspection and let a Jite Auto Deals consultant guide you through the next step.
+                We coordinate physical viewing, test-drive, customs/document review, and price negotiation before any payment is made.
               </p>
             </div>
 
@@ -726,13 +708,17 @@ export default function VehicleDetailsModal({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 relative z-10 pt-2">
               <button
                 type="button"
-                id="vehicle_modal_book_inspection_btn"
+                id="vehicle_modal_get_car_btn"
                 onClick={() => {
                   onOpenQualifier(vehicle);
                 }}
-                className="md:col-span-1 py-3.5 px-6 rounded-xl text-sm font-extrabold uppercase tracking-wide shadow-lg transition-all text-center cursor-pointer select-none active:scale-[0.98] bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10"
+                className={`md:col-span-1 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg transition-all text-center cursor-pointer select-none active:scale-[0.98] ${
+                  vehicle.status === 'Sold'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30'
+                    : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/10'
+                }`}
               >
-                BOOK INSPECTION
+                {vehicle.status === 'Sold' ? 'Source Similar Unit' : 'Get This Car'}
               </button>
 
               <a
@@ -749,18 +735,18 @@ export default function VehicleDetailsModal({
               <a
                 href={phoneCallUrl}
                 id="vehicle_modal_call_btn"
-                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] text-slate-100 border border-slate-700 hover:border-amber-500/50 py-3.5 px-6 rounded-xl text-sm font-bold transition-all text-center cursor-pointer select-none"
-                title={`Call a Consultant (${phoneDisplay})`}
+                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] text-slate-100 border border-slate-700 hover:border-amber-500/50 py-3.5 px-6 rounded-xl text-sm font-mono font-bold transition-all text-center cursor-pointer select-none"
+                title={`Call ${phoneDisplay}`}
               >
                 <Phone size={16} className="text-amber-400" />
-                <span>Call a Consultant</span>
+                <span>Call {phoneDisplay}</span>
               </a>
             </div>
 
-            {/* Inspection confirmation notice banner */}
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs text-slate-400 border-t border-slate-900 pt-4">
-              <ShieldCheck size={14} className="text-amber-400 shrink-0" />
-              <span>We'll confirm your inspection details with you before your visit.</span>
+            {/* security check banner */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-[10px] text-slate-500 border-t border-slate-900 pt-4">
+              <ShieldCheck size={12} className="text-emerald-500" />
+              <span>Full buyer protection checklist active. Zero advance deposits required.</span>
             </div>
           </div>
 
@@ -856,10 +842,10 @@ export default function VehicleDetailsModal({
                   x: { type: 'spring', stiffness: 300, damping: 30 },
                   opacity: { duration: 0.2 },
                 }}
-                src={getOptimizedImageUrl(images[currentImageIndex], 'zoom')}
+                src={getImageUrl(images[currentImageIndex])}
                 alt={`${vehicle.make} ${vehicle.model} full high-res view`}
                 className="max-h-full max-w-full object-contain rounded-xl shadow-2xl transition-all cursor-grab active:cursor-grabbing"
-                style={{ imageRendering: 'auto' }}
+                style={{ imageRendering: '-webkit-optimize-contrast' }}
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.2}

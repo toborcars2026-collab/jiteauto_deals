@@ -28,15 +28,7 @@ import {
   verifyAdminSession,
   logoutAdminSession
 } from '../services/adminAuth';
-const defaultFunnelStats: FunnelAnalyticsData = {
-  aiOpened: 0,
-  aiConversations: 0,
-  vehiclesViewed: 0,
-  enquiriesStarted: 0,
-  sourcingRequests: 0,
-  whatsAppClicks: 0,
-};
-import { Vehicle, Lead, Inquiry, BusinessSettings, FunnelAnalyticsData } from '../types';
+import { Vehicle, Lead, Inquiry, BusinessSettings } from '../types';
 import ShareVehicleModal from './ShareVehicleModal';
 import AdminInventoryTab from './admin/AdminInventoryTab';
 import AdminSlideshowTab from './admin/AdminSlideshowTab';
@@ -82,7 +74,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [leads, setLeads] = useState<Lead[]>(() => getLeads());
   const [inquiries, setInquiries] = useState<Inquiry[]>(() => getInquiries());
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => getBusinessSettings());
-  const [funnelStats, setFunnelStats] = useState<FunnelAnalyticsData>(() => defaultFunnelStats);
 
   // Edit vehicle state
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -404,88 +395,40 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
         {/* Collapsible KPI Stats Dashboard */}
         {showKpiStats && (
-          <div className="space-y-3 animate-fadeIn">
-            {/* Inventory Overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block">Total Units</span>
-                <span className="text-2xl font-black text-slate-900 font-display">{totalVehicles}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-emerald-700 block">Available</span>
-                <span className="text-2xl font-black text-emerald-800 font-display">{availableVehicles}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-amber-700 block">Reserved</span>
-                <span className="text-2xl font-black text-amber-800 font-display">{reservedVehicles}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-red-200 bg-red-50/20 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-red-700 block">Sold</span>
-                <span className="text-2xl font-black text-red-800 font-display">{soldVehicles}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-purple-200 bg-purple-50/20 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-purple-700 block">Hero Slides</span>
-                <span className="text-2xl font-black text-purple-800 font-display">{slideshowCount}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-blue-200 bg-blue-50/20 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-blue-700 block">New Leads</span>
-                <span className="text-2xl font-black text-blue-800 font-display">{newLeadsCount}</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Inquiries</span>
-                <span className="text-2xl font-black text-slate-900 font-display">{newInquiriesCount}</span>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 animate-fadeIn">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block">Total Units</span>
+              <span className="text-2xl font-black text-slate-900 font-display">{totalVehicles}</span>
             </div>
 
-            {/* Jite AI Vehicle Consultant & Conversion Funnel */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white shadow-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                    <Sparkles size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white">Jite AI Vehicle Consultant • Conversion Funnel</h3>
-                    <p className="text-[10px] text-slate-400 font-mono">Visitor Journey: Discovery → Consultation → Match → WhatsApp Handoff</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  Real-Time Intelligence
-                </span>
-              </div>
+            <div className="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-emerald-700 block">Available</span>
+              <span className="text-2xl font-black text-emerald-800 font-display">{availableVehicles}</span>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">AI Chats Opened</span>
-                  <span className="text-lg font-black font-display text-amber-400">{funnelStats.aiOpened || 0}</span>
-                </div>
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">Conversations</span>
-                  <span className="text-lg font-black font-display text-white">{funnelStats.aiConversations || 0}</span>
-                </div>
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">Matches Viewed</span>
-                  <span className="text-lg font-black font-display text-sky-400">{funnelStats.vehiclesViewed || 0}</span>
-                </div>
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">High-Intent Inquiries</span>
-                  <span className="text-lg font-black font-display text-indigo-400">{funnelStats.enquiriesStarted || 0}</span>
-                </div>
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">Sourcing Requests</span>
-                  <span className="text-lg font-black font-display text-purple-400">{funnelStats.sourcingRequests || 0}</span>
-                </div>
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20">
-                  <span className="text-[10px] font-mono text-emerald-400 uppercase block">WhatsApp Handoffs</span>
-                  <span className="text-lg font-black font-display text-emerald-400">{funnelStats.whatsAppClicks || 0}</span>
-                </div>
-              </div>
+            <div className="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-amber-700 block">Reserved</span>
+              <span className="text-2xl font-black text-amber-800 font-display">{reservedVehicles}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-red-200 bg-red-50/20 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-red-700 block">Sold</span>
+              <span className="text-2xl font-black text-red-800 font-display">{soldVehicles}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-purple-200 bg-purple-50/20 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-purple-700 block">Hero Slides</span>
+              <span className="text-2xl font-black text-purple-800 font-display">{slideshowCount}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-blue-200 bg-blue-50/20 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-blue-700 block">New Leads</span>
+              <span className="text-2xl font-black text-blue-800 font-display">{newLeadsCount}</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+              <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Inquiries</span>
+              <span className="text-2xl font-black text-slate-900 font-display">{newInquiriesCount}</span>
             </div>
           </div>
         )}

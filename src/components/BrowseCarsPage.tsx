@@ -17,7 +17,6 @@ import { formatCurrency } from '../utils';
 interface BrowseCarsPageProps {
   vehicles: Vehicle[];
   onViewDetails: (vehicle: Vehicle) => void;
-  onBookInspection?: (vehicle: Vehicle) => void;
   onAskAboutCar?: (vehicle: Vehicle) => void;
   onConsultVehicle?: (vehicle: Vehicle) => void;
   onFindMyCar: () => void;
@@ -28,14 +27,12 @@ interface BrowseCarsPageProps {
 export default function BrowseCarsPage({
   vehicles,
   onViewDetails,
-  onBookInspection,
   onAskAboutCar,
   onConsultVehicle,
   onFindMyCar,
   onSourceCar,
   onGoHome,
 }: BrowseCarsPageProps) {
-  const handleBook = onBookInspection || onConsultVehicle || onAskAboutCar || (() => {});
   const handleConsult = onConsultVehicle || onAskAboutCar || (() => {});
   const handleGoHome = onGoHome || (() => {});
 
@@ -655,14 +652,12 @@ export default function BrowseCarsPage({
         {/* Results Grid */}
         {filteredVehicles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-6">
-            {filteredVehicles.map((vehicle, idx) => (
+            {filteredVehicles.map((vehicle) => (
               <VehicleCard
                 key={vehicle.id}
                 vehicle={vehicle}
-                priority={idx < 3}
-                index={idx}
                 onViewDetails={onViewDetails}
-                onBookInspection={handleBook}
+                onAskAboutCar={handleConsult}
               />
             ))}
           </div>
