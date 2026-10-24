@@ -46,6 +46,9 @@ export interface Lead {
   createdAt: string;
   status: LeadStatus;
   notes?: string;
+  source?: string;
+  aiSummary?: string;
+  whatsappHandoff?: boolean;
 }
 
 export interface Inquiry {
@@ -61,6 +64,11 @@ export interface Inquiry {
   message?: string;
   createdAt: string;
   status: LeadStatus;
+  preferredDate?: string;
+  preferredTime?: string;
+  type?: 'inspection' | 'general' | string;
+  vehiclePrice?: number;
+  vehicleLocation?: string;
 }
 
 export interface BusinessSettings {
@@ -78,6 +86,46 @@ export interface BusinessSettings {
   homepageCtaText: string;
   footerText: string;
   updatedAt?: string;
+}
+
+export interface FunnelAnalyticsData {
+  visitors?: number;
+  aiOpened?: number;
+  aiConversations?: number;
+  vehicleSearches?: number;
+  vehiclesViewed?: number;
+  vehicleSaves?: number;
+  compareActions?: number;
+  enquiriesStarted?: number;
+  leadsSubmitted?: number;
+  whatsAppClicks?: number;
+  interestedClicks?: number;
+  callClicks?: number;
+  sourcingRequests?: number;
+  filterUsage?: number;
+  findMyCarSubmissions?: number;
+  sourceSubmissions?: number;
+  topViewedVehicles?: Record<string, number>;
+  topEnquiryVehicles?: Record<string, number>;
+  mostSearchedBrands?: Record<string, number>;
+  lastUpdated?: string;
+  updatedAt?: string;
+}
+
+export interface AIConsultantMessage {
+  id: string;
+  sender: 'ai' | 'user';
+  text: string;
+  timestamp?: string | number;
+  suggestedVehicles?: Vehicle[];
+  matchedVehicleIds?: string[];
+  suggestedActions?: string[];
+  isHighIntent?: boolean;
+  sourcingOpportunity?: boolean;
+  whatsAppSummary?: string;
+  ctaType?: 'inspection' | 'whatsapp' | 'call' | 'sourcing' | 'details';
+  ctaVehicle?: Vehicle;
+  quickReplies?: string[];
 }
 
 

@@ -17,6 +17,7 @@ import { formatCurrency } from '../utils';
 interface BrowseCarsPageProps {
   vehicles: Vehicle[];
   onViewDetails: (vehicle: Vehicle) => void;
+  onBookInspection?: (vehicle: Vehicle) => void;
   onAskAboutCar?: (vehicle: Vehicle) => void;
   onConsultVehicle?: (vehicle: Vehicle) => void;
   onFindMyCar: () => void;
@@ -27,6 +28,7 @@ interface BrowseCarsPageProps {
 export default function BrowseCarsPage({
   vehicles,
   onViewDetails,
+  onBookInspection,
   onAskAboutCar,
   onConsultVehicle,
   onFindMyCar,
@@ -34,6 +36,7 @@ export default function BrowseCarsPage({
   onGoHome,
 }: BrowseCarsPageProps) {
   const handleConsult = onConsultVehicle || onAskAboutCar || (() => {});
+  const handleBook = onBookInspection || handleConsult;
   const handleGoHome = onGoHome || (() => {});
 
   // Primary Search & Filters
@@ -657,6 +660,7 @@ export default function BrowseCarsPage({
                 key={vehicle.id}
                 vehicle={vehicle}
                 onViewDetails={onViewDetails}
+                onBookInspection={handleBook}
                 onAskAboutCar={handleConsult}
               />
             ))}

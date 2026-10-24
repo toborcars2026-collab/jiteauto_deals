@@ -721,6 +721,39 @@ export function getImageUrl(url: string | undefined | null): string {
   return normalizeImageInput(url);
 }
 
+export function getOptimizedImageUrl(url: string | undefined | null, preset: 'card' | 'thumb' | 'detail' | 'fullscreen' | string = 'card'): string {
+  const base = getImageUrl(url);
+  if (!base) return '';
+
+  // If unsplash image, dynamically adjust quality & dimensions per preset
+  if (base.includes('unsplash.com')) {
+    const cleanBase = base.split('?')[0];
+    if (preset === 'thumb') {
+      return `${cleanBase}?auto=format&fit=crop&q=95&w=600`;
+    }
+    if (preset === 'card') {
+      return `${cleanBase}?auto=format&fit=crop&q=95&w=1200`;
+    }
+    if (preset === 'detail') {
+      return `${cleanBase}?auto=format&fit=crop&q=95&w=1800`;
+    }
+    if (preset === 'fullscreen') {
+      return `${cleanBase}?auto=format&fit=crop&q=98&w=2560`;
+    }
+  }
+
+  return base;
+}
+
+export function getVehicleCardSrcSet(url: string | undefined | null): string | undefined {
+  const base = getImageUrl(url);
+  if (!base) return undefined;
+  if (base.includes('unsplash.com')) {
+    return `${base}&w=480 480w, ${base}&w=800 800w, ${base}&w=1200 1200w`;
+  }
+  return undefined;
+}
+
 // ============================================================================
 // CLOUD FIRESTORE INTEGRATION & REAL-TIME SYNC
 // ============================================================================
@@ -2077,6 +2110,47 @@ export function handlePhoneCall(customPhone?: string): void {
 
 export function getGeneralConsultationMessage(): string {
   return `Hello Jite Auto Deals! I'm interested in finding a quality vehicle. I'd love to consult with a vehicle specialist to compare my options based on my budget.`;
+}
+
+export function formatInspectionDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (year && month && day) {
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  } catch {}
+  return dateStr;
+}
+
+export function getVehicleInspectionMessage(
+  vehicle: Vehicle,
+  customerName: string,
+  whatsAppNumber: string,
+  inspectionDate: string,
+  preferredTime: string
+): string {
+  const vehicleLine = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim();
+  const priceLine = formatCurrency(vehicle.price);
+  const locationLine = vehicle.location || 'Abuja';
+
+  return (
+    `Hello Jite Auto Deals, I would like to book a vehicle inspection.\n\n` +
+    `Vehicle: ${vehicleLine}\n` +
+    `Price: ${priceLine}\n` +
+    `Location: ${locationLine}\n\n` +
+    `Name: ${customerName.trim()}\n` +
+    `WhatsApp Number: ${whatsAppNumber.trim()}\n` +
+    `Inspection Date: ${inspectionDate.trim()}\n` +
+    `Preferred Time: ${preferredTime.trim()}\n\n` +
+    `Please confirm the inspection details.`
+  );
 }
 
 export function getVehicleInquiryMessage(vehicle: Vehicle): string {

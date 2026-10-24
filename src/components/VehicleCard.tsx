@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { MapPin, MessageSquare, ArrowUpRight } from 'lucide-react';
+import { MapPin, ArrowUpRight, CalendarCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
 import { formatCurrency, getImageUrl } from '../utils';
@@ -8,10 +8,16 @@ interface VehicleCardProps {
   key?: React.Key;
   vehicle: Vehicle;
   onViewDetails: (vehicle: Vehicle) => void;
-  onAskAboutCar: (vehicle: Vehicle) => void;
+  onBookInspection?: (vehicle: Vehicle) => void;
+  onAskAboutCar?: (vehicle: Vehicle) => void;
 }
 
-export default function VehicleCard({ vehicle, onViewDetails, onAskAboutCar }: VehicleCardProps) {
+export default function VehicleCard({
+  vehicle,
+  onViewDetails,
+  onBookInspection,
+  onAskAboutCar,
+}: VehicleCardProps) {
   const [currentImgIdx, setCurrentImgIdx] = useState(0);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
@@ -181,25 +187,29 @@ export default function VehicleCard({ vehicle, onViewDetails, onAskAboutCar }: V
           </div>
         </div>
 
-        {/* CTAs: Primary (Ask About This Car) + Secondary (View Details) */}
+        {/* CTAs: Primary (BOOK INSPECTION) + Secondary (View Details) */}
         <div className="mt-5 space-y-2 pt-1">
           {/* Primary CTA */}
           <button
             type="button"
-            id={`card_btn_ask_${vehicle.id}`}
+            id={`card_btn_book_inspection_${vehicle.id}`}
             onClick={(e) => {
               e.stopPropagation();
-              onAskAboutCar(vehicle);
+              if (onBookInspection) {
+                onBookInspection(vehicle);
+              } else if (onAskAboutCar) {
+                onAskAboutCar(vehicle);
+              }
             }}
-            className={`flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-extrabold rounded-xl transition-all shadow-sm cursor-pointer select-none active:scale-[0.98] ${
+            className={`flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer select-none active:scale-[0.98] ${
               isSold
                 ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10'
             }`}
-            title={isSold ? 'Request similar vehicle sourcing' : 'Start consultation about this vehicle'}
+            title={isSold ? 'Request similar vehicle sourcing' : `Book vehicle inspection for ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
           >
-            <MessageSquare size={15} />
-            <span>{isSold ? 'Source Similar Vehicle' : 'Ask About This Car'}</span>
+            <CalendarCheck size={15} />
+            <span>{isSold ? 'Source Similar Vehicle' : 'BOOK INSPECTION'}</span>
           </button>
 
           {/* Secondary CTA */}

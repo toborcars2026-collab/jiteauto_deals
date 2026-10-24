@@ -14,6 +14,7 @@ import {
   Share2,
   Car,
   ArrowLeft,
+  ArrowUpRight,
   Search,
   AlertTriangle,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle, BusinessSettings } from '../types';
 import { AppHistoryState } from '../App';
 import ShareVehicleModal from './ShareVehicleModal';
+import VehicleFullscreenViewer from './VehicleFullscreenViewer';
 import {
   formatCurrency,
   formatMileage,
@@ -28,6 +30,7 @@ import {
   safeOpenWhatsApp,
   getVehicleInquiryMessage,
   getImageUrl,
+  getOptimizedImageUrl,
   decodeUnicodeEscapes,
   getVehicleSlug,
   getBusinessPhoneDisplay,
@@ -42,6 +45,7 @@ interface VehicleDetailsModalProps {
   onRetry?: () => void;
   onClose: () => void;
   onOpenQualifier: (vehicle: Vehicle) => void;
+  onOpenInspection?: (vehicle: Vehicle) => void;
   onOpenConsultantModal?: (vehicle: Vehicle, channel?: 'whatsapp' | 'call') => void;
   businessSettings?: BusinessSettings;
 }
@@ -54,6 +58,7 @@ export default function VehicleDetailsModal({
   onRetry,
   onClose,
   onOpenQualifier,
+  onOpenInspection,
   onOpenConsultantModal,
   businessSettings,
 }: VehicleDetailsModalProps) {
@@ -62,6 +67,16 @@ export default function VehicleDetailsModal({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
+  const modalThumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Smooth-scroll active thumbnail into view
+  useEffect(() => {
+    modalThumbnailRefs.current[activeImageIndex]?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  }, [activeImageIndex]);
 
   const phoneDisplay = getBusinessPhoneDisplay(businessSettings);
   const phoneCallUrl = getBusinessPhoneCallUrl(businessSettings);
@@ -525,10 +540,9 @@ export default function VehicleDetailsModal({
                       x: { type: 'spring', stiffness: 300, damping: 30 },
                       opacity: { duration: 0.2 },
                     }}
-                    src={getImageUrl(images[currentImageIndex])}
+                    src={getOptimizedImageUrl(images[currentImageIndex], 'detail')}
                     alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover transition-transform cursor-grab active:cursor-grabbing"
-                    style={{ imageRendering: '-webkit-optimize-contrast' }}
+                    className="w-full h-full object-cover transition-transform cursor-pointer"
                     loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
                     decoding="async"
                     drag="x"
@@ -544,22 +558,27 @@ export default function VehicleDetailsModal({
                       }
                     }}
                     onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                      e.currentTarget.src =
+                        'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
                     }}
                     referrerPolicy="no-referrer"
                   />
                 </AnimatePresence>
 
-                {/* Top Right Fullscreen Zoom Trigger */}
+                {/* Clear "TAP TO VIEW FULL PHOTO" Overlay Indication */}
                 <button
                   type="button"
-                  id="details_open_zoom_btn"
-                  onClick={handleOpenFullscreenZoom}
-                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-black text-amber-400 border border-amber-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md backdrop-blur-sm z-10 cursor-pointer"
-                  title="View 100% Original Resolution Photo"
+                  id="details_tap_to_view_photo_btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenFullscreenZoom();
+                  }}
+                  className="absolute bottom-3 left-3 bg-slate-950/85 hover:bg-slate-950 active:scale-95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-black tracking-wider border border-white/20 z-10 cursor-pointer flex items-center gap-1.5 shadow-xl transition-all select-none group/tap"
+                  aria-label="TAP TO VIEW FULL PHOTO"
+                  title="TAP TO VIEW FULL PHOTO"
                 >
-                  <Maximize2 size={14} />
-                  <span>100% Quality Zoom</span>
+                  <ArrowUpRight size={14} className="text-amber-400 group-hover/tap:translate-x-0.5 group-hover/tap:-translate-y-0.5 transition-transform" />
+                  <span className="font-sans uppercase">TAP TO VIEW FULL PHOTO</span>
                 </button>
 
                 {images.length > 1 && (
@@ -567,51 +586,54 @@ export default function VehicleDetailsModal({
                     <button
                       type="button"
                       onClick={handlePrevImage}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
+                      aria-label="Previous image"
                     >
                       <ChevronLeft size={18} />
                     </button>
                     <button
                       type="button"
                       onClick={handleNextImage}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
+                      aria-label="Next image"
                     >
                       <ChevronRight size={18} />
                     </button>
                   </>
                 )}
 
-                {/* Slide Helper Pill & Counter Tag */}
-                {images.length > 1 && (
-                  <div className="absolute bottom-4 left-4 bg-black/75 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-slate-300 font-medium border border-white/10 z-10 pointer-events-none">
-                    Slide photo to browse
-                  </div>
-                )}
-                <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white font-mono font-medium border border-white/10 z-10">
+                {/* Photo Counter Tag */}
+                <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white font-mono font-medium border border-white/10 z-10">
                   {currentImageIndex + 1} / {images.length}
                 </div>
               </div>
 
               {/* Thumbnails Row */}
               {images.length > 1 && (
-                <div className="flex gap-2.5 overflow-x-auto pb-1">
+                <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
                   {images.map((img, idx) => (
                     <button
                       key={idx}
+                      ref={(el) => {
+                        modalThumbnailRefs.current[idx] = el;
+                      }}
                       onClick={() => setActiveImageIndex(idx)}
-                      className={`relative h-14 w-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
-                        currentImageIndex === idx ? 'border-amber-500 scale-95 shadow-sm' : 'border-slate-100 hover:border-slate-300'
+                      className={`relative h-14 w-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer opacity-100 ${
+                        currentImageIndex === idx
+                          ? 'border-amber-500 scale-95 shadow-md ring-2 ring-amber-500/40'
+                          : 'border-slate-200 hover:border-slate-400'
                       }`}
+                      aria-label={`Select photo ${idx + 1}`}
                     >
                       <img
-                        src={getImageUrl(img)}
+                        src={getOptimizedImageUrl(img, 'thumb')}
                         alt="thumbnail"
-                        loading="lazy"
+                        loading="eager"
                         decoding="async"
                         className="h-full w-full object-cover"
-                        style={{ imageRendering: '-webkit-optimize-contrast' }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                          e.currentTarget.src =
+                            'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
                         }}
                         referrerPolicy="no-referrer"
                       />
@@ -710,15 +732,19 @@ export default function VehicleDetailsModal({
                 type="button"
                 id="vehicle_modal_get_car_btn"
                 onClick={() => {
-                  onOpenQualifier(vehicle);
+                  if (onOpenInspection) {
+                    onOpenInspection(vehicle);
+                  } else {
+                    onOpenQualifier(vehicle);
+                  }
                 }}
-                className={`md:col-span-1 py-3.5 px-6 rounded-xl text-sm font-extrabold shadow-lg transition-all text-center cursor-pointer select-none active:scale-[0.98] ${
+                className={`md:col-span-1 py-3.5 px-6 rounded-xl text-sm font-black uppercase tracking-wider shadow-lg transition-all text-center cursor-pointer select-none active:scale-[0.98] ${
                   vehicle.status === 'Sold'
                     ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30'
-                    : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/10'
+                    : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10'
                 }`}
               >
-                {vehicle.status === 'Sold' ? 'Source Similar Unit' : 'Get This Car'}
+                {vehicle.status === 'Sold' ? 'Source Similar Unit' : 'BOOK INSPECTION'}
               </button>
 
               <a
@@ -774,128 +800,17 @@ export default function VehicleDetailsModal({
         </div>
       </div>
 
-      {/* Fullscreen High-Res Image Lightbox Modal */}
-      {isFullscreenZoom && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-fadeIn"
-          onClick={(e) => {
-            // Close if user clicked the backdrop outside interactive elements
-            if (e.target === e.currentTarget) {
-              handleCloseFullscreenZoom();
-            }
-          }}
-        >
-          {/* Top Control Bar */}
-          <div className="flex items-center justify-between text-white z-10 border-b border-white/10 pb-4 gap-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                id="viewer_back_to_details_btn"
-                onClick={handleCloseFullscreenZoom}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-400 hover:text-white transition-all text-xs font-bold border border-white/15 cursor-pointer shrink-0 active:scale-95"
-                title="Back to vehicle details (Escape / Back)"
-              >
-                <ArrowLeft size={16} />
-                <span>Back to Vehicle Details</span>
-              </button>
-              
-              <div className="hidden sm:block min-w-0">
-                <span className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold block">100% Original Resolution Viewer</span>
-                <h3 className="text-sm font-bold text-slate-200 truncate">
-                  {vehicle.year} {vehicle.make} {vehicle.model} • Photo {currentImageIndex + 1} of {images.length}
-                </h3>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                id="viewer_close_lightbox_btn"
-                onClick={handleCloseFullscreenZoom}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20 cursor-pointer"
-                aria-label="Close Lightbox"
-                title="Close Lightbox (Escape / Back)"
-              >
-                <X size={22} />
-              </button>
-            </div>
-          </div>
-
-          {/* Center Image Container */}
-          <div 
-            className="relative flex-1 flex items-center justify-center my-4 overflow-hidden select-none"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                handleCloseFullscreenZoom();
-              }
-            }}
-          >
-            <AnimatePresence initial={false} custom={direction} mode="popLayout">
-              <motion.img
-                key={currentImageIndex}
-                custom={direction}
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{
-                  x: { type: 'spring', stiffness: 300, damping: 30 },
-                  opacity: { duration: 0.2 },
-                }}
-                src={getImageUrl(images[currentImageIndex])}
-                alt={`${vehicle.make} ${vehicle.model} full high-res view`}
-                className="max-h-full max-w-full object-contain rounded-xl shadow-2xl transition-all cursor-grab active:cursor-grabbing"
-                style={{ imageRendering: '-webkit-optimize-contrast' }}
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.2}
-                onDragEnd={handleDragEnd}
-                referrerPolicy="no-referrer"
-              />
-            </AnimatePresence>
-
-            {images.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  id="viewer_prev_image_btn"
-                  onClick={handlePrevImage}
-                  className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10 cursor-pointer"
-                  aria-label="Previous Image"
-                >
-                  <ChevronLeft size={28} />
-                </button>
-                <button
-                  type="button"
-                  id="viewer_next_image_btn"
-                  onClick={handleNextImage}
-                  className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center transition-all border border-white/20 shadow-xl z-10 cursor-pointer"
-                  aria-label="Next Image"
-                >
-                  <ChevronRight size={28} />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Bottom Thumbnails */}
-          {images.length > 1 && (
-            <div className="flex gap-2 justify-center overflow-x-auto py-2 z-10">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={`h-12 w-16 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                    currentImageIndex === idx ? 'border-amber-400 scale-105 ring-2 ring-amber-400/50' : 'border-slate-700 opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <img src={getImageUrl(img)} alt="thumb" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Fullscreen Vehicle Photo Viewer */}
+      <VehicleFullscreenViewer
+        vehicle={vehicle}
+        images={images}
+        currentIndex={currentImageIndex}
+        isOpen={isFullscreenZoom}
+        onClose={handleCloseFullscreenZoom}
+        onIndexChange={(idx) => {
+          setActiveImageIndex(idx);
+        }}
+      />
 
       {/* Share Vehicle Modal */}
       <ShareVehicleModal

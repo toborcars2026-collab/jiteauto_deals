@@ -7,6 +7,7 @@ import { isVehicleActive } from '../utils';
 interface FeaturedVehiclesProps {
   vehicles: Vehicle[];
   onViewDetails: (vehicle: Vehicle) => void;
+  onBookInspection?: (vehicle: Vehicle) => void;
   onAskAboutCar?: (vehicle: Vehicle) => void;
   onConsultVehicle?: (vehicle: Vehicle) => void;
   onViewAllCars?: () => void;
@@ -16,6 +17,7 @@ interface FeaturedVehiclesProps {
 export default function FeaturedVehicles({
   vehicles,
   onViewDetails,
+  onBookInspection,
   onAskAboutCar,
   onConsultVehicle,
   onViewAllCars,
@@ -23,6 +25,7 @@ export default function FeaturedVehicles({
 }: FeaturedVehiclesProps) {
   const handleViewAll = onBrowseAll || onViewAllCars || (() => {});
   const handleConsult = onConsultVehicle || onAskAboutCar || (() => {});
+  const handleBook = onBookInspection || handleConsult;
 
   // Select top 6 active & available vehicles
   const featuredList = vehicles
@@ -63,6 +66,7 @@ export default function FeaturedVehicles({
               key={vehicle.id}
               vehicle={vehicle}
               onViewDetails={onViewDetails}
+              onBookInspection={handleBook}
               onAskAboutCar={handleConsult}
             />
           ))}

@@ -53,11 +53,12 @@ const HowItWorksPage = lazy(() => import('./components/HowItWorksPage'));
 const AboutPage = lazy(() => import('./components/AboutPage'));
 const ConsultantModal = lazy(() => import('./components/ConsultantModal'));
 const LeadQualifierModal = lazy(() => import('./components/LeadQualifierModal'));
+const InspectionBookingModal = lazy(() => import('./components/InspectionBookingModal'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 export interface AppHistoryState {
   tab: NavigationTab;
-  modal?: 'details' | 'qualifier' | 'consultant' | null;
+  modal?: 'details' | 'qualifier' | 'consultant' | 'inspection' | null;
   viewer?: boolean | null;
   share?: boolean | null;
   vehicleId?: string | null;
@@ -102,10 +103,10 @@ export default function App() {
   const [isConsultantOpen, setIsConsultantOpen] = useState(false);
   const [consultantVehicle, setConsultantVehicle] = useState<Vehicle | null>(null);
 
-  const [isQualifierOpen, setIsQualifierOpen] = useState<boolean>(() => {
+  const [isInspectionOpen, setIsInspectionOpen] = useState<boolean>(() => {
     return Boolean(initialRoute.slugOrId && initialRoute.qualify);
   });
-  const [qualifierVehicle, setQualifierVehicle] = useState<Vehicle | null>(() => {
+  const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(() => {
     if (initialRoute.slugOrId && initialRoute.qualify) {
       return initialMatchedVehicle;
     }
@@ -115,7 +116,7 @@ export default function App() {
   // Tab navigation handler with clean history stack
   const handleTabChange = (newTab: NavigationTab, replace: boolean = false) => {
     // If already on the same tab and no modal is open, smooth scroll to top
-    if (currentTab === newTab && !isDetailsOpen && !isConsultantOpen && !isQualifierOpen) {
+    if (currentTab === newTab && !isDetailsOpen && !isConsultantOpen && !isInspectionOpen) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -141,7 +142,8 @@ export default function App() {
     setIsDetailsOpen(false);
     setSelectedVehicle(null);
     setIsConsultantOpen(false);
-    setIsQualifierOpen(false);
+    setIsInspectionOpen(false);
+    setInspectionVehicle(null);
 
     // Dynamic metadata update
     const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
@@ -216,39 +218,38 @@ export default function App() {
     setIsConsultantOpen(true);
   };
 
-  // Open Qualifier Modal ("Get This Car")
-  const handleOpenQualifier = (vehicle: Vehicle) => {
+  // Open Vehicle Inspection Modal ("BOOK INSPECTION")
+  const handleOpenInspection = (vehicle: Vehicle) => {
     const slug = getVehicleSlug(vehicle);
     const newState: AppHistoryState = {
       tab: currentTab,
-      modal: 'qualifier',
+      modal: 'inspection',
       vehicleId: vehicle.id,
       vehicleSlug: slug,
     };
-    const newUrl = `/?vehicle=${encodeURIComponent(slug)}&qualify=1`;
+    const newUrl = `/?vehicle=${encodeURIComponent(slug)}&inspection=1`;
     try {
       window.history.pushState(newState, '', newUrl);
     } catch {}
 
-    setIsDetailsOpen(false);
-    setQualifierVehicle(vehicle);
-    setIsQualifierOpen(true);
+    setInspectionVehicle(vehicle);
+    setIsInspectionOpen(true);
   };
 
-  // Close Qualifier Modal
-  const handleCloseQualifier = () => {
-    setIsQualifierOpen(false);
-    setQualifierVehicle(null);
+  // Close Inspection Modal
+  const handleCloseInspection = () => {
+    setIsInspectionOpen(false);
+    setInspectionVehicle(null);
     const targetTab = currentTab || 'home';
     const targetUrl = targetTab === 'home' ? '/' : `/?tab=${targetTab}`;
 
     try {
       const histState = window.history.state as AppHistoryState | null;
-      if (histState && histState.modal === 'qualifier' && window.history.length > 1) {
+      if (histState && (histState.modal === 'inspection' || histState.modal === 'qualifier') && window.history.length > 1) {
         window.history.back();
         setTimeout(() => {
           const currentHistState = window.history.state as AppHistoryState | null;
-          if (currentHistState?.modal === 'qualifier') {
+          if (currentHistState?.modal === 'inspection' || currentHistState?.modal === 'qualifier') {
             window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
           }
         }, 150);
@@ -260,6 +261,10 @@ export default function App() {
       window.history.replaceState({ tab: targetTab, modal: null }, '', targetUrl);
     } catch {}
   };
+
+  // Backwards compatibility for any legacy callers
+  const handleOpenQualifier = handleOpenInspection;
+  const handleCloseQualifier = handleCloseInspection;
 
   // 1. Initial Page Load and Data Prioritization
   useEffect(() => {
@@ -315,8 +320,8 @@ export default function App() {
             if (matched) {
               preloadPrimaryImage(matched.images?.[0]);
               if (route.qualify) {
-                setQualifierVehicle(matched);
-                setIsQualifierOpen(true);
+                setInspectionVehicle(matched);
+                setIsInspectionOpen(true);
               } else {
                 setSelectedVehicle(matched);
                 setIsDetailsOpen(true);
@@ -349,7 +354,7 @@ export default function App() {
           if (matched) {
             preloadPrimaryImage(matched.images?.[0]);
             if (route.qualify) {
-              setQualifierVehicle((prev) => prev || matched);
+              setInspectionVehicle((prev) => prev || matched);
             } else {
               setSelectedVehicle((prev) => prev || matched);
               setIsDetailsOpen(true);
@@ -368,7 +373,7 @@ export default function App() {
         const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
         if (matched) {
           if (route.qualify) {
-            setQualifierVehicle((prev) => prev || matched);
+            setInspectionVehicle((prev) => prev || matched);
           } else {
             setSelectedVehicle((prev) => prev || matched);
             setIsDetailsOpen(true);
@@ -411,8 +416,8 @@ export default function App() {
       if (!state || !state.modal) {
         setIsDetailsOpen(false);
         setSelectedVehicle(null);
-        setIsQualifierOpen(false);
-        setQualifierVehicle(null);
+        setIsInspectionOpen(false);
+        setInspectionVehicle(null);
         setIsConsultantOpen(false);
 
         if (state?.tab) {
@@ -422,8 +427,8 @@ export default function App() {
       }
 
       if (state.modal === 'details') {
-        setIsQualifierOpen(false);
-        setQualifierVehicle(null);
+        setIsInspectionOpen(false);
+        setInspectionVehicle(null);
         setIsConsultantOpen(false);
 
         if (state.vehicleSlug || state.vehicleId) {
@@ -438,14 +443,14 @@ export default function App() {
         } else {
           setIsDetailsOpen(true);
         }
-      } else if (state.modal === 'qualifier') {
+      } else if (state.modal === 'inspection' || state.modal === 'qualifier') {
         setIsDetailsOpen(false);
         if (state.vehicleSlug || state.vehicleId) {
           const targetIdentifier = state.vehicleSlug || state.vehicleId || '';
           const matched = findVehicleBySlugOrId(vehicles, targetIdentifier);
           if (matched) {
-            setQualifierVehicle(matched);
-            setIsQualifierOpen(true);
+            setInspectionVehicle(matched);
+            setIsInspectionOpen(true);
           }
         }
       }
@@ -491,6 +496,7 @@ export default function App() {
               vehicles={vehicles}
               onViewDetails={handleViewDetails}
               onBrowseAll={() => handleTabChange('browse')}
+              onBookInspection={handleOpenInspection}
               onConsultVehicle={(car) => handleOpenConsultant(car)}
             />
 
@@ -517,6 +523,7 @@ export default function App() {
             <BrowseCarsPage
               vehicles={vehicles}
               onViewDetails={handleViewDetails}
+              onBookInspection={handleOpenInspection}
               onConsultVehicle={(car) => handleOpenConsultant(car)}
               onFindMyCar={() => handleTabChange('find-car')}
               onSourceCar={() => handleTabChange('source-car')}
@@ -617,7 +624,8 @@ export default function App() {
             });
         }}
         onClose={handleCloseDetails}
-        onOpenQualifier={handleOpenQualifier}
+        onOpenInspection={handleOpenInspection}
+        onOpenQualifier={handleOpenInspection}
         businessSettings={businessSettings}
         onOpenConsultantModal={(car, channel) => {
           if (channel === 'call') {
@@ -642,19 +650,20 @@ export default function App() {
         </Suspense>
       )}
 
-      {/* Lead Qualifier Modal */}
-      {isQualifierOpen && (
+      {/* Vehicle Inspection Booking Modal */}
+      {isInspectionOpen && (
         <Suspense fallback={null}>
-          <LeadQualifierModal
-            vehicle={qualifierVehicle}
-            isOpen={isQualifierOpen}
-            onClose={handleCloseQualifier}
+          <InspectionBookingModal
+            vehicle={inspectionVehicle}
+            isOpen={isInspectionOpen}
+            onClose={handleCloseInspection}
+            businessSettings={businessSettings}
           />
         </Suspense>
       )}
 
       {/* Floating Consultation Action (Subtle, non-intrusive, only on explore/browse tabs, never covers forms or modals) */}
-      {!isDetailsOpen && !isConsultantOpen && !isQualifierOpen && (currentTab === 'home' || currentTab === 'browse') && (
+      {!isDetailsOpen && !isConsultantOpen && !isInspectionOpen && (currentTab === 'home' || currentTab === 'browse') && (
         <div className="fixed bottom-5 right-5 z-30 select-none">
           <a
             href={getWhatsAppLink(getGeneralConsultationMessage(), businessSettings?.whatsAppNumber)}

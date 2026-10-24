@@ -25,6 +25,18 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
     { id: 'about', label: 'About', icon: UserCheck },
   ];
 
+  const handlePrefetchTab = (tabId: NavigationTab) => {
+    if (tabId === 'browse') import('./BrowseCarsPage').catch(() => {});
+    else if (tabId === 'find-car') import('./FindMyCarPage').catch(() => {});
+    else if (tabId === 'source-car') import('./SourceCarPage').catch(() => {});
+    else if (tabId === 'how-it-works') import('./HowItWorksPage').catch(() => {});
+    else if (tabId === 'about') import('./AboutPage').catch(() => {});
+  };
+
+  const handlePrefetchConsultant = () => {
+    import('./ConsultantModal').catch(() => {});
+  };
+
   const handleNavClick = (tabId: NavigationTab) => {
     setCurrentTab(tabId);
     setIsOpen(false);
@@ -62,6 +74,8 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
                   type="button"
                   id={`nav_link_${item.id}`}
                   onClick={() => handleNavClick(item.id)}
+                  onMouseEnter={() => handlePrefetchTab(item.id)}
+                  onTouchStart={() => handlePrefetchTab(item.id)}
                   className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
@@ -92,6 +106,8 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
               type="button"
               id="header_btn_consultant"
               onClick={onOpenConsultation}
+              onMouseEnter={handlePrefetchConsultant}
+              onTouchStart={handlePrefetchConsultant}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md shadow-amber-500/10 hover:shadow-lg transition-all duration-200 cursor-pointer select-none"
             >
               <MessageSquare size={15} />
@@ -115,6 +131,8 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
               type="button"
               id="mobile_btn_talk_consultant_quick"
               onClick={onOpenConsultation}
+              onMouseEnter={handlePrefetchConsultant}
+              onTouchStart={handlePrefetchConsultant}
               className="sm:hidden flex items-center gap-1 bg-amber-500 text-slate-950 px-2.5 py-1.5 rounded-lg text-xs font-extrabold"
             >
               <MessageSquare size={13} />
@@ -147,6 +165,8 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
                 type="button"
                 id={`mobile_nav_${item.id}`}
                 onClick={() => handleNavClick(item.id)}
+                onMouseEnter={() => handlePrefetchTab(item.id)}
+                onTouchStart={() => handlePrefetchTab(item.id)}
                 className={`flex w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                   isActive
                     ? 'bg-amber-500 text-slate-950'
@@ -167,6 +187,8 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
                 setIsOpen(false);
                 onOpenConsultation();
               }}
+              onMouseEnter={handlePrefetchConsultant}
+              onTouchStart={handlePrefetchConsultant}
               className="flex w-full items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-extrabold rounded-xl shadow-md cursor-pointer"
             >
               <MessageSquare size={16} />
