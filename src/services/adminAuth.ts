@@ -1,305 +1,350 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 
-const SESSION_TOKEN_KEY = 'jite_admin_session_active';
-const LOCAL_CONFIG_KEY = 'jite_admin_sec_config';
+export interface AdminAuthStatus {
+  bootstrapped: boolean;
+  authorizedEmailHint: string | null;
+  emailDeliveryConfigured: boolean;
+  authenticated: boolean;
+  email: string | null;
+  role: string | null;
+  updatedAt: string | null;
+}
 
-export interface AdminAuthResult {
+export interface AdminLoginResult {
   success: boolean;
   error?: string;
+  code?: string;
+  step?: 'otp_required' | 'authenticated';
+  preAuthToken?: string;
+  emailMasked?: string;
+  resendIn?: number;
+  expiresIn?: number;
+  token?: string;
   role?: string;
-}
-
-export interface AdminSecurityConfig {
-  salt: string;
-  hash: string;
-  updatedAt: string;
-}
-
-/**
- * Default initial administrator credentials ("toborium2006#")
- * Salt: 9f8b4a2c1d3e5f7a0b2c4d6e8f1a3b5c (16 hex bytes)
- * Algorithm: PBKDF2 (SHA-512, 100,000 iterations, 64-byte key)
- */
-export const INITIAL_ADMIN_CONFIG: AdminSecurityConfig = {
-  salt: '9f8b4a2c1d3e5f7a0b2c4d6e8f1a3b5c',
-  hash: 'd97087b85cb39e5442199d06eaf7ccd99a8b451d4a4ab52f334ba3e8ca7ce142464176ed4d2093c2a569bc7e6da91bff11d7774730ba67e26a3b1fe7913897e2',
-  updatedAt: '2026-08-28T00:00:00.000Z'
-};
-
-// In-memory cache of active config
-let cachedConfig: AdminSecurityConfig | null = null;
-
-/**
- * Cryptographic PBKDF2 hashing using browser native Web Crypto API.
- * 100% compatible with modern browsers and Node.js crypto.pbkdf2Sync.
- */
-async function derivePasswordHash(password: string, saltHex: string): Promise<string> {
-  const enc = new TextEncoder();
-  const subtle = (typeof window !== 'undefined' && window.crypto?.subtle) || (globalThis as any).crypto?.subtle;
-  
-  if (!subtle) {
-    throw new Error('Web Crypto is not supported in this environment.');
-  }
-
-  const keyMaterial = await subtle.importKey(
-    'raw',
-    enc.encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits']
-  );
-
-  const saltBytes = new Uint8Array(
-    saltHex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
-  );
-
-  const derivedBits = await subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: saltBytes,
-      iterations: 100000,
-      hash: 'SHA-512'
-    },
-    keyMaterial,
-    512 // 64 bytes = 512 bits
-  );
-
-  return Array.from(new Uint8Array(derivedBits))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  email?: string;
+  emailDelivered?: boolean;
+  emailDeliveryError?: string | null;
+  devTestCode?: string;
 }
 
 /**
- * Timing-safe string comparison
+ * Checks server authentication status:
+ * - Whether initial one-time bootstrap has been completed
+ * - Masked authorized email hint
+ * - Whether transactional email provider is configured
+ * - Whether current client has an active authenticated session
  */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-/**
- * Generates a cryptographically random 16-byte hex salt
- */
-function generateRandomSalt(): string {
-  const randomBytes = new Uint8Array(16);
-  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
-    window.crypto.getRandomValues(randomBytes);
-  } else {
-    for (let i = 0; i < 16; i++) {
-      randomBytes[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  return Array.from(randomBytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-/**
- * Retrieves the active security config from Firestore (or local fallback/initial default).
- */
-export async function getActiveAdminConfig(): Promise<AdminSecurityConfig> {
-  if (cachedConfig) {
-    return cachedConfig;
-  }
-
-  // 1. Try local cache
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem(LOCAL_CONFIG_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.salt && parsed.hash) {
-          cachedConfig = parsed;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  // 2. Try Firestore `settings/admin_security`
+export async function getAdminAuthStatus(): Promise<AdminAuthStatus> {
   try {
-    const fetchPromise = getDoc(doc(db, 'settings', 'admin_security'));
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-    const snap = await Promise.race([fetchPromise, timeoutPromise]) as any;
+    const res = await fetch('/api/admin-auth?action=status', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
 
-    if (snap && snap.exists && snap.exists()) {
-      const data = snap.data() as any;
-      if (data && data.salt && data.hash) {
-        cachedConfig = {
-          salt: data.salt,
-          hash: data.hash,
-          updatedAt: data.updatedAt || new Date().toISOString()
-        };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(LOCAL_CONFIG_KEY, JSON.stringify(cachedConfig));
-        }
-        return cachedConfig;
-      }
-    }
-  } catch (err) {
-    // Graceful fallback to initial default or cached config
-  }
-
-  if (!cachedConfig) {
-    cachedConfig = INITIAL_ADMIN_CONFIG;
-  }
-  return cachedConfig;
-}
-
-/**
- * Authenticates administrator using the single master password.
- * Checks against the customized Firestore hash or the initial password hash.
- */
-export async function authenticateAdmin(password: string): Promise<AdminAuthResult> {
-  if (!password || !password.trim()) {
-    return {
-      success: false,
-      error: 'Please enter the administrator password.'
-    };
-  }
-
-  try {
-    const config = await getActiveAdminConfig();
-    
-    // Check against active config
-    const computedHash = await derivePasswordHash(password.trim(), config.salt);
-    let isMatch = safeEqual(computedHash, config.hash);
-
-    // Also check raw password without trimming in case trailing spaces were intentional
-    if (!isMatch && password !== password.trim()) {
-      const rawHash = await derivePasswordHash(password, config.salt);
-      isMatch = safeEqual(rawHash, config.hash);
-    }
-
-    if (isMatch) {
-      if (typeof window !== 'undefined') {
-        const sessionToken = `admin_sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-        sessionStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
-        localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
-      }
+    if (res.ok) {
+      const data = await res.json();
       return {
-        success: true,
-        role: 'admin'
+        bootstrapped: Boolean(data.bootstrapped),
+        authorizedEmailHint: data.authorizedEmailHint || null,
+        emailDeliveryConfigured: Boolean(data.emailDeliveryConfigured),
+        authenticated: Boolean(data.authenticated),
+        email: data.email || null,
+        role: data.role || null,
+        updatedAt: data.updatedAt || null,
       };
     }
-
     return {
-      success: false,
-      error: 'Incorrect administrator password. Please try again.'
+      bootstrapped: false,
+      authorizedEmailHint: null,
+      emailDeliveryConfigured: false,
+      authenticated: false,
+      email: null,
+      role: null,
+      updatedAt: null,
     };
-  } catch (err: any) {
+  } catch {
     return {
-      success: false,
-      error: 'Incorrect administrator password. Please try again.'
+      bootstrapped: false,
+      authorizedEmailHint: null,
+      emailDeliveryConfigured: false,
+      authenticated: false,
+      email: null,
+      role: null,
+      updatedAt: null,
     };
   }
 }
 
 /**
- * Verifies if an active administrator session is currently present.
+ * Initial One-Time Administrator Setup (Bootstrap)
+ * Can only be executed once. Once completed, permanently locked.
  */
-export async function verifyAdminSession(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
-  const inSession = sessionStorage.getItem(SESSION_TOKEN_KEY);
-  if (inSession) return true;
-  const inLocal = localStorage.getItem(SESSION_TOKEN_KEY);
-  if (inLocal) {
-    sessionStorage.setItem(SESSION_TOKEN_KEY, inLocal);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Changes administrator password:
- * - Validates current password against active hash
- * - Validates new password (minimum 8 chars)
- * - Cryptographically hashes new password
- * - Persists new credentials to Firestore `settings/admin_security`
- * - Immediately invalidates old password and activates new password
- */
-export async function changeAdminPassword(
-  currentPassword: string,
-  newPassword: string
-): Promise<{ success: boolean; error?: string; message?: string }> {
-  if (!currentPassword || !newPassword) {
-    return {
-      success: false,
-      error: 'Both current password and new password are required.'
-    };
-  }
-
-  if (newPassword.length < 8) {
-    return {
-      success: false,
-      error: 'New password must be at least 8 characters long.'
-    };
-  }
-
+export async function bootstrapAdmin(payload: {
+  email: string;
+  password?: string;
+  confirmPassword?: string;
+  googleUid?: string;
+}): Promise<{ success: boolean; error?: string; token?: string; email?: string }> {
   try {
-    const config = await getActiveAdminConfig();
-    const currentHash = await derivePasswordHash(currentPassword.trim(), config.salt);
-    const isCurrentValid = safeEqual(currentHash, config.hash);
+    const res = await fetch('/api/admin-auth?action=bootstrap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-    if (!isCurrentValid) {
+    const data = await res.json();
+    if (!res.ok || !data.success) {
       return {
         success: false,
-        error: 'Incorrect current administrator password.'
+        error: data.error || 'Failed to complete initial administrator setup.',
       };
-    }
-
-    // Generate new cryptographic salt and hash for new password
-    const newSalt = generateRandomSalt();
-    const newHash = await derivePasswordHash(newPassword.trim(), newSalt);
-    const nowIso = new Date().toISOString();
-
-    const newConfig: AdminSecurityConfig = {
-      salt: newSalt,
-      hash: newHash,
-      updatedAt: nowIso
-    };
-
-    // Save to Firestore
-    try {
-      const docRef = doc(db, 'settings', 'admin_security');
-      await setDoc(docRef, newConfig, { merge: true });
-    } catch (saveErr) {
-      console.warn('[AdminAuth] Firestore write notice (saving to local store):', saveErr);
-    }
-
-    // Update in-memory and local cache
-    cachedConfig = newConfig;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(LOCAL_CONFIG_KEY, JSON.stringify(newConfig));
-      const newSessionToken = `admin_sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-      sessionStorage.setItem(SESSION_TOKEN_KEY, newSessionToken);
-      localStorage.setItem(SESSION_TOKEN_KEY, newSessionToken);
     }
 
     return {
       success: true,
-      message: 'Administrator password changed successfully.'
+      token: data.token,
+      email: data.email,
     };
   } catch (err: any) {
     return {
       success: false,
-      error: 'Failed to update administrator password. Please try again.'
+      error: err?.message || 'Network error during administrator setup.',
     };
   }
 }
 
 /**
- * Signs out administrator and removes active session token.
+ * Continue with Google Authentication
+ * 1. Opens Google secure authentication popup
+ * 2. Authenticates account with Firebase Auth
+ * 3. Sends credentials to trusted backend for strict single-authorized-admin authorization
+ * 4. If account doesn't match: immediately signs out and displays "ACCESS DENIED"
+ */
+export async function signInWithGoogleAdmin(): Promise<{ success: boolean; error?: string; email?: string }> {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(auth, provider);
+    const user = cred.user;
+
+    if (!user || !user.email) {
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error: 'Unable to retrieve authenticated Google account email.',
+      };
+    }
+
+    const idToken = await user.getIdToken();
+
+    // Verify against trusted server authorization
+    const res = await fetch('/api/admin-auth?action=google-signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        uid: user.uid,
+        idToken,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      // Must revoke client-side session immediately
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error:
+          data.error ||
+          'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.',
+      };
+    }
+
+    return {
+      success: true,
+      email: data.email || user.email,
+    };
+  } catch (err: any) {
+    await signOut(auth).catch(() => {});
+    return {
+      success: false,
+      error: err?.message || 'Google authentication was cancelled or interrupted.',
+    };
+  }
+}
+
+/**
+ * Step 1: Email and Password Authentication
+ * Verifies email and password, then triggers dispatch of a 6-digit OTP code to the registered email.
+ */
+export async function loginWithEmailPassword(email: string, password: string): Promise<AdminLoginResult> {
+  try {
+    const res = await fetch('/api/admin-auth?action=email-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Incorrect email address or password. Please try again.',
+        code: data.code,
+      };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error during authentication. Please try again.',
+    };
+  }
+}
+
+/**
+ * Step 2: Verify 6-digit Email One-Time Verification Code (OTP)
+ */
+export async function verifyEmailOtp(preAuthToken: string, code: string): Promise<AdminLoginResult> {
+  try {
+    const res = await fetch('/api/admin-auth?action=verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preAuthToken, code }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Incorrect verification code. Please check your email.',
+        code: data.code,
+      };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to verify code. Please try again.',
+    };
+  }
+}
+
+/**
+ * Resend Email One-Time Verification Code (OTP)
+ */
+export async function resendEmailOtp(preAuthToken: string): Promise<{
+  success: boolean;
+  error?: string;
+  resendIn?: number;
+  message?: string;
+  emailDelivered?: boolean;
+  emailDeliveryError?: string | null;
+  devTestCode?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin-auth?action=resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preAuthToken }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to resend verification code.',
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Verification code resent successfully.',
+      resendIn: data.resendIn || 60,
+      emailDelivered: data.emailDelivered,
+      emailDeliveryError: data.emailDeliveryError,
+      devTestCode: data.devTestCode,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error while resending verification code.',
+    };
+  }
+}
+
+/**
+ * Verifies if an active, unexpired administrator session is present
+ */
+export async function verifyAdminSession(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/admin-auth?action=verify', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return Boolean(data.authenticated);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Signs out administrator from both server and Firebase Auth
  */
 export async function logoutAdminSession(): Promise<void> {
-  if (typeof window !== 'undefined') {
-    sessionStorage.removeItem(SESSION_TOKEN_KEY);
-    localStorage.removeItem(SESSION_TOKEN_KEY);
+  try {
+    await fetch('/api/admin-auth?action=logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch {}
+
+  try {
+    await signOut(auth);
+  } catch {}
+}
+
+/**
+ * Changes administrator password (requires active session)
+ */
+export async function changeAdminPassword(
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword?: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch('/api/admin-auth?action=change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to update administrator password.',
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Administrator password changed successfully.',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error while updating password.',
+    };
   }
 }

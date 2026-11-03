@@ -29,8 +29,17 @@ The Android application operates as a native client connected directly to the **
 2. Select **Open an existing project** and navigate to the `/android` folder.
 3. Allow Gradle to sync dependencies automatically.
 
-### 2. Build Debug APK
+### 2. Build Release APK (app-release.apk)
 Run the following in the terminal or use Android Studio Build Menu:
+```bash
+cd android
+./gradlew assembleRelease
+```
+The generated release APK will be at:
+`android/app/build/outputs/apk/release/app-release.apk`
+
+### 3. Build Debug APK (app-debug.apk)
+Run:
 ```bash
 cd android
 ./gradlew assembleDebug
@@ -38,7 +47,7 @@ cd android
 The generated APK will be at:
 `android/app/build/outputs/apk/debug/app-debug.apk`
 
-### 3. Generate Release Android App Bundle (AAB) for Google Play
+### 4. Generate Production Android App Bundle (AAB) for Google Play
 Run:
 ```bash
 ./gradlew bundleRelease

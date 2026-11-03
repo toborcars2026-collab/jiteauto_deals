@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Car, Search, Check, MapPin } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
 import { formatCurrency, getOptimizedImageUrl, getVehicleCardSrcSet, getSlideshowVehicles } from '../utils';
 
@@ -18,70 +17,251 @@ export default function Hero({
   onFindMyCar,
   onViewVehicleDetails,
 }: HeroProps) {
-  const [currentSlideIdx, setCurrentSlideIdx] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const [isPaused, setIsPaused] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false);
+  const slideshowVehicles = useMemo(() => getSlideshowVehicles(vehicles), [vehicles]);
+  const count = slideshowVehicles.length;
+
+  const [activeVehicleIndex, setActiveVehicleIndex] = useState(0);
+  const [trackIndex, setTrackIndex] = useState(count > 1 ? 1 : 0);
+  const [isTransitionEnabled, setIsTransitionEnabled] = useState(true);
+  const [dragOffset, setDragOffset] = useState(0);
+
+  const trackRef = useRef<HTMLDivElement>(null);
+  const isTransitioningRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const isHorizontalSwipeRef = useRef(false);
   const dragOccurredRef = useRef(false);
+  const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const preloadedUrlsRef = useRef<Set<string>>(new Set());
 
+  // Synchronize index when vehicle count changes
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
+    if (count <= 1) {
+      setTrackIndex(0);
+      setActiveVehicleIndex(0);
+    } else {
+      setTrackIndex((prev) => (prev < 1 || prev > count ? 1 : prev));
+      setActiveVehicleIndex((prev) => (prev >= count ? 0 : prev));
+    }
+  }, [count]);
 
-  const slideshowVehicles = getSlideshowVehicles(vehicles);
-
-  // Auto-slide effect for hero preview showcase
+  // Eagerly preload all slideshow images on mount and update
   useEffect(() => {
-    if (slideshowVehicles.length <= 1 || isPaused) return;
+    if (!slideshowVehicles.length) return;
 
-    const interval = setInterval(() => {
-      setDirection(1);
-      setCurrentSlideIdx((prev) => (prev + 1) % slideshowVehicles.length);
-    }, 5500);
+    slideshowVehicles.forEach((veh) => {
+      const raw = veh.images?.[0];
+      if (raw) {
+        const url = getOptimizedImageUrl(raw, 'card');
+        if (url && !preloadedUrlsRef.current.has(url)) {
+          preloadedUrlsRef.current.add(url);
+          const img = new Image();
+          img.src = url;
+          if (img.decode) {
+            img.decode().catch(() => {});
+          }
+        }
+      }
+    });
+  }, [slideshowVehicles]);
 
-    return () => clearInterval(interval);
-  }, [slideshowVehicles.length, isPaused]);
+  // Advance to next slide with transition lock and safety timeout
+  const handleNext = useCallback(() => {
+    if (count <= 1) return;
+    if (isTransitioningRef.current) return;
 
-  const activeVehicle = slideshowVehicles[currentSlideIdx] || vehicles[0];
+    isTransitioningRef.current = true;
+    setIsTransitionEnabled(true);
 
-  const handlePrev = () => {
-    setDirection(-1);
-    setCurrentSlideIdx((prev) => (prev - 1 + slideshowVehicles.length) % slideshowVehicles.length);
-  };
+    setActiveVehicleIndex((prev) => (prev + 1) % count);
+    setTrackIndex((prev) => prev + 1);
 
-  const handleNext = () => {
-    setDirection(1);
-    setCurrentSlideIdx((prev) => (prev + 1) % slideshowVehicles.length);
-  };
+    // Safety timeout: unlock after 750ms if onTransitionEnd does not fire
+    if (transitionSafetyTimeoutRef.current) {
+      clearTimeout(transitionSafetyTimeoutRef.current);
+    }
+    transitionSafetyTimeoutRef.current = setTimeout(() => {
+      isTransitioningRef.current = false;
+    }, 750);
+  }, [count]);
 
-  const handleDragEnd = (_event: any, info: any) => {
-    const swipe = info.offset.x;
-    const velocity = info.velocity.x;
-    if (swipe < -35 || velocity < -150) {
-      dragOccurredRef.current = true;
-      handleNext();
-    } else if (swipe > 35 || velocity > 150) {
-      dragOccurredRef.current = true;
-      handlePrev();
+  // Retreat to previous slide
+  const handlePrev = useCallback(() => {
+    if (count <= 1) return;
+    if (isTransitioningRef.current) return;
+
+    isTransitioningRef.current = true;
+    setIsTransitionEnabled(true);
+
+    setActiveVehicleIndex((prev) => (prev - 1 + count) % count);
+    setTrackIndex((prev) => prev - 1);
+
+    if (transitionSafetyTimeoutRef.current) {
+      clearTimeout(transitionSafetyTimeoutRef.current);
+    }
+    transitionSafetyTimeoutRef.current = setTimeout(() => {
+      isTransitioningRef.current = false;
+    }, 750);
+  }, [count]);
+
+  // Directly jump to a specific dot slide
+  const handleDotClick = useCallback(
+    (targetIndex: number) => {
+      if (count <= 1 || isTransitioningRef.current) return;
+      if (targetIndex === activeVehicleIndex) return;
+
+      isTransitioningRef.current = true;
+      setIsTransitionEnabled(true);
+      setActiveVehicleIndex(targetIndex);
+      setTrackIndex(targetIndex + 1);
+
+      if (transitionSafetyTimeoutRef.current) {
+        clearTimeout(transitionSafetyTimeoutRef.current);
+      }
+      transitionSafetyTimeoutRef.current = setTimeout(() => {
+        isTransitioningRef.current = false;
+      }, 750);
+    },
+    [count, activeVehicleIndex]
+  );
+
+  // Seamless infinite loop transition reset
+  const handleTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== trackRef.current) return;
+
+    if (transitionSafetyTimeoutRef.current) {
+      clearTimeout(transitionSafetyTimeoutRef.current);
+      transitionSafetyTimeoutRef.current = null;
+    }
+
+    if (trackIndex === count + 1) {
+      // Slid forward into cloned first slide -> instantly snap back to real slide 1
+      setIsTransitionEnabled(false);
+      setTrackIndex(1);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsTransitionEnabled(true);
+          isTransitioningRef.current = false;
+        });
+      });
+    } else if (trackIndex === 0) {
+      // Slid backward into cloned last slide -> instantly snap back to real last slide
+      setIsTransitionEnabled(false);
+      setTrackIndex(count);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsTransitionEnabled(true);
+          isTransitioningRef.current = false;
+        });
+      });
+    } else {
+      isTransitioningRef.current = false;
     }
   };
 
-  const slideVariants = {
-    enter: (dir: number) => ({
-      x: dir > 0 ? '100%' : '-100%',
-      opacity: 0,
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1,
-    },
-    exit: (dir: number) => ({
-      zIndex: 0,
-      x: dir < 0 ? '100%' : '-100%',
-      opacity: 0,
-    }),
+  // Robust automatic playback ticker (fires consistently every 4.2 seconds)
+  const resetAutoPlay = useCallback(() => {
+    if (autoPlayTimerRef.current) {
+      clearInterval(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    if (count <= 1) return;
+
+    autoPlayTimerRef.current = setInterval(() => {
+      if (!isDraggingRef.current) {
+        handleNext();
+      }
+    }, 4200);
+  }, [count, handleNext]);
+
+  useEffect(() => {
+    resetAutoPlay();
+    return () => {
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
+      if (transitionSafetyTimeoutRef.current) {
+        clearTimeout(transitionSafetyTimeoutRef.current);
+        transitionSafetyTimeoutRef.current = null;
+      }
+    };
+  }, [resetAutoPlay]);
+
+  // Touch and mouse gesture handlers for mobile & desktop swiping
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if (count <= 1 || isTransitioningRef.current) return;
+    isDraggingRef.current = true;
+    dragOccurredRef.current = false;
+    isHorizontalSwipeRef.current = false;
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startXRef.current = clientX;
+    startYRef.current = clientY;
   };
+
+  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaX = clientX - startXRef.current;
+    const deltaY = clientY - startYRef.current;
+
+    if (!isHorizontalSwipeRef.current) {
+      if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        isHorizontalSwipeRef.current = true;
+      } else if (Math.abs(deltaY) > 8) {
+        isDraggingRef.current = false;
+        setDragOffset(0);
+        return;
+      }
+    }
+
+    if (isHorizontalSwipeRef.current) {
+      dragOccurredRef.current = true;
+      setDragOffset(deltaX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+
+    if (isHorizontalSwipeRef.current) {
+      const finalOffset = dragOffset;
+      setDragOffset(0);
+
+      if (finalOffset < -45) {
+        handleNext();
+        resetAutoPlay();
+      } else if (finalOffset > 45) {
+        handlePrev();
+        resetAutoPlay();
+      }
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const activeVehicle = slideshowVehicles[activeVehicleIndex] || vehicles[0];
+
+  const handleImageClick = () => {
+    if (!dragOccurredRef.current && activeVehicle) {
+      onViewVehicleDetails(activeVehicle);
+    }
+  };
+
+  // Build the track slides array (with cloned ends for seamless infinite loop)
+  const trackSlides = useMemo(() => {
+    if (count <= 1) return slideshowVehicles;
+    return [slideshowVehicles[count - 1], ...slideshowVehicles, slideshowVehicles[0]];
+  }, [count, slideshowVehicles]);
 
   return (
     <section
@@ -155,65 +335,90 @@ export default function Hero({
           {/* Right Column: Live Inventory Spotlight Card */}
           {activeVehicle && (
             <div className="lg:col-span-5">
-              <div
-                className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl group"
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
-              >
+              <div className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl group">
                 {/* Image Slide Area */}
-                <div className="relative aspect-[16/11] overflow-hidden bg-slate-950">
-                  <AnimatePresence initial={false} custom={direction} mode="popLayout">
-                    <motion.img
-                      key={activeVehicle.id}
-                      custom={direction}
-                      variants={slideVariants}
-                      initial={hasMounted ? 'enter' : false}
-                      animate="center"
-                      exit="exit"
-                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                      src={getOptimizedImageUrl(activeVehicle.images?.[0], 'card')}
-                      srcSet={getVehicleCardSrcSet(activeVehicle.images?.[0])}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
-                      width={640}
-                      height={440}
-                      alt={`${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model}`}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                      className="w-full h-full object-cover cursor-pointer select-none"
-                      style={{ imageRendering: 'auto' }}
-                      drag="x"
-                      dragConstraints={{ left: 0, right: 0 }}
-                      dragElastic={0.2}
-                      onDragStart={() => {
-                        dragOccurredRef.current = false;
-                      }}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => {
-                        if (!dragOccurredRef.current) {
-                          onViewVehicleDetails(activeVehicle);
-                        }
-                      }}
-                    />
-                  </AnimatePresence>
+                <div
+                  className="relative aspect-[16/11] overflow-hidden bg-slate-950 cursor-pointer select-none"
+                  style={{ touchAction: 'pan-y', contain: 'layout paint' }}
+                  onClick={handleImageClick}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                  onMouseDown={handleTouchStart}
+                  onMouseMove={handleTouchMove}
+                  onMouseUp={handleTouchEnd}
+                  onMouseLeave={handleTouchEnd}
+                >
+                  {/* Persistent background fallback image - ensures zero blank screen */}
+                  {activeVehicle && (
+                    <div className="absolute inset-0 pointer-events-none z-0">
+                      <img
+                        src={getOptimizedImageUrl(activeVehicle.images?.[0], 'card')}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-full h-full object-cover filter blur-[2px] scale-105 opacity-60"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/40" />
+                    </div>
+                  )}
 
-                  {/* Single Clean Condition Tag */}
-                  <div className="absolute top-3.5 left-3.5 z-10">
-                    <span className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md bg-slate-950/85 text-amber-300 border border-white/10 backdrop-blur-sm">
-                      {activeVehicle.condition || 'Foreign Used'}
-                    </span>
+                  {/* Infinite Continuous Track */}
+                  <div
+                    ref={trackRef}
+                    className="relative z-10 flex w-full h-full will-change-transform"
+                    style={{
+                      transform: `translate3d(calc(-${trackIndex * 100}% + ${dragOffset}px), 0, 0)`,
+                      transition:
+                        isDraggingRef.current || !isTransitionEnabled
+                          ? 'none'
+                          : 'transform 600ms cubic-bezier(0.16, 1, 0.3, 1)',
+                      willChange: 'transform',
+                    }}
+                    onTransitionEnd={handleTransitionEnd}
+                  >
+                    {trackSlides.map((veh, idx) => (
+                      <div
+                        key={`${veh.id}-${idx}`}
+                        className="relative w-full h-full flex-none shrink-0 overflow-hidden bg-slate-900"
+                        style={{ width: '100%', height: '100%' }}
+                      >
+                        <img
+                          src={getOptimizedImageUrl(veh.images?.[0], 'card')}
+                          srcSet={getVehicleCardSrcSet(veh.images?.[0])}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
+                          width={640}
+                          height={440}
+                          alt={`${veh.year} ${veh.make} ${veh.model}`}
+                          loading="eager"
+                          fetchPriority={idx === trackIndex ? 'high' : 'auto'}
+                          decoding="async"
+                          className="w-full h-full object-cover select-none pointer-events-none"
+                          draggable={false}
+                          style={{ imageRendering: 'auto' }}
+                        />
+
+                        {/* Clean Condition Badge on each slide */}
+                        <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none">
+                          <span className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md bg-slate-950/85 text-amber-300 border border-white/10 backdrop-blur-sm">
+                            {veh.condition || 'Foreign Used'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Navigation Arrows (if multiple slideshow items) */}
-                  {slideshowVehicles.length > 1 && (
-                    <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none z-10">
+                  {count > 1 && (
+                    <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none z-20">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePrev();
+                          resetAutoPlay();
                         }}
-                        className="w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-sm border border-white/10 transition-transform active:scale-90"
+                        className="w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-md border border-white/10 transition-transform active:scale-90 cursor-pointer shadow-lg"
                         aria-label="Previous vehicle"
                       >
                         <ChevronLeft size={16} />
@@ -223,8 +428,9 @@ export default function Hero({
                         onClick={(e) => {
                           e.stopPropagation();
                           handleNext();
+                          resetAutoPlay();
                         }}
-                        className="w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-sm border border-white/10 transition-transform active:scale-90"
+                        className="w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center pointer-events-auto backdrop-blur-md border border-white/10 transition-transform active:scale-90 cursor-pointer shadow-lg"
                         aria-label="Next vehicle"
                       >
                         <ChevronRight size={16} />
@@ -236,24 +442,24 @@ export default function Hero({
                 {/* Card Information */}
                 <div className="p-5 bg-slate-900 border-t border-slate-800">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold block">
                         Live Inventory Preview
                       </span>
                       <h3
                         onClick={() => onViewVehicleDetails(activeVehicle)}
-                        className="font-display text-lg font-bold text-white hover:text-amber-400 transition-colors cursor-pointer"
+                        className="font-display text-lg font-bold text-white hover:text-amber-400 transition-colors cursor-pointer truncate"
                       >
                         {activeVehicle.year} {activeVehicle.make} {activeVehicle.model}
                       </h3>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 truncate">
                         <span>{activeVehicle.transmission || 'Automatic'}</span>
                         <span>·</span>
                         <span>{activeVehicle.fuelType || 'Petrol'}</span>
                         <span>·</span>
                         <span className="flex items-center gap-1">
-                          <MapPin size={11} className="text-amber-400" />
-                          {activeVehicle.location || 'Lagos'}
+                          <MapPin size={11} className="text-amber-400 shrink-0" />
+                          <span className="truncate">{activeVehicle.location || 'Lagos'}</span>
                         </span>
                       </div>
                     </div>
@@ -268,7 +474,7 @@ export default function Hero({
                     </div>
                   </div>
 
-                  {/* Quick Action Button */}
+                  {/* Quick Action Button & Slide Indicator Pills */}
                   <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
                     <button
                       type="button"
@@ -277,15 +483,20 @@ export default function Hero({
                     >
                       View Details & Inspection →
                     </button>
-                    {slideshowVehicles.length > 1 && (
-                      <div className="flex items-center gap-1">
+                    {count > 1 && (
+                      <div className="flex items-center gap-1.5">
                         {slideshowVehicles.map((_, i) => (
                           <button
                             key={i}
                             type="button"
-                            onClick={() => setCurrentSlideIdx(i)}
-                            className={`h-1.5 rounded-full transition-all ${
-                              i === currentSlideIdx ? 'w-5 bg-amber-400' : 'w-1.5 bg-slate-700 hover:bg-slate-600'
+                            onClick={() => {
+                              handleDotClick(i);
+                              resetAutoPlay();
+                            }}
+                            className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                              i === activeVehicleIndex
+                                ? 'w-5 bg-amber-400'
+                                : 'w-1.5 bg-slate-700 hover:bg-slate-600'
                             }`}
                             aria-label={`Go to slide ${i + 1}`}
                           />

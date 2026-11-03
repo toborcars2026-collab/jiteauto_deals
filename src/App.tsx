@@ -42,6 +42,8 @@ import {
   preloadPrimaryImage,
   getInitialVehicleRoute,
   getInitialServerRouteData,
+  getSlideshowVehicles,
+  getOptimizedImageUrl,
 } from './utils';
 import { generateVehicleMetadata, generateTabMetadata, updateClientMeta } from './metaHelper';
 
@@ -55,8 +57,6 @@ const ConsultantModal = lazy(() => import('./components/ConsultantModal'));
 const LeadQualifierModal = lazy(() => import('./components/LeadQualifierModal'));
 const InspectionBookingModal = lazy(() => import('./components/InspectionBookingModal'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
-const AndroidAppSimulatorModal = lazy(() => import('./components/AndroidAppSimulatorModal'));
-const DownloadAppModal = lazy(() => import('./components/DownloadAppModal'));
 
 export interface AppHistoryState {
   tab: NavigationTab;
@@ -77,6 +77,12 @@ const initialMatchedVehicle =
 
 if (initialMatchedVehicle?.images?.[0]) {
   preloadPrimaryImage(initialMatchedVehicle.images[0]);
+} else {
+  // Preload primary hero slideshow vehicle image eagerly
+  const initialHeroVehicles = getSlideshowVehicles(initialVehiclesList);
+  if (initialHeroVehicles[0]?.images?.[0]) {
+    preloadPrimaryImage(getOptimizedImageUrl(initialHeroVehicles[0].images[0], 'card'));
+  }
 }
 
 export default function App() {
@@ -114,9 +120,6 @@ export default function App() {
     }
     return null;
   });
-
-  const [isAndroidSimulatorOpen, setIsAndroidSimulatorOpen] = useState(false);
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // Tab navigation handler with clean history stack
   const handleTabChange = (newTab: NavigationTab, replace: boolean = false) => {
@@ -472,8 +475,6 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={handleTabChange}
         onOpenConsultation={() => handleOpenConsultant(null)}
-        onOpenAndroidSimulator={() => setIsAndroidSimulatorOpen(true)}
-        onOpenDownloadApp={() => setIsDownloadModalOpen(true)}
       />
 
       {/* Main Content Router */}
@@ -665,36 +666,6 @@ export default function App() {
             isOpen={isInspectionOpen}
             onClose={handleCloseInspection}
             businessSettings={businessSettings}
-          />
-        </Suspense>
-      )}
-
-      {/* Android Mobile Application Simulator Modal */}
-      {isAndroidSimulatorOpen && (
-        <Suspense fallback={null}>
-          <AndroidAppSimulatorModal
-            isOpen={isAndroidSimulatorOpen}
-            onClose={() => setIsAndroidSimulatorOpen(false)}
-            vehicles={vehicles}
-            businessSettings={businessSettings}
-            onOpenDownloadModal={() => {
-              setIsAndroidSimulatorOpen(false);
-              setIsDownloadModalOpen(true);
-            }}
-          />
-        </Suspense>
-      )}
-
-      {/* Download & Install App Modal */}
-      {isDownloadModalOpen && (
-        <Suspense fallback={null}>
-          <DownloadAppModal
-            isOpen={isDownloadModalOpen}
-            onClose={() => setIsDownloadModalOpen(false)}
-            onOpenSimulator={() => {
-              setIsDownloadModalOpen(false);
-              setIsAndroidSimulatorOpen(true);
-            }}
           />
         </Suspense>
       )}

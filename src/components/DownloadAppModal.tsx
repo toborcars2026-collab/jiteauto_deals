@@ -285,18 +285,28 @@ export default function DownloadAppModal({
 
               {/* Build Instructions */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <h5 className="text-sm font-bold text-white flex items-center gap-2">
                     <Terminal size={16} className="text-amber-400" />
-                    How to Build the APK in Android Studio
+                    How to Compile app-release.apk in Android Studio
                   </h5>
-                  <button
-                    onClick={handleCopyGradle}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all"
-                  >
-                    {copiedGradle ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                    <span>{copiedGradle ? 'Copied' : 'Copy Command'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('./gradlew assembleRelease');
+                        setCopiedGradle(true);
+                        setTimeout(() => setCopiedGradle(false), 2500);
+                      }}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      {copiedGradle ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                      <span>{copiedGradle ? 'Copied' : 'Copy ./gradlew assembleRelease'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 leading-relaxed">
+                  <strong>Notice:</strong> Compiling a genuine native Android APK requires the Android SDK, Java JDK (17+), and Gradle build-tools available in Android Studio. The complete native Kotlin &amp; Jetpack Compose project is packaged above ready for 1-click build.
                 </div>
 
                 <div className="space-y-3 text-xs text-slate-300">
@@ -305,7 +315,7 @@ export default function DownloadAppModal({
                       1
                     </span>
                     <p>
-                      <strong>Download and extract</strong> the ZIP file onto your computer.
+                      <strong>Download &amp; Extract:</strong> Download the complete project ZIP archive (<code className="text-amber-300">jite-auto-deals-android-app.zip</code>) and extract it to your computer.
                     </p>
                   </div>
 
@@ -314,7 +324,7 @@ export default function DownloadAppModal({
                       2
                     </span>
                     <p>
-                      Open <strong>Android Studio</strong> (Hedgehog or newer) and choose <strong>File &gt; Open...</strong>, then select the extracted folder.
+                      <strong>Open in Android Studio:</strong> Launch Android Studio and click <strong>File &gt; Open...</strong>, selecting the extracted project folder. Gradle will automatically sync all Jetpack Compose and Firebase dependencies.
                     </p>
                   </div>
 
@@ -322,15 +332,15 @@ export default function DownloadAppModal({
                     <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                       3
                     </span>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5 w-full">
                       <p>
-                        To generate the standalone debug APK, click <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong> or run:
+                        <strong>Build Release APK (app-release.apk):</strong> In Android Studio, go to <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong>, or run the following command in terminal:
                       </p>
-                      <pre className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs">
-                        ./gradlew assembleDebug
+                      <pre className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs overflow-x-auto">
+                        ./gradlew assembleRelease
                       </pre>
                       <p className="text-[11px] text-slate-400">
-                        Output APK location: <code className="text-amber-300">app/build/outputs/apk/debug/app-debug.apk</code>
+                        Generated APK output: <code className="text-amber-300 font-mono">app/build/outputs/apk/release/app-release.apk</code>
                       </p>
                     </div>
                   </div>
@@ -340,7 +350,7 @@ export default function DownloadAppModal({
                       4
                     </span>
                     <p>
-                      Copy <code className="text-amber-400">app-debug.apk</code> onto any Android smartphone or tablet to install and run!
+                      <strong>Install on Android:</strong> Transfer <code className="text-amber-400 font-mono">app-release.apk</code> directly to your Android device via USB, Drive, or WhatsApp, and tap to install.
                     </p>
                   </div>
                 </div>

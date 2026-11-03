@@ -100,9 +100,24 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["businessName", "phoneDisplay", "whatsAppNumber"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator account role document",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
     }
   },
   "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Role verification mapping for the single authorised administrator"
+    },
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/entities/Vehicle" },
       "description": "Authoritative vehicle catalog for Jite Auto Deals"
