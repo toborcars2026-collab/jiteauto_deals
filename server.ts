@@ -411,6 +411,17 @@ app.get("/api/vehicles", (req, res) => {
   res.json(vehicles);
 });
 
+// Download native Android source project zip package
+app.get("/api/download-android-project", (req, res) => {
+  const zipPath = path.join(process.cwd(), "public", "jite-auto-deals-android.zip");
+  if (fs.existsSync(zipPath)) {
+    res.setHeader("Content-Disposition", 'attachment; filename="jite-auto-deals-android-app.zip"');
+    res.setHeader("Content-Type", "application/zip");
+    return res.sendFile(zipPath);
+  }
+  return res.status(404).json({ error: "Android package not found" });
+});
+
 app.post("/api/vehicles", requireAdminSession, (req, res) => {
   const newVehicles = req.body;
   if (!Array.isArray(newVehicles)) {

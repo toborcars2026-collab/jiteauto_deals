@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Phone, Car, Search, Share2, HelpCircle, UserCheck, MessageSquare } from 'lucide-react';
+import { Menu, X, Phone, Car, Search, Share2, HelpCircle, UserCheck, MessageSquare, Smartphone, Download } from 'lucide-react';
 import { NavigationTab, BusinessSettings } from '../types';
 import { getBusinessPhoneDisplay, getBusinessPhoneCallUrl } from '../utils';
 
@@ -7,10 +7,19 @@ interface HeaderProps {
   currentTab: NavigationTab;
   setCurrentTab: (tab: NavigationTab) => void;
   onOpenConsultation: () => void;
+  onOpenAndroidSimulator?: () => void;
+  onOpenDownloadApp?: () => void;
   businessSettings?: BusinessSettings;
 }
 
-export default function Header({ currentTab, setCurrentTab, onOpenConsultation, businessSettings }: HeaderProps) {
+export default function Header({
+  currentTab,
+  setCurrentTab,
+  onOpenConsultation,
+  onOpenAndroidSimulator,
+  onOpenDownloadApp,
+  businessSettings
+}: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const phoneDisplay = getBusinessPhoneDisplay(businessSettings);
@@ -89,7 +98,18 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
           </nav>
 
           {/* Right Action CTA & Phone Link */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2.5">
+            <button
+              type="button"
+              id="header_download_app_btn"
+              onClick={onOpenDownloadApp || onOpenAndroidSimulator}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 text-xs font-bold transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+              title="Download or Install Jite Auto Deals App on your phone"
+            >
+              <Download size={14} />
+              <span>Get App</span>
+            </button>
+
             <a
               href={phoneCallUrl}
               id="header_call_btn"
@@ -180,6 +200,35 @@ export default function Header({ currentTab, setCurrentTab, onOpenConsultation, 
           })}
 
           <div className="pt-4 border-t border-slate-800/80 mt-3 space-y-2.5">
+            <button
+              type="button"
+              id="mobile_drawer_btn_download_app"
+              onClick={() => {
+                setIsOpen(false);
+                if (onOpenDownloadApp) onOpenDownloadApp();
+                else if (onOpenAndroidSimulator) onOpenAndroidSimulator();
+              }}
+              className="flex w-full items-center justify-center gap-2 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-extrabold rounded-xl shadow-md cursor-pointer"
+            >
+              <Download size={16} />
+              <span>Download & Install App</span>
+            </button>
+
+            {onOpenAndroidSimulator && (
+              <button
+                type="button"
+                id="mobile_drawer_btn_android"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenAndroidSimulator();
+                }}
+                className="flex w-full items-center justify-center gap-2 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold rounded-xl shadow-sm cursor-pointer"
+              >
+                <Smartphone size={15} className="text-amber-400" />
+                <span>Launch Android Simulator</span>
+              </button>
+            )}
+
             <button
               type="button"
               id="mobile_drawer_btn_consultant"
