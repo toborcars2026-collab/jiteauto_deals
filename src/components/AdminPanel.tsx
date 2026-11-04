@@ -13,9 +13,6 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  Mail,
-  Clock,
-  AlertTriangle,
   LogOut,
   ChevronDown,
   ChevronUp,
@@ -27,13 +24,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import {
-  getAdminAuthStatus,
-  AdminAuthStatus,
-  bootstrapAdmin,
-  signInWithGoogleAdmin,
-  loginWithEmailPassword,
-  verifyEmailOtp,
-  resendEmailOtp,
+  authenticateAdmin,
   verifyAdminSession,
   logoutAdminSession
 } from '../services/adminAuth';
@@ -75,45 +66,15 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPanelProps) {
-  // Authentication & Verification State
+  // Authenticated state - starts unauthenticated
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isVerifyingSession, setIsVerifyingSession] = useState<boolean>(true);
-  const [authStatus, setAuthStatus] = useState<AdminAuthStatus | null>(null);
 
-  // Active Flow Step: 'login' | 'otp' | 'bootstrap'
-  const [currentStep, setCurrentStep] = useState<'login' | 'otp' | 'bootstrap'>('login');
-
-  // Input fields
-  const [emailInput, setEmailInput] = useState('');
+  // Simple Password Login Form
   const [passwordInput, setPasswordInput] = useState('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-  const [setupSecretInput, setSetupSecretInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Domain Authorization Diagnostic state
-  const [unauthorizedDomainDetails, setUnauthorizedDomainDetails] = useState<{
-    domain: string;
-    projectId: string;
-  } | null>(null);
-
-  // OTP Verification state
-  const [otpInput, setOtpInput] = useState('');
-  const [preAuthToken, setPreAuthToken] = useState('');
-  const [maskedEmail, setMaskedEmail] = useState('');
-  const [emailDelivered, setEmailDelivered] = useState(true);
-  const [emailDeliveryError, setEmailDeliveryError] = useState<string | null>(null);
-  const [devTestCode, setDevTestCode] = useState<string | null>(null);
-  const [otpExpiresIn, setOtpExpiresIn] = useState<number>(300);
-  const [resendCooldown, setResendCooldown] = useState<number>(60);
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
-
-  // Loading & message states
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
-  const [isResending, setIsResending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(null);
 
   // Dashboard Tabs & Data
   const [activeTab, setActiveTab] = useState<'inventory' | 'slideshow' | 'add-car' | 'leads' | 'inquiries' | 'settings'>('inventory');
@@ -130,29 +91,18 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [sharingVehicle, setSharingVehicle] = useState<Vehicle | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Initial check: verify active session & bootstrap status
+  // Quick initial check to see if an active session exists
   useEffect(() => {
     let isMounted = true;
 
     async function checkAuthAndSession() {
       try {
-        const [validSession, status] = await Promise.all([
-          verifyAdminSession(),
-          getAdminAuthStatus(),
-        ]);
-
-        if (!isMounted) return;
-        setAuthStatus(status);
-
-        if (validSession) {
+        const validSession = await verifyAdminSession();
+        if (isMounted && validSession) {
           setIsAuthenticated(true);
-        } else if (!status.bootstrapped) {
-          setCurrentStep('bootstrap');
-        } else {
-          setCurrentStep('login');
         }
       } catch (err) {
-        if (isMounted) setCurrentStep('login');
+        // Fall back to password login screen
       } finally {
         if (isMounted) {
           setIsVerifyingSession(false);
@@ -167,250 +117,42 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     };
   }, []);
 
-  // OTP Countdown and Resend Timers
-  useEffect(() => {
-    if (currentStep !== 'otp') return;
-
-    const timer = setInterval(() => {
-      setOtpExpiresIn((prev) => (prev > 0 ? prev - 1 : 0));
-      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentStep]);
-
-  // Format MM:SS for OTP countdown
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  // 1. Handle Google Authentication
-  const handleGoogleSignIn = async () => {
-    setAuthError(null);
-    setAuthSuccessMessage(null);
-    setUnauthorizedDomainDetails(null);
-    setIsGoogleSubmitting(true);
-
-    try {
-      const res = await signInWithGoogleAdmin();
-      if (res.success) {
-        setIsAuthenticated(true);
-        setAuthError(null);
-        setUnauthorizedDomainDetails(null);
-      } else {
-        if (res.code === 'auth/unauthorized-domain' || res.unauthorizedDomain) {
-          setUnauthorizedDomainDetails({
-            domain: res.unauthorizedDomain || (typeof window !== 'undefined' ? window.location.hostname : 'jiteautodeals.vercel.app'),
-            projectId: 'gen-lang-client-0327661147',
-          });
-        }
-        setAuthError(
-          res.error ||
-            'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.'
-        );
-      }
-    } catch (err: any) {
-      const isUnauthDomain =
-        err?.code === 'auth/unauthorized-domain' ||
-        (typeof err?.message === 'string' && err.message.includes('auth/unauthorized-domain'));
-
-      if (isUnauthDomain) {
-        setUnauthorizedDomainDetails({
-          domain: typeof window !== 'undefined' ? window.location.hostname : 'jiteautodeals.vercel.app',
-          projectId: 'gen-lang-client-0327661147',
-        });
-      }
-
-      setAuthError(
-        err?.message ||
-          'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.'
-      );
-    } finally {
-      setIsGoogleSubmitting(false);
-    }
-  };
-
-  // 2. Handle Step 1: Email and Password Authentication
-  const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
+  // Handle Simple Password Administrator Sign In
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    setAuthSuccessMessage(null);
 
-    const email = emailInput.trim();
     const password = passwordInput;
-
-    if (!email || !password) {
-      setAuthError('Please enter both your administrator email and password.');
+    if (!password) {
+      setAuthError('Please enter the administrator password.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const res = await loginWithEmailPassword(email, password);
-
-      if (res.success && res.step === 'otp_required' && res.preAuthToken) {
-        setPreAuthToken(res.preAuthToken);
-        setMaskedEmail(res.emailMasked || email);
-        setOtpExpiresIn(res.expiresIn || 300);
-        setResendCooldown(res.resendIn || 60);
-        setEmailDelivered(res.emailDelivered ?? true);
-        setEmailDeliveryError(res.emailDeliveryError || null);
-        setDevTestCode(res.devTestCode || null);
-        setOtpInput('');
-        setAttemptsRemaining(null);
-        setCurrentStep('otp');
-        setAuthError(null);
-      } else if (res.success && res.step === 'authenticated') {
-        setIsAuthenticated(true);
-        setAuthError(null);
-      } else {
-        setAuthError(res.error || 'Incorrect email address or password. Please verify and try again.');
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Authentication error. Please check your credentials and try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 3. Handle Step 2: 6-Digit Email OTP Verification
-  const handleOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-
-    const cleanCode = otpInput.replace(/\D/g, '');
-    if (cleanCode.length !== 6) {
-      setAuthError('Please enter all 6 digits of the verification code.');
-      return;
-    }
-
-    if (otpExpiresIn <= 0) {
-      setAuthError('Verification code has expired. Please request a new code using the Resend option.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const res = await verifyEmailOtp(preAuthToken, cleanCode);
+      const res = await authenticateAdmin(password);
       if (res.success) {
         setIsAuthenticated(true);
-        setCurrentStep('login');
-        setOtpInput('');
-        setPreAuthToken('');
         setPasswordInput('');
         setAuthError(null);
       } else {
-        setAuthError(res.error || 'Incorrect verification code. Please check your email.');
-        if (typeof (res as any).attemptsRemaining === 'number') {
-          setAttemptsRemaining((res as any).attemptsRemaining);
-        }
+        setAuthError(res.error || 'Incorrect administrator password. Please try again.');
       }
     } catch (err: any) {
-      setAuthError(err?.message || 'Verification failed. Please try again.');
+      setAuthError('Incorrect administrator password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 4. Handle Resend OTP Code
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0 || isResending) return;
-
-    setIsResending(true);
-    setAuthError(null);
-
-    try {
-      const res = await resendEmailOtp(preAuthToken);
-      if (res.success) {
-        setResendCooldown(res.resendIn || 60);
-        setOtpExpiresIn(300);
-        setEmailDelivered(res.emailDelivered ?? true);
-        setEmailDeliveryError(res.emailDeliveryError || null);
-        if (res.devTestCode) setDevTestCode(res.devTestCode);
-        setAuthSuccessMessage(res.message || 'A new verification code has been dispatched to your email.');
-        setTimeout(() => setAuthSuccessMessage(null), 5000);
-      } else {
-        setAuthError(res.error || 'Failed to resend verification code.');
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Network error while resending verification code.');
-    } finally {
-      setIsResending(false);
-    }
-  };
-
-  // 5. Handle Initial One-Time Administrator Bootstrap Setup
-  const handleBootstrapSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-
-    const email = emailInput.trim();
-    if (!email || !email.includes('@')) {
-      setAuthError('Please enter a valid administrator email address.');
-      return;
-    }
-
-    if (!passwordInput || passwordInput.length < 8) {
-      setAuthError('Administrator password must be at least 8 characters long.');
-      return;
-    }
-
-    if (passwordInput !== confirmPasswordInput) {
-      setAuthError('Passwords do not match. Please verify and try again.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const res = await bootstrapAdmin({
-        email,
-        password: passwordInput,
-        confirmPassword: confirmPasswordInput,
-        setupSecret: setupSecretInput.trim() || undefined,
-      });
-
-      if (res.success) {
-        setIsAuthenticated(true);
-        setAuthStatus({
-          bootstrapped: true,
-          authorizedEmailHint: email,
-          emailDeliveryConfigured: false,
-          authenticated: true,
-          email,
-          role: 'admin',
-          updatedAt: new Date().toISOString(),
-        });
-        setCurrentStep('login');
-        setPasswordInput('');
-        setConfirmPasswordInput('');
-        setAuthError(null);
-      } else {
-        setAuthError(res.error || 'Failed to complete initial administrator setup.');
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Network error during administrator setup.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 6. Handle Sign Out
+  // Handle Sign Out
   const handleSignOut = async () => {
     try {
       await logoutAdminSession();
       setIsAuthenticated(false);
       setActiveTab('inventory');
-      setEmailInput('');
       setPasswordInput('');
-      setConfirmPasswordInput('');
-      setOtpInput('');
-      setPreAuthToken('');
-      setCurrentStep('login');
       setAuthError(null);
       if (onCancel) {
         onCancel();
@@ -450,7 +192,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       unsubVehicles();
       unsubSettings();
     };
-  }, [isAuthenticated, setVehicles]);
+  }, [isAuthenticated]);
 
   // Handle Start Edit Vehicle
   const handleStartEdit = (car: Vehicle) => {
@@ -476,10 +218,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     }
   };
 
-  // Loading spinner during fast initial session validation
+  // Initial fast check state
   if (isVerifyingSession) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center p-6 bg-slate-900 text-white">
+      <div className="min-h-[80vh] flex items-center justify-center p-6 bg-slate-900 text-white">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw size={28} className="animate-spin text-amber-400" />
           <span className="text-xs font-mono text-slate-400">Loading Administrator Command Center...</span>
@@ -488,7 +230,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     );
   }
 
-  // Multi-Layer Secure Administrator Login & Setup Screen
+  // Password-Only Administrator Login Screen
   if (!isAuthenticated) {
     return (
       <div id="admin-login-screen" className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-900 text-white">
@@ -497,456 +239,77 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 shadow-inner">
-              <ShieldCheck size={28} />
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2 shadow-inner">
+              <Lock size={26} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold font-display tracking-tight text-white uppercase">
-                ADMINISTRATOR COMMAND CENTER
+              <h2 className="text-2xl font-bold font-display tracking-tight text-white">
+                Jite Auto Deals
               </h2>
               <p className="text-xs uppercase tracking-widest text-amber-400 font-mono font-bold mt-1">
-                Secure Administrator Access
+                ADMINISTRATOR LOGIN
               </p>
             </div>
           </div>
 
-          {/* Domain Authorization Diagnostic Notice (Fix for auth/unauthorized-domain) */}
-          {unauthorizedDomainDetails && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-mono space-y-3 animate-fadeIn shadow-lg">
-              <div className="flex items-center gap-2 font-bold text-amber-400">
-                <AlertTriangle size={18} className="shrink-0" />
-                <span className="uppercase tracking-wider">Firebase Action: Add Authorized Domain</span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                Google Authentication rejected the request because the domain{' '}
-                <strong className="text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-amber-500/40">
-                  {unauthorizedDomainDetails.domain}
-                </strong>{' '}
-                is not yet authorized in Firebase project{' '}
-                <strong className="text-amber-300">{unauthorizedDomainDetails.projectId}</strong>.
-              </p>
-              <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 space-y-1.5 text-[11px]">
-                <span className="text-amber-400 font-bold block">Steps to enable in Firebase Console:</span>
-                <ol className="list-decimal pl-4 space-y-1 text-slate-300">
-                  <li>
-                    Go to{' '}
-                    <a
-                      href={`https://console.firebase.google.com/project/${unauthorizedDomainDetails.projectId}/authentication/settings`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-amber-400 underline hover:text-amber-300 font-semibold"
-                    >
-                      Firebase Console &gt; Authentication &gt; Settings
-                    </a>
-                  </li>
-                  <li>Click <span className="text-white font-semibold">Authorized domains</span> in the sidebar</li>
-                  <li>Click <span className="text-white font-semibold">Add domain</span></li>
-                  <li>Enter: <span className="text-amber-300 font-bold font-mono bg-slate-950 px-1 py-0.5 rounded border border-amber-500/20">{unauthorizedDomainDetails.domain}</span></li>
-                  <li>Click <span className="text-white font-semibold">Save</span></li>
-                </ol>
-              </div>
-              <div className="pt-1 text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 border-t border-amber-500/20">
-                <CheckCircle2 size={13} className="shrink-0" />
-                <span>Immediate Alternative: Sign in below using Email &amp; Password + OTP, which works instantly on all domains.</span>
-              </div>
+          {/* Error Banner */}
+          {authError && (
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+              <ShieldAlert size={16} className="shrink-0 text-rose-400" />
+              <span>{authError}</span>
             </div>
           )}
 
-          {/* Standard Error Banner */}
-          {authError && !unauthorizedDomainDetails && (
-            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-start gap-2.5 animate-fadeIn">
-              <ShieldAlert size={16} className="shrink-0 text-rose-400 mt-0.5" />
-              <div className="space-y-1">
-                <span className="font-bold block leading-relaxed">{authError}</span>
-                {attemptsRemaining !== null && attemptsRemaining > 0 && (
-                  <span className="text-[11px] text-rose-300 block">
-                    Security notice: {attemptsRemaining} attempt{attemptsRemaining === 1 ? '' : 's'} remaining before temporary lockout.
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Success Banner */}
-          {authSuccessMessage && (
-            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono flex items-center gap-2 animate-fadeIn">
-              <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
-              <span>{authSuccessMessage}</span>
-            </div>
-          )}
-
-          {/* FLOW STEP 1: INITIAL ONE-TIME ADMINISTRATOR SETUP */}
-          {currentStep === 'bootstrap' && (
-            <div className="space-y-5 animate-fadeIn">
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-slate-300 text-xs font-mono space-y-1">
-                <span className="text-amber-400 font-bold block">One-Time Administrator Setup</span>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Establish the authorized administrator email and master password. Once completed, this setup is permanently locked and cannot be accessed again.
-                </p>
-              </div>
-
-              <form onSubmit={handleBootstrapSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                      SETUP SECRET (OPTIONAL)
-                    </label>
-                    <span className="text-[10px] text-slate-500 font-mono">ADMIN_SETUP_SECRET</span>
-                  </div>
-                  <div className="relative">
-                    <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="password"
-                      placeholder="Enter server bootstrap secret if configured"
-                      value={setupSecretInput}
-                      onChange={(e) => {
-                        setSetupSecretInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    Protects the one-time provisioning endpoint against unauthorized activation.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                    AUTHORIZED ADMINISTRATOR EMAIL
-                  </label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="blwuniabuja@gmail.com"
-                      value={emailInput}
-                      onChange={(e) => {
-                        setEmailInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    All administrative Google & Email logins are strictly locked to this account.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                    MASTER PASSWORD
-                  </label>
-                  <div className="relative">
-                    <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Minimum 8 characters"
-                      value={passwordInput}
-                      onChange={(e) => {
-                        setPasswordInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                    CONFIRM MASTER PASSWORD
-                  </label>
-                  <div className="relative">
-                    <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Repeat master password"
-                      value={confirmPasswordInput}
-                      onChange={(e) => {
-                        setConfirmPasswordInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
-                    >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase mt-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>INITIALIZING ACCOUNT...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>ESTABLISH ADMINISTRATOR ACCOUNT</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* FLOW STEP 2: NORMAL LOGIN (GOOGLE SIGN-IN + EMAIL/PASSWORD FORM) */}
-          {currentStep === 'login' && (
-            <div className="space-y-5 animate-fadeIn">
-              {/* Prominent Continue with Google Button */}
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isGoogleSubmitting || isSubmitting}
-                className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-3 border border-slate-200 cursor-pointer disabled:opacity-50"
-              >
-                {isGoogleSubmitting ? (
-                  <>
-                    <RefreshCw size={18} className="animate-spin text-slate-700" />
-                    <span>AUTHENTICATING GOOGLE ACCOUNT...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                    <span>CONTINUE WITH GOOGLE</span>
-                  </>
-                )}
-              </button>
-
-              {/* Section Divider */}
-              <div className="relative flex items-center justify-center my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-800" />
-                </div>
-                <div className="relative bg-slate-950 px-3 text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold">
-                  OR SIGN IN WITH EMAIL & PASSWORD
-                </div>
-              </div>
-
-              {/* Email and Password Form */}
-              <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                    EMAIL ADDRESS
-                  </label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="admin@jiteautodeals.com"
-                      value={emailInput}
-                      onChange={(e) => {
-                        setEmailInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                    PASSWORD
-                  </label>
-                  <div className="relative">
-                    <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Enter administrator password"
-                      value={passwordInput}
-                      onChange={(e) => {
-                        setPasswordInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
-                      title={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isGoogleSubmitting}
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>VERIFYING CREDENTIALS...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>SIGN IN</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* FLOW STEP 3: EMAIL VERIFICATION CODE (OTP) SCREEN */}
-          {currentStep === 'otp' && (
-            <div className="space-y-5 animate-fadeIn">
-              <div className="text-center space-y-2">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
-                  <Mail size={22} />
-                </div>
-                <h3 className="text-lg font-bold font-display text-white uppercase tracking-tight">
-                  EMAIL VERIFICATION
-                </h3>
-                <p className="text-xs text-slate-400 font-mono leading-relaxed">
-                  We have sent a verification code to your registered email address{' '}
-                  <span className="text-amber-400 font-bold">{maskedEmail}</span>.
-                </p>
-              </div>
-
-              {/* Honest Transactional Email Notice if provider not configured */}
-              {!emailDelivered && emailDeliveryError && (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <AlertTriangle size={14} className="shrink-0 text-amber-400" />
-                    <span>Transactional Email Notice</span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    {emailDeliveryError}
-                  </p>
-                  {devTestCode && (
-                    <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">Development Test Code:</span>
-                      <span className="font-bold text-amber-400 tracking-widest font-mono bg-slate-900 px-2 py-0.5 rounded border border-amber-500/30">
-                        {devTestCode}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 6-Digit Verification Code Form */}
-              <form onSubmit={handleOtpSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <label className="uppercase tracking-wider text-slate-300 font-bold">
-                      VERIFICATION CODE
-                    </label>
-                    <span className="text-amber-400 flex items-center gap-1 font-bold">
-                      <Clock size={12} />
-                      {formatTime(otpExpiresIn)}
-                    </span>
-                  </div>
-
-                  <input
-                    type="text"
-                    maxLength={6}
-                    autoFocus
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="••••••"
-                    value={otpInput}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      setOtpInput(val);
-                      if (authError) setAuthError(null);
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3.5 text-center text-2xl font-mono tracking-[12px] text-amber-400 placeholder:text-slate-700 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                  />
-                  <p className="text-[10px] text-slate-500 font-mono text-center">
-                    Enter the 6-digit one-time code sent to your email.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || otpInput.length !== 6 || otpExpiresIn <= 0}
-                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>VERIFYING CODE...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>VERIFY CODE</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Resend Code Option with Countdown & Back to Sign In */}
-              <div className="pt-2 flex flex-col items-center gap-2.5 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={resendCooldown > 0 || isResending}
-                  className="text-xs font-mono text-amber-400 hover:text-amber-300 disabled:text-slate-600 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
-                >
-                  {isResending ? (
-                    <>
-                      <RefreshCw size={12} className="animate-spin" />
-                      <span>Resending Code...</span>
-                    </>
-                  ) : resendCooldown > 0 ? (
-                    <>
-                      <span>Resend code in {resendCooldown}s</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Resend Code</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentStep('login');
-                    setOtpInput('');
-                    setAuthError(null);
+          {/* Password Login Form */}
+          <form onSubmit={handlePasswordLogin} className="space-y-4 animate-fadeIn">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                PASSWORD
+              </label>
+              <div className="relative">
+                <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoFocus
+                  placeholder="Enter administrator password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (authError) setAuthError(null);
                   }}
-                  className="text-[11px] text-slate-500 hover:text-slate-400 font-mono cursor-pointer"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  ← Return to Sign In
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Return to website button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black tracking-wider py-3.5 rounded-xl shadow-lg transition-all active:scale-98 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 uppercase"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <span>ENTER ADMIN COMMAND CENTER</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
           {onCancel && (
             <button
               type="button"
