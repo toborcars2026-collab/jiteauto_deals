@@ -67,7 +67,6 @@ export default function VehicleDetailsModal({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
-  const pointerDownPosRef = useRef({ x: 0, y: 0 });
   const modalThumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Smooth-scroll active thumbnail into view
@@ -528,23 +527,7 @@ export default function VehicleDetailsModal({
             
             {/* Gallery Left Column */}
             <div className="lg:col-span-6 space-y-4">
-              <div
-                onClick={() => {
-                  if (!dragOccurredRef.current) {
-                    handleOpenFullscreenZoom();
-                  }
-                }}
-                className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none cursor-pointer"
-                title="Tap anywhere to view full photo"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleOpenFullscreenZoom();
-                  }
-                }}
-              >
+              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none">
                 <AnimatePresence initial={false} custom={direction} mode="popLayout">
                   <motion.img
                     key={currentImageIndex}
@@ -565,24 +548,11 @@ export default function VehicleDetailsModal({
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.2}
-                    onPointerDown={(e) => {
-                      dragOccurredRef.current = false;
-                      pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
-                    }}
-                    onPointerUp={(e) => {
-                      const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
-                      const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
-                      if (dx < 10 && dy < 10) {
-                        dragOccurredRef.current = false;
-                        handleOpenFullscreenZoom();
-                      }
-                    }}
                     onDragStart={() => {
                       dragOccurredRef.current = false;
                     }}
                     onDragEnd={handleDragEnd}
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       if (!dragOccurredRef.current) {
                         handleOpenFullscreenZoom();
                       }
@@ -615,10 +585,7 @@ export default function VehicleDetailsModal({
                   <>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrevImage();
-                      }}
+                      onClick={handlePrevImage}
                       className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
                       aria-label="Previous image"
                     >
@@ -626,10 +593,7 @@ export default function VehicleDetailsModal({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNextImage();
-                      }}
+                      onClick={handleNextImage}
                       className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
                       aria-label="Next image"
                     >

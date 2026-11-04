@@ -42,8 +42,6 @@ import {
   preloadPrimaryImage,
   getInitialVehicleRoute,
   getInitialServerRouteData,
-  getSlideshowVehicles,
-  getOptimizedImageUrl,
 } from './utils';
 import { generateVehicleMetadata, generateTabMetadata, updateClientMeta } from './metaHelper';
 
@@ -77,12 +75,6 @@ const initialMatchedVehicle =
 
 if (initialMatchedVehicle?.images?.[0]) {
   preloadPrimaryImage(initialMatchedVehicle.images[0]);
-} else {
-  // Preload primary hero slideshow vehicle image eagerly
-  const initialHeroVehicles = getSlideshowVehicles(initialVehiclesList);
-  if (initialHeroVehicles[0]?.images?.[0]) {
-    preloadPrimaryImage(getOptimizedImageUrl(initialHeroVehicles[0].images[0], 'card'));
-  }
 }
 
 export default function App() {
