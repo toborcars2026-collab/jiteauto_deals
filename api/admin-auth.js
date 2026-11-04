@@ -22,6 +22,9 @@ const activeSessions = new Map();
 // Pending OTPs: preAuthToken -> { preAuthToken, otpHash, email, expiresAt, attempts, resendAllowedAt }
 const pendingOtps = new Map();
 
+// Atomic bootstrap mutex to prevent race conditions during one-time setup
+let isBootstrapping = false;
+
 // Rate limiting: IP -> { count, firstAttempt, lockedUntil }
 const loginAttempts = new Map();
 const MAX_FAILED_ATTEMPTS = 5;
@@ -607,6 +610,18 @@ export default async function handler(req, res) {
           return;
         }
 
+        if (isBootstrapping) {
+          res.statusCode = 409;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Administrator setup is currently being processed by another request.',
+              code: 'SETUP_IN_PROGRESS',
+            })
+          );
+          return;
+        }
+
         const currentConfig = await getAdminAuthConfig();
         if (currentConfig.bootstrapped) {
           res.statusCode = 403;
@@ -620,33 +635,57 @@ export default async function handler(req, res) {
           return;
         }
 
-        const body = await parseJsonBody(req);
-        const { email, password, confirmPassword, googleUid } = body;
+        isBootstrapping = true;
+        try {
+          const body = await parseJsonBody(req);
+          const { email, password, confirmPassword, googleUid, setupSecret } = body;
 
-        if (!email || typeof email !== 'string' || !email.includes('@')) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'A valid administrator email address is required.' }));
-          return;
-        }
+          // Enforce temporary high-entropy setup secret if configured in server environment
+          const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
+          const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
 
-        const cleanEmail = email.toLowerCase().trim();
+          if (expectedSecret && incomingSecret !== expectedSecret) {
+            res.statusCode = 401;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Unauthorized: Invalid or missing administrator bootstrap setup secret (ADMIN_SETUP_SECRET).',
+                code: 'INVALID_SETUP_SECRET',
+              })
+            );
+            return;
+          }
 
-        if (!password || typeof password !== 'string' || password.length < 8) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Administrator password must be at least 8 characters long.',
-            })
-          );
-          return;
-        }
+          if (!email || typeof email !== 'string' || !email.includes('@')) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ success: false, error: 'A valid administrator email address is required.' }));
+            return;
+          }
 
-        if (confirmPassword && password !== confirmPassword) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Passwords do not match. Please verify and try again.' }));
-          return;
-        }
+          const cleanEmail = email.toLowerCase().trim();
+          const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+          if (!emailRegex.test(cleanEmail)) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ success: false, error: 'Please enter a valid, RFC-compliant email address.' }));
+            return;
+          }
+
+          if (!password || typeof password !== 'string' || password.length < 8) {
+            res.statusCode = 400;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Administrator password must be at least 8 characters long.',
+              })
+            );
+            return;
+          }
+
+          if (confirmPassword && password !== confirmPassword) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ success: false, error: 'Passwords do not match. Please verify and try again.' }));
+            return;
+          }
 
         // Establish the single administrator credentials
         const salt = crypto.randomBytes(16).toString('hex');
@@ -688,6 +727,9 @@ export default async function handler(req, res) {
           })
         );
         return;
+        } finally {
+          isBootstrapping = false;
+        }
       }
 
       // 3. Continue with Google Authentication
@@ -889,10 +931,18 @@ export default async function handler(req, res) {
           text: `Your Jite Auto Deals verification code is: ${otpCode}. It expires in 5 minutes. Do not share this code.`,
         });
 
-        const deliveryOk = Boolean(emailResult.delivered);
-        if (!deliveryOk) {
-          console.warn('[Admin Auth Email Warning]: Email provider did not confirm acceptance:', emailResult.error);
-          console.log(`[DEV OTP INSPECTOR] Code for ${expectedEmail}: ${otpCode} (expires in 5m)`);
+        if (!emailResult.delivered) {
+          pendingOtps.delete(preAuthToken);
+          res.statusCode = 502;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: `Email delivery failed: ${emailResult.error || 'Transactional email credentials not configured in server environment.'}`,
+              code: 'EMAIL_DELIVERY_FAILED',
+              emailDelivered: false,
+            })
+          );
+          return;
         }
 
         res.statusCode = 200;
@@ -904,9 +954,7 @@ export default async function handler(req, res) {
             emailMasked: maskEmail(expectedEmail),
             resendIn: 60,
             expiresIn: 300,
-            emailDelivered: deliveryOk,
-            emailDeliveryError: deliveryOk ? null : (emailResult.error || 'Email service unconfigured'),
-            devTestCode: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+            emailDelivered: true,
           })
         );
         return;
@@ -1103,20 +1151,25 @@ export default async function handler(req, res) {
           text: `Your new Jite Auto Deals verification code is: ${freshOtpCode}. It expires in 5 minutes.`,
         });
 
-        const deliveryOk = Boolean(emailResult.delivered);
-        if (!deliveryOk) {
-          console.warn('[Admin Auth Email Resend Warning]:', emailResult.error);
-          console.log(`[DEV OTP INSPECTOR] Resent Code for ${record.email}: ${freshOtpCode}`);
+        if (!emailResult.delivered) {
+          res.statusCode = 502;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: `Email delivery failed: ${emailResult.error || 'Failed to dispatch verification email.'}`,
+              code: 'EMAIL_DELIVERY_FAILED',
+              emailDelivered: false,
+            })
+          );
+          return;
         }
 
         res.statusCode = 200;
         res.end(
           JSON.stringify({
             success: true,
-            message: deliveryOk ? 'A new verification code has been sent to your email.' : 'New verification code generated.',
-            emailDelivered: deliveryOk,
-            emailDeliveryError: deliveryOk ? null : (emailResult.error || 'Email service unconfigured'),
-            devTestCode: process.env.NODE_ENV !== 'production' ? freshOtpCode : undefined,
+            message: 'A new verification code has been sent to your email.',
+            emailDelivered: true,
             resendIn: 60,
           })
         );

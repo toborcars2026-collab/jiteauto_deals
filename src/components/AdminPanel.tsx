@@ -87,8 +87,15 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [setupSecretInput, setSetupSecretInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Domain Authorization Diagnostic state
+  const [unauthorizedDomainDetails, setUnauthorizedDomainDetails] = useState<{
+    domain: string;
+    projectId: string;
+  } | null>(null);
 
   // OTP Verification state
   const [otpInput, setOtpInput] = useState('');
@@ -183,6 +190,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const handleGoogleSignIn = async () => {
     setAuthError(null);
     setAuthSuccessMessage(null);
+    setUnauthorizedDomainDetails(null);
     setIsGoogleSubmitting(true);
 
     try {
@@ -190,13 +198,31 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       if (res.success) {
         setIsAuthenticated(true);
         setAuthError(null);
+        setUnauthorizedDomainDetails(null);
       } else {
+        if (res.code === 'auth/unauthorized-domain' || res.unauthorizedDomain) {
+          setUnauthorizedDomainDetails({
+            domain: res.unauthorizedDomain || (typeof window !== 'undefined' ? window.location.hostname : 'jiteautodeals.vercel.app'),
+            projectId: 'gen-lang-client-0327661147',
+          });
+        }
         setAuthError(
           res.error ||
             'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.'
         );
       }
     } catch (err: any) {
+      const isUnauthDomain =
+        err?.code === 'auth/unauthorized-domain' ||
+        (typeof err?.message === 'string' && err.message.includes('auth/unauthorized-domain'));
+
+      if (isUnauthDomain) {
+        setUnauthorizedDomainDetails({
+          domain: typeof window !== 'undefined' ? window.location.hostname : 'jiteautodeals.vercel.app',
+          projectId: 'gen-lang-client-0327661147',
+        });
+      }
+
       setAuthError(
         err?.message ||
           'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.'
@@ -345,6 +371,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         email,
         password: passwordInput,
         confirmPassword: confirmPasswordInput,
+        setupSecret: setupSecretInput.trim() || undefined,
       });
 
       if (res.success) {
@@ -483,8 +510,50 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
             </div>
           </div>
 
-          {/* Error Banner */}
-          {authError && (
+          {/* Domain Authorization Diagnostic Notice (Fix for auth/unauthorized-domain) */}
+          {unauthorizedDomainDetails && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-mono space-y-3 animate-fadeIn shadow-lg">
+              <div className="flex items-center gap-2 font-bold text-amber-400">
+                <AlertTriangle size={18} className="shrink-0" />
+                <span className="uppercase tracking-wider">Firebase Action: Add Authorized Domain</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Google Authentication rejected the request because the domain{' '}
+                <strong className="text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-amber-500/40">
+                  {unauthorizedDomainDetails.domain}
+                </strong>{' '}
+                is not yet authorized in Firebase project{' '}
+                <strong className="text-amber-300">{unauthorizedDomainDetails.projectId}</strong>.
+              </p>
+              <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 space-y-1.5 text-[11px]">
+                <span className="text-amber-400 font-bold block">Steps to enable in Firebase Console:</span>
+                <ol className="list-decimal pl-4 space-y-1 text-slate-300">
+                  <li>
+                    Go to{' '}
+                    <a
+                      href={`https://console.firebase.google.com/project/${unauthorizedDomainDetails.projectId}/authentication/settings`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-400 underline hover:text-amber-300 font-semibold"
+                    >
+                      Firebase Console &gt; Authentication &gt; Settings
+                    </a>
+                  </li>
+                  <li>Click <span className="text-white font-semibold">Authorized domains</span> in the sidebar</li>
+                  <li>Click <span className="text-white font-semibold">Add domain</span></li>
+                  <li>Enter: <span className="text-amber-300 font-bold font-mono bg-slate-950 px-1 py-0.5 rounded border border-amber-500/20">{unauthorizedDomainDetails.domain}</span></li>
+                  <li>Click <span className="text-white font-semibold">Save</span></li>
+                </ol>
+              </div>
+              <div className="pt-1 text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 border-t border-amber-500/20">
+                <CheckCircle2 size={13} className="shrink-0" />
+                <span>Immediate Alternative: Sign in below using Email &amp; Password + OTP, which works instantly on all domains.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Standard Error Banner */}
+          {authError && !unauthorizedDomainDetails && (
             <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono flex items-start gap-2.5 animate-fadeIn">
               <ShieldAlert size={16} className="shrink-0 text-rose-400 mt-0.5" />
               <div className="space-y-1">
@@ -517,6 +586,31 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
               </div>
 
               <form onSubmit={handleBootstrapSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                      SETUP SECRET (OPTIONAL)
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">ADMIN_SETUP_SECRET</span>
+                  </div>
+                  <div className="relative">
+                    <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="password"
+                      placeholder="Enter server bootstrap secret if configured"
+                      value={setupSecretInput}
+                      onChange={(e) => {
+                        setSetupSecretInput(e.target.value);
+                        if (authError) setAuthError(null);
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    Protects the one-time provisioning endpoint against unauthorized activation.
+                  </p>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block font-bold">
                     AUTHORIZED ADMINISTRATOR EMAIL

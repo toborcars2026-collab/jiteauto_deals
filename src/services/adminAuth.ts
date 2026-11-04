@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export interface AdminAuthStatus {
@@ -86,11 +86,15 @@ export async function bootstrapAdmin(payload: {
   password?: string;
   confirmPassword?: string;
   googleUid?: string;
-}): Promise<{ success: boolean; error?: string; token?: string; email?: string }> {
+  setupSecret?: string;
+}): Promise<{ success: boolean; error?: string; token?: string; email?: string; code?: string }> {
   try {
     const res = await fetch('/api/admin-auth?action=bootstrap', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(payload.setupSecret ? { 'x-admin-setup-secret': payload.setupSecret } : {}),
+      },
       body: JSON.stringify(payload),
     });
 
@@ -99,6 +103,7 @@ export async function bootstrapAdmin(payload: {
       return {
         success: false,
         error: data.error || 'Failed to complete initial administrator setup.',
+        code: data.code,
       };
     }
 
@@ -122,7 +127,13 @@ export async function bootstrapAdmin(payload: {
  * 3. Sends credentials to trusted backend for strict single-authorized-admin authorization
  * 4. If account doesn't match: immediately signs out and displays "ACCESS DENIED"
  */
-export async function signInWithGoogleAdmin(): Promise<{ success: boolean; error?: string; email?: string }> {
+export async function signInWithGoogleAdmin(): Promise<{
+  success: boolean;
+  error?: string;
+  email?: string;
+  code?: string;
+  unauthorizedDomain?: string;
+}> {
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -159,6 +170,7 @@ export async function signInWithGoogleAdmin(): Promise<{ success: boolean; error
         error:
           data.error ||
           'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.',
+        code: data.code,
       };
     }
 
@@ -168,8 +180,27 @@ export async function signInWithGoogleAdmin(): Promise<{ success: boolean; error
     };
   } catch (err: any) {
     await signOut(auth).catch(() => {});
+
+    // Inspect specifically for Firebase auth/unauthorized-domain error
+    const isUnauthorizedDomain =
+      err?.code === 'auth/unauthorized-domain' ||
+      (typeof err?.message === 'string' && err.message.includes('auth/unauthorized-domain'));
+
+    if (isUnauthorizedDomain) {
+      const currentHost =
+        typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'jiteautodeals.vercel.app';
+
+      return {
+        success: false,
+        code: 'auth/unauthorized-domain',
+        unauthorizedDomain: currentHost,
+        error: `Firebase: Error (auth/unauthorized-domain). The current domain "${currentHost}" is not yet added to Firebase Authentication Authorized Domains for project "gen-lang-client-0327661147".`,
+      };
+    }
+
     return {
       success: false,
+      code: err?.code,
       error: err?.message || 'Google authentication was cancelled or interrupted.',
     };
   }
@@ -177,14 +208,29 @@ export async function signInWithGoogleAdmin(): Promise<{ success: boolean; error
 
 /**
  * Step 1: Email and Password Authentication
- * Verifies email and password, then triggers dispatch of a 6-digit OTP code to the registered email.
+ * Uses Firebase Authentication email/password when configured, verified against backend master record.
+ * Then initiates dispatch of 6-digit OTP code to the registered email.
  */
 export async function loginWithEmailPassword(email: string, password: string): Promise<AdminLoginResult> {
   try {
+    let firebaseIdToken: string | undefined;
+
+    // Attempt Firebase Authentication email/password sign-in first
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (userCred.user) {
+        firebaseIdToken = await userCred.user.getIdToken();
+      }
+    } catch (fbErr: any) {
+      // If Firebase Auth Email/Password provider is disabled in Firebase console (auth/operation-not-allowed)
+      // or user was initialized before Firebase Auth user record, the backend will verify using PBKDF2 hash
+      console.warn('[Firebase Auth email/password note]:', fbErr?.code || fbErr?.message);
+    }
+
     const res = await fetch('/api/admin-auth?action=email-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, idToken: firebaseIdToken }),
     });
 
     const data = await res.json();
@@ -193,6 +239,7 @@ export async function loginWithEmailPassword(email: string, password: string): P
         success: false,
         error: data.error || 'Incorrect email address or password. Please try again.',
         code: data.code,
+        emailDelivered: data.emailDelivered,
       };
     }
 
