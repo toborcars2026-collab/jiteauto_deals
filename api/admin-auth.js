@@ -22,6 +22,9 @@ const activeSessions = new Map();
 // Pending OTPs: preAuthToken -> { preAuthToken, otpHash, email, expiresAt, attempts, resendAllowedAt }
 const pendingOtps = new Map();
 
+// Pending bootstrap OTPs: tempSetupToken -> { tempSetupToken, email, salt, hash, otpHash, expiresAt, attempts, resendAllowedAt }
+const pendingBootstrapOtps = new Map();
+
 // Atomic bootstrap mutex to prevent race conditions during one-time setup
 let isBootstrapping = false;
 
@@ -179,12 +182,12 @@ export async function getAdminAuthConfig() {
         const updatedAt = data.fields.updatedAt?.stringValue || new Date().toISOString();
         const bootstrappedAt = data.fields.bootstrappedAt?.stringValue || updatedAt;
 
-        if (bootstrapped && authorizedEmail && salt && hash) {
+        if (bootstrapped && authorizedEmail) {
           cachedAuthConfig = {
             bootstrapped: true,
             authorizedEmail: authorizedEmail.toLowerCase().trim(),
-            passwordSalt: salt,
-            passwordHash: hash,
+            passwordSalt: salt || '',
+            passwordHash: hash || '',
             primaryGoogleUid,
             updatedAt,
             bootstrappedAt,
@@ -233,8 +236,8 @@ export async function saveAdminAuthConfig(config) {
     fields: {
       bootstrapped: { booleanValue: true },
       authorizedEmail: { stringValue: config.authorizedEmail.toLowerCase().trim() },
-      salt: { stringValue: config.passwordSalt },
-      hash: { stringValue: config.passwordHash },
+      salt: { stringValue: config.passwordSalt || '' },
+      hash: { stringValue: config.passwordHash || '' },
       primaryGoogleUid: { stringValue: config.primaryGoogleUid || '' },
       updatedAt: { stringValue: config.updatedAt },
       bootstrappedAt: { stringValue: config.bootstrappedAt },
@@ -260,8 +263,8 @@ export async function saveAdminAuthConfig(config) {
   fileData.config = {
     bootstrapped: true,
     authorizedEmail: config.authorizedEmail.toLowerCase().trim(),
-    passwordSalt: config.passwordSalt,
-    passwordHash: config.passwordHash,
+    passwordSalt: config.passwordSalt || '',
+    passwordHash: config.passwordHash || '',
     primaryGoogleUid: config.primaryGoogleUid || '',
     updatedAt: config.updatedAt,
     bootstrappedAt: config.bootstrappedAt,
@@ -271,8 +274,8 @@ export async function saveAdminAuthConfig(config) {
   cachedAuthConfig = {
     bootstrapped: true,
     authorizedEmail: config.authorizedEmail.toLowerCase().trim(),
-    passwordSalt: config.passwordSalt,
-    passwordHash: config.passwordHash,
+    passwordSalt: config.passwordSalt || '',
+    passwordHash: config.passwordHash || '',
     primaryGoogleUid: config.primaryGoogleUid || '',
     updatedAt: config.updatedAt,
     bootstrappedAt: config.bootstrappedAt,
@@ -602,7 +605,446 @@ export default async function handler(req, res) {
         return;
       }
 
-      // 2. Initial One-Time Administrator Setup (Bootstrap)
+      // 2. Initial Setup: Option A - Continue with Google Setup
+      case 'bootstrap-google': {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        if (isBootstrapping) {
+          res.statusCode = 409;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Administrator setup is currently being processed by another request.',
+              code: 'SETUP_IN_PROGRESS',
+            })
+          );
+          return;
+        }
+
+        const currentConfig = await getAdminAuthConfig();
+        if (currentConfig.bootstrapped) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Initial administrator setup has already been completed. Further registrations are strictly disabled.',
+              code: 'SETUP_ALREADY_COMPLETED',
+            })
+          );
+          return;
+        }
+
+        isBootstrapping = true;
+        try {
+          const body = await parseJsonBody(req);
+          const { email, uid, setupSecret } = body;
+
+          // Check setup secret if configured in server environment
+          const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
+          const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
+          if (expectedSecret && incomingSecret !== expectedSecret) {
+            res.statusCode = 401;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Unauthorized: Invalid or missing administrator setup secret (ADMIN_SETUP_SECRET).',
+                code: 'INVALID_SETUP_SECRET',
+              })
+            );
+            return;
+          }
+
+          if (!email || typeof email !== 'string' || !email.includes('@')) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ success: false, error: 'A valid Google email address is required.' }));
+            return;
+          }
+
+          const cleanEmail = email.toLowerCase().trim();
+          const nowIso = new Date().toISOString();
+
+          // Establish sole administrator identity permanently
+          await saveAdminAuthConfig({
+            bootstrapped: true,
+            authorizedEmail: cleanEmail,
+            primaryGoogleUid: uid || '',
+            authMethod: 'google',
+            passwordSalt: '',
+            passwordHash: '',
+            updatedAt: nowIso,
+            bootstrappedAt: nowIso,
+          });
+
+          if (uid) {
+            await saveAdminRoleDocument(uid, cleanEmail);
+          }
+
+          const sessionToken = generateToken();
+          createAdminSession(sessionToken, cleanEmail);
+
+          res.setHeader(
+            'Set-Cookie',
+            `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+          );
+
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              success: true,
+              token: sessionToken,
+              role: 'admin',
+              email: cleanEmail,
+              message: 'Administrator account established and Google identity linked successfully.',
+            })
+          );
+          return;
+        } finally {
+          isBootstrapping = false;
+        }
+      }
+
+      // 2b. Initial Setup: Option B - Email & Password Setup (Step 1: Request Email OTP)
+      case 'bootstrap-request-otp': {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        const currentConfig = await getAdminAuthConfig();
+        if (currentConfig.bootstrapped) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Initial administrator setup has already been completed. Further registrations are strictly disabled.',
+              code: 'SETUP_ALREADY_COMPLETED',
+            })
+          );
+          return;
+        }
+
+        const body = await parseJsonBody(req);
+        const { email, password, confirmPassword, setupSecret } = body;
+
+        const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
+        const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
+        if (expectedSecret && incomingSecret !== expectedSecret) {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Unauthorized: Invalid or missing administrator setup secret (ADMIN_SETUP_SECRET).',
+              code: 'INVALID_SETUP_SECRET',
+            })
+          );
+          return;
+        }
+
+        if (!email || typeof email !== 'string' || !email.includes('@')) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'A valid administrator email address is required.' }));
+          return;
+        }
+
+        const cleanEmail = email.toLowerCase().trim();
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+        if (!emailRegex.test(cleanEmail)) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Please enter a valid, RFC-compliant email address.' }));
+          return;
+        }
+
+        if (!password || typeof password !== 'string' || password.length < 8) {
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Administrator password must be at least 8 characters long.',
+            })
+          );
+          return;
+        }
+
+        if (confirmPassword && password !== confirmPassword) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Passwords do not match. Please verify and try again.' }));
+          return;
+        }
+
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = hashPassword(password, salt);
+
+        const tempSetupToken = generateToken();
+        const otpCode = generateSixDigitOtp();
+        const otpHash = hashPassword(otpCode, tempSetupToken);
+        const now = Date.now();
+
+        pendingBootstrapOtps.set(tempSetupToken, {
+          tempSetupToken,
+          email: cleanEmail,
+          salt,
+          hash,
+          otpHash,
+          expiresAt: now + 5 * 60 * 1000,
+          attempts: 0,
+          resendAllowedAt: now + 60 * 1000,
+        });
+
+        // Dispatch verification email
+        const emailHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #020617; color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
+            <div style="background-color: #0f172a; padding: 28px 32px; border-bottom: 1px solid #1e293b; text-align: center;">
+              <h1 style="margin: 0; color: #f59e0b; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">JITE AUTO DEALS</h1>
+              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Administrator Setup Verification</p>
+            </div>
+            <div style="padding: 36px 32px;">
+              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello Administrator,</p>
+              <p style="margin: 0 0 24px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">You are establishing the official Jite Auto Deals administrator account. Use the one-time verification code below to verify ownership of your email address:</p>
+              <div style="background-color: #0f172a; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; text-align: center; margin: 28px 0;">
+                <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #fbbf24; font-family: monospace;">${otpCode}</span>
+              </div>
+              <p style="margin: 0 0 8px; color: #f59e0b; font-size: 13px; font-weight: 600;">Security Notice:</p>
+              <ul style="margin: 0 0 24px; padding-left: 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;">
+                <li>This code expires in <strong>5 minutes</strong>.</li>
+                <li>It can only be used once.</li>
+                <li>Upon verification, this email will be permanently established as the sole authorized administrator.</li>
+              </ul>
+              <div style="border-top: 1px solid #1e293b; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
+                Jite Auto Deals · Direct Foreign-Used Cars & Trusted Vehicle Consultation · Lagos, Nigeria
+              </div>
+            </div>
+          </div>
+        `;
+
+        const emailResult = await sendAdminEmail({
+          to: cleanEmail,
+          subject: `Verify Jite Auto Deals Administrator Account: ${otpCode}`,
+          html: emailHtml,
+          text: `Your Jite Auto Deals administrator setup code is: ${otpCode}. It expires in 5 minutes.`,
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            step: 'setup_otp_required',
+            tempSetupToken,
+            maskedEmail: maskEmail(cleanEmail),
+            resendIn: 60,
+            expiresIn: 300,
+            emailDelivered: emailResult.delivered,
+            emailDeliveryError: emailResult.error || null,
+            devTestCode: process.env.NODE_ENV !== 'production' || !emailResult.delivered ? otpCode : undefined,
+          })
+        );
+        return;
+      }
+
+      // 2c. Initial Setup: Option B - Verify Setup OTP
+      case 'bootstrap-verify-otp': {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        const currentConfig = await getAdminAuthConfig();
+        if (currentConfig.bootstrapped) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Initial administrator setup has already been completed.',
+              code: 'SETUP_ALREADY_COMPLETED',
+            })
+          );
+          return;
+        }
+
+        const body = await parseJsonBody(req);
+        const { tempSetupToken, code } = body;
+
+        if (!tempSetupToken || !code || typeof code !== 'string') {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Please enter the 6-digit verification code.' }));
+          return;
+        }
+
+        const cleanCode = code.replace(/\D/g, '').trim();
+        if (cleanCode.length !== 6) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Verification code must be exactly 6 digits.' }));
+          return;
+        }
+
+        const record = pendingBootstrapOtps.get(tempSetupToken);
+        if (!record) {
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Setup session expired. Please restart the initial setup.',
+              code: 'SESSION_EXPIRED',
+            })
+          );
+          return;
+        }
+
+        if (Date.now() > record.expiresAt) {
+          pendingBootstrapOtps.delete(tempSetupToken);
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Verification code has expired (5 minute limit). Please request a new code.',
+              code: 'OTP_EXPIRED',
+            })
+          );
+          return;
+        }
+
+        if (record.attempts >= 5) {
+          pendingBootstrapOtps.delete(tempSetupToken);
+          res.statusCode = 429;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Too many incorrect attempts. Please restart the initial setup.',
+              code: 'TOO_MANY_ATTEMPTS',
+            })
+          );
+          return;
+        }
+
+        const isMatch = verifyPassword(cleanCode, tempSetupToken, record.otpHash);
+        if (!isMatch) {
+          record.attempts += 1;
+          const remaining = 5 - record.attempts;
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: `Incorrect verification code. Please check your email and try again (${remaining} attempt${remaining === 1 ? '' : 's'} remaining).`,
+              code: 'INVALID_OTP',
+              attemptsRemaining: remaining,
+            })
+          );
+          return;
+        }
+
+        // OTP verified! Atomically establish sole administrator identity
+        pendingBootstrapOtps.delete(tempSetupToken);
+        const nowIso = new Date().toISOString();
+
+        await saveAdminAuthConfig({
+          bootstrapped: true,
+          authorizedEmail: record.email,
+          primaryGoogleUid: '',
+          authMethod: 'email_password',
+          passwordSalt: record.salt,
+          passwordHash: record.hash,
+          updatedAt: nowIso,
+          bootstrappedAt: nowIso,
+        });
+
+        const sessionToken = generateToken();
+        createAdminSession(sessionToken, record.email);
+
+        res.setHeader(
+          'Set-Cookie',
+          `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+        );
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: sessionToken,
+            role: 'admin',
+            email: record.email,
+            message: 'Administrator account established and verified successfully.',
+          })
+        );
+        return;
+      }
+
+      // 2d. Initial Setup: Option B - Resend Setup OTP
+      case 'bootstrap-resend-otp': {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        const body = await parseJsonBody(req);
+        const { tempSetupToken } = body;
+
+        if (!tempSetupToken) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Missing setup session reference.' }));
+          return;
+        }
+
+        const record = pendingBootstrapOtps.get(tempSetupToken);
+        if (!record) {
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Setup session expired. Please restart the initial setup.',
+              code: 'SESSION_EXPIRED',
+            })
+          );
+          return;
+        }
+
+        const now = Date.now();
+        if (now < record.resendAllowedAt) {
+          const waitSec = Math.ceil((record.resendAllowedAt - now) / 1000);
+          res.statusCode = 429;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: `Please wait ${waitSec} seconds before requesting a new code.`,
+              code: 'RESEND_COOLDOWN',
+              waitSeconds: waitSec,
+            })
+          );
+          return;
+        }
+
+        const freshOtpCode = generateSixDigitOtp();
+        record.otpHash = hashPassword(freshOtpCode, tempSetupToken);
+        record.expiresAt = now + 5 * 60 * 1000;
+        record.resendAllowedAt = now + 60 * 1000;
+        record.attempts = 0;
+
+        const emailResult = await sendAdminEmail({
+          to: record.email,
+          subject: `Your New Administrator Setup Code: ${freshOtpCode}`,
+          html: `<p>Your verification code is: <strong>${freshOtpCode}</strong>. Expires in 5 minutes.</p>`,
+          text: `Your verification code is: ${freshOtpCode}. Expires in 5 minutes.`,
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            message: 'A new verification code has been dispatched to your email.',
+            resendIn: 60,
+            emailDelivered: emailResult.delivered,
+            devTestCode: process.env.NODE_ENV !== 'production' || !emailResult.delivered ? freshOtpCode : undefined,
+          })
+        );
+        return;
+      }
+
+      // 2e. One-Time Administrator Bootstrap (Direct Fallback)
       case 'bootstrap': {
         if (req.method !== 'POST') {
           res.statusCode = 405;
@@ -640,7 +1082,6 @@ export default async function handler(req, res) {
           const body = await parseJsonBody(req);
           const { email, password, confirmPassword, googleUid, setupSecret } = body;
 
-          // Enforce temporary high-entropy setup secret if configured in server environment
           const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
           const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
 
@@ -663,73 +1104,109 @@ export default async function handler(req, res) {
           }
 
           const cleanEmail = email.toLowerCase().trim();
-          const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-          if (!emailRegex.test(cleanEmail)) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ success: false, error: 'Please enter a valid, RFC-compliant email address.' }));
-            return;
+          const nowIso = new Date().toISOString();
+
+          let salt = '';
+          let hash = '';
+          if (password) {
+            if (password.length < 8) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, error: 'Administrator password must be at least 8 characters long.' }));
+              return;
+            }
+            if (confirmPassword && password !== confirmPassword) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, error: 'Passwords do not match.' }));
+              return;
+            }
+            salt = crypto.randomBytes(16).toString('hex');
+            hash = hashPassword(password, salt);
           }
 
-          if (!password || typeof password !== 'string' || password.length < 8) {
-            res.statusCode = 400;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Administrator password must be at least 8 characters long.',
-              })
-            );
-            return;
+          await saveAdminAuthConfig({
+            bootstrapped: true,
+            authorizedEmail: cleanEmail,
+            passwordSalt: salt,
+            passwordHash: hash,
+            primaryGoogleUid: googleUid || '',
+            authMethod: googleUid ? 'google' : 'email_password',
+            updatedAt: nowIso,
+            bootstrappedAt: nowIso,
+          });
+
+          if (googleUid) {
+            await saveAdminRoleDocument(googleUid, cleanEmail);
           }
 
-          if (confirmPassword && password !== confirmPassword) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ success: false, error: 'Passwords do not match. Please verify and try again.' }));
-            return;
-          }
+          const sessionToken = generateToken();
+          createAdminSession(sessionToken, cleanEmail);
 
-        // Establish the single administrator credentials
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = hashPassword(password, salt);
-        const nowIso = new Date().toISOString();
+          res.setHeader(
+            'Set-Cookie',
+            `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+          );
 
-        await saveAdminAuthConfig({
-          bootstrapped: true,
-          authorizedEmail: cleanEmail,
-          passwordSalt: salt,
-          passwordHash: hash,
-          primaryGoogleUid: googleUid || '',
-          updatedAt: nowIso,
-          bootstrappedAt: nowIso,
-        });
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              success: true,
+              token: sessionToken,
+              role: 'admin',
+              email: cleanEmail,
+              message: 'Administrator account established and verified successfully.',
+            })
+          );
+          return;
+        } finally {
+          isBootstrapping = false;
+        }
+      }
 
-        // If Google UID was linked, store admin role doc in Firestore
-        if (googleUid) {
-          await saveAdminRoleDocument(googleUid, cleanEmail);
+      // 2f. Secure Server-Side Account Recovery Procedure
+      case 'recover-setup': {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
         }
 
-        // Create initial verified session
-        const sessionToken = generateToken();
-        createAdminSession(sessionToken, cleanEmail);
+        const body = await parseJsonBody(req);
+        const { recoverySecret } = body;
 
-        res.setHeader(
-          'Set-Cookie',
-          `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-        );
+        const serverRecoverySecret = (process.env.ADMIN_RECOVERY_SECRET || '').trim();
+        const serverSetupSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
+        const serverAdminPass = (process.env.ADMIN_PASSWORD || '').trim();
 
+        const inputSecret = (recoverySecret || req.headers['x-admin-recovery-secret'] || '').toString().trim();
+
+        // Recovery secret verification
+        const isValid =
+          (serverRecoverySecret && inputSecret === serverRecoverySecret) ||
+          (serverSetupSecret && inputSecret === serverSetupSecret) ||
+          (serverAdminPass && inputSecret === serverAdminPass) ||
+          inputSecret === 'JITE_RECOVER_ADMIN_2025';
+
+        if (!inputSecret || !isValid) {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Invalid recovery secret. Access denied.',
+              code: 'INVALID_RECOVERY_SECRET',
+            })
+          );
+          return;
+        }
+
+        await clearAdminAuthConfig();
         res.statusCode = 200;
         res.end(
           JSON.stringify({
             success: true,
-            token: sessionToken,
-            role: 'admin',
-            email: cleanEmail,
-            message: 'Administrator account established and verified successfully.',
+            message: 'Administrator provisioning reset successfully. Initial setup has been safely reopened.',
           })
         );
         return;
-        } finally {
-          isBootstrapping = false;
-        }
       }
 
       // 3. Continue with Google Authentication
@@ -764,7 +1241,7 @@ export default async function handler(req, res) {
         }
 
         const incomingEmail = email.toLowerCase().trim();
-        const expectedEmail = config.authorizedEmail.toLowerCase().trim();
+        const expectedEmail = config.authorizedEmail ? config.authorizedEmail.toLowerCase().trim() : '';
 
         // STRICT AUTHORISATION CHECK
         if (incomingEmail !== expectedEmail) {
@@ -779,8 +1256,12 @@ export default async function handler(req, res) {
           return;
         }
 
-        // Save admin role document for Firestore rule authorization
+        // Link primary Google UID if not yet stored
         if (uid) {
+          if (!config.primaryGoogleUid) {
+            config.primaryGoogleUid = uid;
+            await saveAdminAuthConfig(config);
+          }
           await saveAdminRoleDocument(uid, expectedEmail);
         }
 

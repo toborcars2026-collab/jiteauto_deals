@@ -121,6 +121,265 @@ export async function bootstrapAdmin(payload: {
 }
 
 /**
+ * Initial Setup Option A: Authenticate Google Account for Initial Setup
+ * Retrieves authenticated Google credentials before the owner confirms permanent administrator association.
+ */
+export async function triggerGoogleAuthForSetup(): Promise<{
+  success: boolean;
+  email?: string;
+  uid?: string;
+  idToken?: string;
+  error?: string;
+  code?: string;
+  unauthorizedDomain?: string;
+}> {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(auth, provider);
+    const user = cred.user;
+
+    if (!user || !user.email) {
+      return {
+        success: false,
+        error: 'Unable to retrieve authenticated Google account email.',
+      };
+    }
+
+    const idToken = await user.getIdToken();
+    return {
+      success: true,
+      email: user.email,
+      uid: user.uid,
+      idToken,
+    };
+  } catch (err: any) {
+    const isUnauthorizedDomain =
+      err?.code === 'auth/unauthorized-domain' ||
+      (typeof err?.message === 'string' && err.message.includes('auth/unauthorized-domain'));
+
+    if (isUnauthorizedDomain) {
+      const currentHost =
+        typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'jiteautodeals.vercel.app';
+      return {
+        success: false,
+        code: 'auth/unauthorized-domain',
+        unauthorizedDomain: currentHost,
+        error: `Firebase: Error (auth/unauthorized-domain). The domain "${currentHost}" is not yet added in Firebase Authentication Authorized Domains.`,
+      };
+    }
+
+    return {
+      success: false,
+      code: err?.code,
+      error: err?.message || 'Google authentication was cancelled or interrupted.',
+    };
+  }
+}
+
+/**
+ * Initial Setup Option A: Confirm and Establish Administrator Account with Google
+ */
+export async function bootstrapWithGoogleAdmin(payload: {
+  email: string;
+  uid: string;
+  idToken?: string;
+  setupSecret?: string;
+}): Promise<{ success: boolean; error?: string; token?: string; email?: string; code?: string }> {
+  try {
+    const res = await fetch('/api/admin-auth?action=bootstrap-google', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(payload.setupSecret ? { 'x-admin-setup-secret': payload.setupSecret } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to complete Google administrator setup.',
+        code: data.code,
+      };
+    }
+
+    return {
+      success: true,
+      token: data.token,
+      email: data.email,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error during Google administrator setup.',
+    };
+  }
+}
+
+/**
+ * Initial Setup Option B: Request Verification OTP for Email & Password Setup
+ */
+export async function requestBootstrapOtp(payload: {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  setupSecret?: string;
+}): Promise<{
+  success: boolean;
+  step?: string;
+  tempSetupToken?: string;
+  maskedEmail?: string;
+  resendIn?: number;
+  expiresIn?: number;
+  emailDelivered?: boolean;
+  emailDeliveryError?: string | null;
+  devTestCode?: string;
+  error?: string;
+  code?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin-auth?action=bootstrap-request-otp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(payload.setupSecret ? { 'x-admin-setup-secret': payload.setupSecret } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to initiate email verification.',
+        code: data.code,
+      };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error requesting setup OTP.',
+    };
+  }
+}
+
+/**
+ * Initial Setup Option B: Verify OTP Code and Activate Administrator Account
+ */
+export async function verifyBootstrapOtp(payload: {
+  tempSetupToken: string;
+  code: string;
+}): Promise<{ success: boolean; error?: string; token?: string; email?: string; code?: string; attemptsRemaining?: number }> {
+  try {
+    const res = await fetch('/api/admin-auth?action=bootstrap-verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Verification failed. Please check the code and try again.',
+        code: data.code,
+        attemptsRemaining: data.attemptsRemaining,
+      };
+    }
+
+    return {
+      success: true,
+      token: data.token,
+      email: data.email,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error verifying setup code.',
+    };
+  }
+}
+
+/**
+ * Initial Setup Option B: Resend Setup OTP Code
+ */
+export async function resendBootstrapOtp(tempSetupToken: string): Promise<{
+  success: boolean;
+  message?: string;
+  resendIn?: number;
+  emailDelivered?: boolean;
+  devTestCode?: string;
+  error?: string;
+  code?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin-auth?action=bootstrap-resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempSetupToken }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to resend setup verification code.',
+        code: data.code,
+      };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error resending setup code.',
+    };
+  }
+}
+
+/**
+ * Secure Server-Side Account Recovery Procedure
+ * Resets administrator provisioning when authorized with ADMIN_RECOVERY_SECRET.
+ */
+export async function recoverAdminSetup(recoverySecret: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  code?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin-auth?action=recover-setup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-recovery-secret': recoverySecret,
+      },
+      body: JSON.stringify({ recoverySecret }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Recovery failed. Please check your recovery secret.',
+        code: data.code,
+      };
+    }
+
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error during recovery.',
+    };
+  }
+}
+
+/**
  * Continue with Google Authentication
  * 1. Opens Google secure authentication popup
  * 2. Authenticates account with Firebase Auth

@@ -1,25 +1,4 @@
 {
-  "config": {
-    "bootstrapped": true,
-    "authorizedEmail": "blwuniabuja@gmail.com",
-    "passwordSalt": "42474706765fe582b990bb198fe64b76",
-    "passwordHash": "dd0745ad341bf09f31efed3a6471d5c864a18f51f1dae24b547deab6b8f4eaa7b321366608c6141943297c5417668331aefd43776653ea2bf0f01b5f4fc12a19",
-    "primaryGoogleUid": "",
-    "updatedAt": "2026-11-03T23:44:57.335Z",
-    "bootstrappedAt": "2026-11-03T23:44:57.335Z"
-  },
-  "sessions": [
-    {
-      "token": "1f2dc0244fbd0991941a3ea148f602cac946cc70bd1d256452508c0cb0d0edc0",
-      "email": "blwuniabuja@gmail.com",
-      "createdAt": 1793749498010,
-      "expiresAt": 1794354298010
-    },
-    {
-      "token": "edcefce8872931cd80c8e87204985022a85a146ebcb74c40f17517a0b0e8192c",
-      "email": "blwuniabuja@gmail.com",
-      "createdAt": 1793749516472,
-      "expiresAt": 1794354316472
-    }
-  ]
+  "config": null,
+  "sessions": []
 }
