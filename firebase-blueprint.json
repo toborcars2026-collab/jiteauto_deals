@@ -100,6 +100,18 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["businessName", "phoneDisplay", "whatsAppNumber"]
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator registry and access control record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
     }
   },
   "firestore": {
@@ -118,6 +130,10 @@
     "/settings/business": {
       "schema": { "$ref": "#/entities/BusinessSettings" },
       "description": "Centralized business contact information and public settings"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Verified administrator role registry"
     }
   }
 }

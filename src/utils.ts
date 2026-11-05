@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
-import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
 
@@ -1186,65 +1186,144 @@ export async function compressImageFile(file: File, maxWidth = 2560, maxHeight =
 }
 
 /**
- * Uploads a local File or Blob directly to Firebase Storage and returns its permanent CDN download URL.
+ * Uploads a local File or Blob directly to Firebase Storage (or server fallback CDN)
+ * and returns its permanent download URL.
  */
-export async function uploadVehicleImageFile(file: File | Blob, vehicleId: string, index: number): Promise<string> {
-  try {
-    const optimized = file instanceof File ? await compressImageFile(file) : file;
-    const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `vehicles/${cleanId}/img_${index + 1}_${Date.now()}.jpg`;
-    const storageRef = ref(storage, filename);
+export async function uploadVehicleImageFile(
+  file: File | Blob,
+  vehicleId: string,
+  index: number,
+  onProgress?: (progressPercent: number) => void
+): Promise<string> {
+  const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
-    const snapshot = await uploadBytes(storageRef, optimized, {
+  // 1. Optimize image locally on client (JPEG max 1600px, quality 0.85)
+  const optimized = file instanceof File ? await compressImageFile(file) : file;
+
+  // 2. Attempt direct upload to Firebase Storage with progress tracking
+  try {
+    const storageRef = ref(storage, filename);
+    const uploadTask = uploadBytesResumable(storageRef, optimized, {
       contentType: 'image/jpeg',
       cacheControl: 'public, max-age=31536000',
     });
 
+    if (onProgress) {
+      uploadTask.on('state_changed', (snapshot) => {
+        const percent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        onProgress(Math.min(99, percent));
+      });
+    }
+
+    const snapshot = await uploadTask;
     const downloadUrl = await getDownloadURL(snapshot.ref);
+    if (onProgress) onProgress(100);
     return downloadUrl;
-  } catch (error) {
-    console.error('[Firebase Storage] Image upload error:', error);
-    throw new Error(`Failed to upload image ${index + 1} to Firebase Storage: ${error instanceof Error ? error.message : String(error)}`);
+  } catch (storageErr) {
+    console.warn('[Firebase Storage Notice] Using high-speed server CDN fallback:', storageErr);
+
+    // 3. Fallback to resilient server upload endpoint
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(optimized);
+    });
+
+    const response = await fetch('/api/upload-vehicle-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vehicleId: cleanId,
+        base64Data,
+        filename: `img_${index + 1}.jpg`,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to upload photo ${index + 1}: ${errText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!data.url) {
+      throw new Error(`Upload endpoint did not return an image URL for photo ${index + 1}`);
+    }
+
+    if (onProgress) onProgress(100);
+    return data.url;
   }
 }
 
 /**
- * Uploads a base64 Data URL string to Firebase Storage and returns its permanent CDN download URL.
+ * Uploads a base64 Data URL string to Firebase Storage or server CDN and returns its permanent download URL.
  */
-export async function uploadVehicleImageDataUrl(dataUrl: string, vehicleId: string, index: number): Promise<string> {
-  try {
-    const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `vehicles/${cleanId}/img_${index + 1}_${Date.now()}.jpg`;
-    const storageRef = ref(storage, filename);
+export async function uploadVehicleImageDataUrl(
+  dataUrl: string,
+  vehicleId: string,
+  index: number,
+  onProgress?: (progressPercent: number) => void
+): Promise<string> {
+  const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
+  try {
+    const storageRef = ref(storage, filename);
     const snapshot = await uploadString(storageRef, dataUrl, 'data_url', {
       contentType: 'image/jpeg',
       cacheControl: 'public, max-age=31536000',
     });
 
     const downloadUrl = await getDownloadURL(snapshot.ref);
+    if (onProgress) onProgress(100);
     return downloadUrl;
-  } catch (error) {
-    console.error('[Firebase Storage] DataURL upload error:', error);
-    throw new Error(`Failed to upload image ${index + 1} to Firebase Storage: ${error instanceof Error ? error.message : String(error)}`);
+  } catch (storageErr) {
+    console.warn('[Firebase Storage Notice] Using high-speed server CDN fallback for dataUrl:', storageErr);
+
+    const response = await fetch('/api/upload-vehicle-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vehicleId: cleanId,
+        base64Data: dataUrl,
+        filename: `img_${index + 1}.jpg`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to upload photo ${index + 1}`);
+    }
+
+    const data = await response.json();
+    if (onProgress) onProgress(100);
+    return data.url;
   }
 }
 
 /**
- * Universal vehicle image processor: converts local files or data URLs to permanent Firebase Storage URLs,
- * or normalizes remote CDN links.
+ * Universal vehicle image processor: converts local files or data URLs to permanent CDN URLs,
+ * or normalizes remote image links.
  */
-export async function uploadVehicleImage(source: File | Blob | string, vehicleId: string, index: number): Promise<string> {
+export async function uploadVehicleImage(
+  source: File | Blob | string,
+  vehicleId: string,
+  index: number,
+  onProgress?: (progressPercent: number) => void
+): Promise<string> {
   if (!source) return '';
 
   if (source instanceof File || source instanceof Blob) {
-    return uploadVehicleImageFile(source, vehicleId, index);
+    return uploadVehicleImageFile(source, vehicleId, index, onProgress);
   }
 
   if (typeof source === 'string') {
     if (source.startsWith('data:image/')) {
-      return uploadVehicleImageDataUrl(source, vehicleId, index);
+      return uploadVehicleImageDataUrl(source, vehicleId, index, onProgress);
     }
+    if (onProgress) onProgress(100);
     return normalizeImageInput(source);
   }
 

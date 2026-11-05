@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Direct Vehicle Photographs Storage Path
+    match /vehicle-images/{vehicleId}/{allPaths=**} {
+      // Public visitors can view vehicle photographs
+      allow read: if true;
+      // Only authenticated administrator can upload, replace, or delete photographs
+      allow write: if request.auth != null && (
+        (request.auth.token.email == 'blwuniabuja@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.admin == true
+      ) && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Legacy vehicle photographs path
+    match /vehicles/{vehicleId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        (request.auth.token.email == 'blwuniabuja@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.admin == true
+      ) && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

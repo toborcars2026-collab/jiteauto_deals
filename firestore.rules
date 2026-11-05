@@ -2,34 +2,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Central Business & Security Settings
-    match /settings/{docId} {
-      allow read, write, create, update, delete: if true;
-    }
-    
-    // Vehicles Catalog (Public read, admin write/delete)
-    match /vehicles/{vehicleId} {
-      allow read, write, create, update, delete: if true;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Customer Leads (Find My Car & Source a Car)
-    match /leads/{leadId} {
-      allow read, write, create, update, delete: if true;
+    // Permanently authorized administrator verification:
+    // 1. Runtime verified email blwuniabuja@gmail.com
+    // 2. Or entry in admins collection
+    // 3. Or server-issued admin custom claim
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'blwuniabuja@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.admin == true
+      );
     }
 
-    // Direct Vehicle Inquiries
-    match /inquiries/{inquiryId} {
-      allow read, write, create, update, delete: if true;
-    }
-
-    // System connectivity and diagnostics collection
-    match /test/{docId} {
-      allow read, write, create, update, delete: if true;
-    }
-
-    // Fallback collection match
+    // Default deny catch-all for Zero-Trust Firestore Security
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Vehicles Catalog:
+    // - Public read for website visitors, Android app, and customer inventory browsing.
+    // - Writes, updates, and deletes strictly restricted to the authorized administrator.
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+
+    // Central Business & Security Settings:
+    // - Public read for business contact info, phone display, WhatsApp numbers, etc.
+    // - Writes strictly restricted to the authorized administrator.
+    match /settings/{docId} {
+      allow read: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+
+    // Customer Leads (Find My Car & Source A Car requests):
+    // - Public create so prospective clients can submit vehicle requests.
+    // - Reads, updates, and deletes restricted to authorized administrator.
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Direct Vehicle Inquiries:
+    // - Public create so prospective buyers can submit vehicle inspection & inquiry requests.
+    // - Reads, updates, and deletes restricted to authorized administrator.
+    match /inquiries/{inquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Administrator Registry:
+    // - Authenticated administrator can read their own record or all admin records.
+    // - Writes strictly restricted to the authorized administrator.
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Diagnostics & connectivity collection
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

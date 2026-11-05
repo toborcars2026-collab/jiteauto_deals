@@ -24,6 +24,18 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Directory & file paths for server persistence across devices
 const DATA_DIR = path.join(process.cwd(), "data_store");
+const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR, {
+  maxAge: "30d",
+  immutable: true,
+  setHeaders: (res) => {
+    res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+  }
+}));
+
 const VEHICLES_FILE = path.join(DATA_DIR, "vehicles.json");
 const DELETED_FILE = path.join(DATA_DIR, "deleted_ids.json");
 const LEADS_FILE = path.join(DATA_DIR, "leads.json");
@@ -420,6 +432,52 @@ app.get("/api/download-android-project", (req, res) => {
     return res.sendFile(zipPath);
   }
   return res.status(404).json({ error: "Android package not found" });
+});
+
+// Direct vehicle image upload endpoint (resilient CDN storage)
+app.post("/api/upload-vehicle-image", (req, res) => {
+  try {
+    const { vehicleId, base64Data, filename } = req.body || {};
+    if (!base64Data || typeof base64Data !== "string") {
+      return res.status(400).json({ error: "Missing base64Data image payload" });
+    }
+
+    const cleanVehicleId = (vehicleId || "car").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const vehicleUploadsDir = path.join(UPLOADS_DIR, "vehicles", cleanVehicleId);
+    if (!fs.existsSync(vehicleUploadsDir)) {
+      fs.mkdirSync(vehicleUploadsDir, { recursive: true });
+    }
+
+    // Parse base64 header if present (e.g. data:image/jpeg;base64,...)
+    const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+    const mimeType = matches ? matches[1] : "image/jpeg";
+    const rawData = matches ? matches[2] : base64Data;
+    const buffer = Buffer.from(rawData, "base64");
+
+    // Size limit check: max 15MB
+    if (buffer.length > 15 * 1024 * 1024) {
+      return res.status(400).json({ error: "Image file exceeds maximum 15MB limit" });
+    }
+
+    let ext = "jpg";
+    if (mimeType.includes("png")) ext = "png";
+    else if (mimeType.includes("webp")) ext = "webp";
+
+    const uniqueName = `img_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    const targetFilePath = path.join(vehicleUploadsDir, uniqueName);
+    fs.writeFileSync(targetFilePath, buffer);
+
+    const relativeUrl = `/uploads/vehicles/${cleanVehicleId}/${uniqueName}`;
+    return res.json({
+      success: true,
+      url: relativeUrl,
+      size: buffer.length,
+      mimeType,
+    });
+  } catch (err: any) {
+    console.error("Upload error:", err);
+    return res.status(500).json({ error: "Failed to save uploaded image: " + err.message });
+  }
 });
 
 app.post("/api/vehicles", requireAdminSession, (req, res) => {
