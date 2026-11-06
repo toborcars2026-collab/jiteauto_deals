@@ -49,6 +49,7 @@ export interface PhotoCardItem {
   errorMessage?: string;
   fileName?: string;
   fileSizeText?: string;
+  statusNote?: string;
 }
 
 export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: AdminAddCarTabProps) {
@@ -165,19 +166,27 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     const newItems: PhotoCardItem[] = [];
 
     Array.from(files).forEach((file: File) => {
-      // Validate file type
-      if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/i)) {
-        setErrorMsg('Some selected files were skipped. Only JPG, JPEG, PNG, and WebP are supported.');
+      // Validate file type (flexible check for Android camera outputs & custom gallery MIME types)
+      const isImageMime = file.type ? file.type.startsWith('image/') : false;
+      const isImageExt = /\.(jpe?g|png|webp|jfif|pjpeg|bmp|heic|heif)$/i.test(file.name);
+      if (!isImageMime && !isImageExt) {
+        setErrorMsg('Some selected files were skipped. Please select standard photograph formats (JPG, PNG, WebP).');
         return;
       }
 
-      // Max size: 15MB
-      if (file.size > 15 * 1024 * 1024) {
-        setErrorMsg(`File "${file.name}" exceeds the 15MB limit and was skipped.`);
+      // Max size: 25MB
+      if (file.size > 25 * 1024 * 1024) {
+        setErrorMsg(`File "${file.name}" exceeds the 25MB limit and was skipped.`);
         return;
       }
 
-      const objectUrl = URL.createObjectURL(file);
+      let objectUrl = '';
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch {
+        objectUrl = '';
+      }
+
       newItems.push({
         id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         file,
@@ -278,7 +287,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
         item.file,
         targetVehicleId,
         idx,
-        (percent, transferred, total) => {
+        (percent, transferred, total, statusNote) => {
           setPhotoCards((prev) =>
             prev.map((p) =>
               p.id === id
@@ -288,6 +297,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                     progress: percent,
                     bytesTransferred: transferred,
                     totalBytes: total,
+                    statusNote: statusNote || p.statusNote,
                   }
                 : p
             )
@@ -431,7 +441,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                 item.file!,
                 targetVehicleId,
                 originalIndex >= 0 ? originalIndex : queueIdx,
-                (percent, transferred, total) => {
+                (percent, transferred, total, statusNote) => {
                   setPhotoCards((prev) =>
                     prev.map((p) =>
                       p.id === item.id
@@ -441,6 +451,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                             progress: percent,
                             bytesTransferred: transferred,
                             totalBytes: total,
+                            statusNote: statusNote || p.statusNote,
                           }
                         : p
                     )
@@ -904,7 +915,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/jpeg,image/jpg,image/png,image/webp"
+                accept="image/*,image/jpeg,image/jpg,image/png,image/webp"
                 className="hidden"
                 onChange={handleFilesSelected}
               />
@@ -1117,12 +1128,17 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
 
                       {/* Card Details & Arrangement Controls */}
                       <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2 flex-1 justify-between">
-                        <div className="text-[11px] font-mono text-slate-600 truncate">
+                        <div className="text-[11px] font-mono text-slate-600 truncate space-y-0.5">
                           <span className="font-bold text-slate-800 truncate block">
                             {item.fileName || `Photo #${index + 1}`}
                           </span>
                           {item.fileSizeText && (
-                            <span className="text-slate-400 text-[10px]">{item.fileSizeText}</span>
+                            <span className="text-slate-400 text-[10px] block">{item.fileSizeText}</span>
+                          )}
+                          {item.statusNote && (
+                            <span className="text-[9px] text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-1.5 py-0.5 block truncate font-medium">
+                              {item.statusNote}
+                            </span>
                           )}
                         </div>
 

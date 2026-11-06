@@ -1141,14 +1141,159 @@ export interface OptimizedImageResult {
   optimizedSize: number;
   width: number;
   height: number;
+  isOptimized: boolean;
+  statusNote?: string;
 }
 
 /**
- * High-performance, non-blocking client-side image optimizer (Part 4):
- * - Resizes large photos to approx 1920px max dimension, preserving exact aspect ratio.
- * - Compresses using high-efficiency WebP (quality 82%), with fallback to JPEG.
- * - Uses asynchronous createImageBitmap off main thread to prevent Android UI freezing.
- * - Skips re-compressing already lightweight images (< 200KB).
+ * Robust binary Data URL reader (Parts 1, 2 & 3):
+ * Reads a File or Blob directly into a base64 Data URL using multi-tier resilient methods.
+ * Bypasses the fragile FileReader event machine on Android Chrome to completely eliminate
+ * "Failed to read image data" (NotReadableError) caused by Android ContentProvider descriptor lifecycles.
+ */
+export async function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  const mimeType = blob.type || 'image/jpeg';
+
+  // Helper to convert Uint8Array to base64 Data URL safely with chunking
+  const uint8ToDataUrl = (bytes: Uint8Array, type: string): string => {
+    let binary = '';
+    const len = bytes.length;
+    const chunkSize = 16384; // 16KB chunks to prevent maximum call stack size exceeded
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+      binary += String.fromCharCode.apply(null, chunk as any);
+    }
+    return `data:${type};base64,${btoa(binary)}`;
+  };
+
+  // Method 1: Native blob.arrayBuffer() with chunked btoa encoding
+  if (typeof blob.arrayBuffer === 'function') {
+    try {
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      if (bytes.length > 0) {
+        return uint8ToDataUrl(bytes, mimeType);
+      }
+    } catch (bufErr) {
+      console.warn('[ArrayBuffer Reader Notice] blob.arrayBuffer() failed, trying Response stream:', bufErr);
+    }
+  }
+
+  // Method 2: new Response(blob).arrayBuffer() (Stream reader bypass for Android Chrome)
+  if (typeof Response !== 'undefined') {
+    try {
+      const res = new Response(blob);
+      const buffer = await res.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      if (bytes.length > 0) {
+        return uint8ToDataUrl(bytes, mimeType);
+      }
+    } catch (resErr) {
+      console.warn('[Response Reader Notice] Response.arrayBuffer() failed:', resErr);
+    }
+  }
+
+  // Method 3: FileReader with readAsArrayBuffer fallback
+  if (typeof FileReader !== 'undefined') {
+    try {
+      const arrayBufferResult = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (reader.result instanceof ArrayBuffer && reader.result.byteLength > 0) {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Empty buffer'));
+          }
+        };
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+        reader.readAsArrayBuffer(blob);
+      });
+      const bytes = new Uint8Array(arrayBufferResult);
+      if (bytes.length > 0) {
+        return uint8ToDataUrl(bytes, mimeType);
+      }
+    } catch (frBufErr) {
+      console.warn('[FileReader ArrayBuffer Notice] readAsArrayBuffer failed:', frBufErr);
+    }
+  }
+
+  // Method 4: Standard FileReader readAsDataURL
+  if (typeof FileReader !== 'undefined') {
+    try {
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string' && reader.result.length > 0) {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Empty payload'));
+          }
+        };
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+        reader.readAsDataURL(blob);
+      });
+    } catch (frUrlErr) {
+      console.warn('[FileReader DataURL Notice] readAsDataURL failed, attempting canvas decode:', frUrlErr);
+    }
+  }
+
+  // Method 5: Offscreen Image + Canvas rasterization (decodes via browser GPU/image engine)
+  if (typeof document !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    try {
+      const canvasResult = await new Promise<string>((resolve, reject) => {
+        let objectUrl: string | null = null;
+        try {
+          objectUrl = URL.createObjectURL(blob);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width || 800;
+            canvas.height = img.naturalHeight || img.height || 600;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              const dataUrl = canvas.toDataURL(mimeType.includes('png') ? 'image/png' : 'image/jpeg', 0.9);
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              resolve(dataUrl);
+            } else {
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              reject(new Error('No 2D canvas context'));
+            }
+          } catch (cErr) {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            reject(cErr);
+          }
+        };
+        img.onerror = (imgErr) => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          reject(imgErr);
+        };
+        img.src = objectUrl;
+      });
+
+      if (canvasResult) return canvasResult;
+    } catch (canvasErr) {
+      console.warn('[Canvas Reader Notice] Canvas rasterization failed:', canvasErr);
+    }
+  }
+
+  throw new Error('Unable to read photograph data on this device. Please retry or select another photograph.');
+}
+
+/**
+ * Robust, non-blocking client-side image optimizer with Automatic Original Fallback (Parts 2, 3, 4, 5):
+ * 1. Validates that file exists and is readable.
+ * 2. Stage 1: Attempts fast off-thread createImageBitmap with EXIF auto-orientation.
+ * 3. Stage 2: Attempts HTMLImageElement with ObjectURL decoding if Stage 1 fails.
+ * 4. Stage 3 (AUTOMATIC ORIGINAL FALLBACK): If optimization or canvas decoding fails on Android,
+ *    it gracefully preserves and returns the original photograph without failing or rejecting.
+ *    Includes statusNote: "Image optimisation unavailable. Uploading original photograph."
  */
 export async function optimizeVehicleImage(
   file: File | Blob,
@@ -1156,22 +1301,27 @@ export async function optimizeVehicleImage(
   maxHeight = 1920,
   quality = 0.82
 ): Promise<OptimizedImageResult> {
-  const originalSize = file.size;
+  const originalSize = file.size || 0;
 
   // Detect WebP support in canvas
   let targetMimeType = 'image/webp';
   if (typeof document !== 'undefined') {
-    const testCanvas = document.createElement('canvas');
-    testCanvas.width = 1;
-    testCanvas.height = 1;
-    if (!testCanvas.toDataURL('image/webp').startsWith('data:image/webp')) {
+    try {
+      const testCanvas = document.createElement('canvas');
+      testCanvas.width = 1;
+      testCanvas.height = 1;
+      if (!testCanvas.toDataURL('image/webp').startsWith('data:image/webp')) {
+        targetMimeType = 'image/jpeg';
+      }
+    } catch {
       targetMimeType = 'image/jpeg';
     }
   }
 
-  // If already compact (< 220KB) and in standard web format, avoid unnecessary re-compression
+  // If already compact (< 250KB) and in standard web format, avoid unnecessary re-compression
   if (
-    originalSize <= 220 * 1024 &&
+    originalSize > 0 &&
+    originalSize <= 250 * 1024 &&
     (file.type === 'image/webp' || file.type === 'image/jpeg' || file.type === 'image/png')
   ) {
     return {
@@ -1181,139 +1331,199 @@ export async function optimizeVehicleImage(
       optimizedSize: originalSize,
       width: 0,
       height: 0,
+      isOptimized: true,
     };
   }
 
-  // 1. Off-thread fast path: createImageBitmap (keeps Android UI buttery smooth)
-  if (typeof createImageBitmap !== 'undefined') {
-    try {
-      const bitmap = await createImageBitmap(file);
-      let { width, height } = bitmap;
-
-      // Calculate constrained dimensions preserving aspect ratio
-      if (width > maxWidth || height > maxHeight) {
-        if (width / maxWidth > height / maxHeight) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        } else {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(bitmap, 0, 0, width, height);
-        bitmap.close();
-
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, targetMimeType, quality)
+  try {
+    // =========================================================================
+    // STAGE 1: Fast off-thread createImageBitmap (Android Chrome / Modern Browsers)
+    // =========================================================================
+    if (typeof createImageBitmap !== 'undefined') {
+      try {
+        // Support EXIF orientation auto-rotation
+        const bitmap = await (createImageBitmap as any)(file, { imageOrientation: 'from-image' }).catch(() =>
+          createImageBitmap(file)
         );
 
-        if (blob && blob.size < originalSize) {
-          return {
-            blob,
-            mimeType: targetMimeType,
-            originalSize,
-            optimizedSize: blob.size,
-            width,
-            height,
-          };
+        let { width, height } = bitmap;
+
+        if (width > 0 && height > 0) {
+          if (width > maxWidth || height > maxHeight) {
+            if (width / maxWidth > height / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(bitmap, 0, 0, width, height);
+            bitmap.close();
+
+            const blob = await new Promise<Blob | null>((resolve) =>
+              canvas.toBlob(resolve, targetMimeType, quality)
+            );
+
+            if (blob && blob.size > 0 && blob.size < (originalSize || Infinity)) {
+              return {
+                blob,
+                mimeType: targetMimeType,
+                originalSize: originalSize || blob.size,
+                optimizedSize: blob.size,
+                width,
+                height,
+                isOptimized: true,
+              };
+            }
+          } else {
+            bitmap.close();
+          }
+        } else {
+          bitmap.close();
         }
-      } else {
-        bitmap.close();
+      } catch (stage1Err) {
+        console.warn('[Stage 1 Optimization Notice] createImageBitmap skipped, trying Image element:', stage1Err);
       }
-    } catch {
-      // Fall through to Image element path
     }
+
+    // =========================================================================
+    // STAGE 2: HTMLImageElement with ObjectURL decoding
+    // =========================================================================
+    try {
+      const stage2Result = await new Promise<OptimizedImageResult | null>((resolve) => {
+        let objectUrl: string | null = null;
+        try {
+          objectUrl = URL.createObjectURL(file);
+        } catch {
+          resolve(null);
+          return;
+        }
+
+        const img = new Image();
+
+        const cleanup = () => {
+          if (objectUrl) {
+            try {
+              URL.revokeObjectURL(objectUrl);
+            } catch {}
+            objectUrl = null;
+          }
+        };
+
+        // Timeout watchdog for Android image decoding (5 seconds max)
+        const timeout = setTimeout(() => {
+          cleanup();
+          resolve(null);
+        }, 5000);
+
+        img.onload = () => {
+          clearTimeout(timeout);
+          try {
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
+
+            if (!width || !height) {
+              cleanup();
+              resolve(null);
+              return;
+            }
+
+            if (width > maxWidth || height > maxHeight) {
+              if (width / maxWidth > height / maxHeight) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+              cleanup();
+              resolve(null);
+              return;
+            }
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+              (blob) => {
+                cleanup();
+                if (blob && blob.size > 0 && blob.size < (originalSize || Infinity)) {
+                  resolve({
+                    blob,
+                    mimeType: targetMimeType,
+                    originalSize: originalSize || blob.size,
+                    optimizedSize: blob.size,
+                    width,
+                    height,
+                    isOptimized: true,
+                  });
+                } else {
+                  resolve(null);
+                }
+              },
+              targetMimeType,
+              quality
+            );
+          } catch {
+            cleanup();
+            resolve(null);
+          }
+        };
+
+        img.onerror = () => {
+          clearTimeout(timeout);
+          cleanup();
+          resolve(null);
+        };
+
+        img.src = objectUrl;
+      });
+
+      if (stage2Result) {
+        return stage2Result;
+      }
+    } catch (stage2Err) {
+      console.warn('[Stage 2 Optimization Notice] HTMLImageElement fallback skipped:', stage2Err);
+    }
+  } catch (outerErr) {
+    console.warn('[Optimization Notice] Error during optimization pipeline, activating Stage 3 fallback:', outerErr);
   }
 
-  // 2. Fallback path: HTMLImageElement with ObjectURL
-  return new Promise((resolve) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      let width = img.naturalWidth || img.width;
-      let height = img.naturalHeight || img.height;
-
-      if (width > maxWidth || height > maxHeight) {
-        if (width / maxWidth > height / maxHeight) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        } else {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve({
-          blob: file,
-          mimeType: file.type || targetMimeType,
-          originalSize,
-          optimizedSize: originalSize,
-          width,
-          height,
-        });
-        return;
-      }
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob && blob.size < originalSize) {
-            resolve({
-              blob,
-              mimeType: targetMimeType,
-              originalSize,
-              optimizedSize: blob.size,
-              width,
-              height,
-            });
-          } else {
-            resolve({
-              blob: file,
-              mimeType: file.type || targetMimeType,
-              originalSize,
-              optimizedSize: originalSize,
-              width,
-              height,
-            });
-          }
-        },
-        targetMimeType,
-        quality
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve({
-        blob: file,
-        mimeType: file.type || targetMimeType,
-        originalSize,
-        optimizedSize: originalSize,
-        width: 0,
-        height: 0,
-      });
-    };
-
-    img.src = objectUrl;
-  });
+  // =========================================================================
+  // STAGE 3 (PART 4): AUTOMATIC ORIGINAL IMAGE FALLBACK
+  // If optimization is unavailable, do NOT fail or reject. Upload original photograph directly.
+  // Inform the administrator: "Image optimisation unavailable. Uploading original photograph."
+  // =========================================================================
+  console.info('[Automatic Original Fallback] Image optimisation unavailable. Uploading original photograph directly.');
+  return {
+    blob: file,
+    mimeType: file.type || targetMimeType,
+    originalSize: originalSize || 1024,
+    optimizedSize: originalSize || 1024,
+    width: 0,
+    height: 0,
+    isOptimized: false,
+    statusNote: 'Image optimisation unavailable. Uploading original photograph.',
+  };
 }
 
 /**
@@ -1338,21 +1548,21 @@ export async function uploadVehicleImageFile(
   file: File | Blob,
   vehicleId: string,
   index: number,
-  onProgress?: (progressPercent: number, bytesTransferred?: number, totalBytes?: number) => void
+  onProgress?: (progressPercent: number, bytesTransferred?: number, totalBytes?: number, statusNote?: string) => void
 ): Promise<string> {
   const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-  // Step 1: Optimize locally on client (max 1920px, WebP/JPEG 82% quality)
+  // Step 1: Optimize locally on client with automatic original image fallback
   const optimizedResult = await optimizeVehicleImage(file, 1920, 1920, 0.82);
-  const optimizedBlob = optimizedResult.blob;
+  const uploadBlob = optimizedResult.blob;
   const isWebP = optimizedResult.mimeType.includes('webp');
   const fileExt = isWebP ? 'webp' : 'jpg';
   const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.${fileExt}`;
 
-  // Notify initial preparation complete
+  // Notify initial preparation status
   if (onProgress) {
-    onProgress(5, 0, optimizedBlob.size);
+    onProgress(5, 0, uploadBlob.size, optimizedResult.statusNote);
   }
 
   // Step 2: Check if Firebase Storage bucket is actively usable
@@ -1361,7 +1571,7 @@ export async function uploadVehicleImageFile(
   if (isStorageReady) {
     try {
       const storageRef = ref(storage, filename);
-      const uploadTask = uploadBytesResumable(storageRef, optimizedBlob, {
+      const uploadTask = uploadBytesResumable(storageRef, uploadBlob, {
         contentType: optimizedResult.mimeType,
         cacheControl: 'public, max-age=31536000',
       });
@@ -1370,8 +1580,12 @@ export async function uploadVehicleImageFile(
         uploadTask.on('state_changed', (snapshot) => {
           if (snapshot.totalBytes > 0) {
             const rawPercent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-            // Reserve 100% for after getDownloadURL completes
-            onProgress(Math.min(99, Math.max(5, rawPercent)), snapshot.bytesTransferred, snapshot.totalBytes);
+            onProgress(
+              Math.min(99, Math.max(5, rawPercent)),
+              snapshot.bytesTransferred,
+              snapshot.totalBytes,
+              optimizedResult.statusNote
+            );
           }
         });
       }
@@ -1379,7 +1593,7 @@ export async function uploadVehicleImageFile(
       const snapshot = await uploadTask;
       const downloadUrl = await getDownloadURL(snapshot.ref);
       storageBucketReachable = true;
-      if (onProgress) onProgress(100, optimizedBlob.size, optimizedBlob.size);
+      if (onProgress) onProgress(100, uploadBlob.size, uploadBlob.size);
       return downloadUrl;
     } catch (storageErr: any) {
       console.warn('[Firebase Storage Notice] Using high-speed direct upload route:', storageErr?.message || storageErr);
@@ -1387,57 +1601,57 @@ export async function uploadVehicleImageFile(
     }
   }
 
-  // Step 3: Resilient high-speed upload fallback with live byte progress tracking
+  // Step 3: Resilient high-speed upload fallback using robust arrayBuffer data URL conversion
+  const base64Data = await readBlobAsDataUrl(uploadBlob);
+
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read image data'));
-    reader.onload = () => {
-      const base64Data = reader.result as string;
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/upload-vehicle-image', true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload-vehicle-image', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
 
-      if (xhr.upload && onProgress) {
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable && e.total > 0) {
-            const rawPercent = Math.round((e.loaded / e.total) * 100);
-            onProgress(Math.min(99, Math.max(10, rawPercent)), e.loaded, e.total);
-          }
-        };
-      }
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const res = JSON.parse(xhr.responseText);
-            if (res.url) {
-              if (onProgress) onProgress(100, optimizedBlob.size, optimizedBlob.size);
-              resolve(res.url);
-            } else {
-              reject(new Error('Server did not return a valid photo URL'));
-            }
-          } catch (e: any) {
-            reject(new Error('Invalid response from upload server: ' + e.message));
-          }
-        } else {
-          reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.statusText}`));
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          const rawPercent = Math.round((e.loaded / e.total) * 100);
+          onProgress(
+            Math.min(99, Math.max(10, rawPercent)),
+            e.loaded,
+            e.total,
+            optimizedResult.statusNote
+          );
         }
       };
+    }
 
-      xhr.onerror = () => reject(new Error('Network error during photo upload. Please check your connection.'));
-      xhr.ontimeout = () => reject(new Error('Upload timed out. Please retry.'));
-      xhr.timeout = 45000;
-
-      xhr.send(
-        JSON.stringify({
-          vehicleId: cleanId,
-          base64Data,
-          filename: `img_${index + 1}.${fileExt}`,
-        })
-      );
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.url) {
+            if (onProgress) onProgress(100, uploadBlob.size, uploadBlob.size);
+            resolve(res.url);
+          } else {
+            reject(new Error('Server did not return a valid photo URL'));
+          }
+        } catch (e: any) {
+          reject(new Error('Invalid response from upload server: ' + e.message));
+        }
+      } else {
+        reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.statusText}`));
+      }
     };
 
-    reader.readAsDataURL(optimizedBlob);
+    xhr.onerror = () => reject(new Error('Network error during photo upload. Please check your connection.'));
+    xhr.ontimeout = () => reject(new Error('Upload timed out. Please retry.'));
+    xhr.timeout = 45000;
+
+    xhr.send(
+      JSON.stringify({
+        vehicleId: cleanId,
+        base64Data,
+        filename: `img_${index + 1}.${fileExt}`,
+      })
+    );
   });
 }
 
