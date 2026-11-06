@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Car, Search, Check, MapPin } from 'lucide-re
 import { Vehicle } from '../types';
 import { formatCurrency, getOptimizedImageUrl, getVehicleCardSrcSet, getSlideshowVehicles } from '../utils';
 
+const FALLBACK_VEHICLE_IMAGE = 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=1200';
+
 interface HeroProps {
   vehicles: Vehicle[];
   onBrowseCars: () => void;
@@ -78,13 +80,28 @@ export default function Hero({
     setActiveVehicleIndex((prev) => (prev + 1) % count);
     setTrackIndex((prev) => prev + 1);
 
-    // Safety timeout: unlock after 750ms if onTransitionEnd does not fire
+    // Safety timeout: unlock and strictly clamp bounds if onTransitionEnd does not fire
     if (transitionSafetyTimeoutRef.current) {
       clearTimeout(transitionSafetyTimeoutRef.current);
     }
     transitionSafetyTimeoutRef.current = setTimeout(() => {
+      setTrackIndex((curr) => {
+        if (curr >= count + 1) {
+          setIsTransitionEnabled(false);
+          if (trackRef.current) void trackRef.current.offsetHeight;
+          requestAnimationFrame(() => setIsTransitionEnabled(true));
+          return 1;
+        }
+        if (curr <= 0) {
+          setIsTransitionEnabled(false);
+          if (trackRef.current) void trackRef.current.offsetHeight;
+          requestAnimationFrame(() => setIsTransitionEnabled(true));
+          return count;
+        }
+        return curr;
+      });
       isTransitioningRef.current = false;
-    }, 750);
+    }, 700);
   }, [count]);
 
   // Retreat to previous slide
@@ -102,11 +119,26 @@ export default function Hero({
       clearTimeout(transitionSafetyTimeoutRef.current);
     }
     transitionSafetyTimeoutRef.current = setTimeout(() => {
+      setTrackIndex((curr) => {
+        if (curr >= count + 1) {
+          setIsTransitionEnabled(false);
+          if (trackRef.current) void trackRef.current.offsetHeight;
+          requestAnimationFrame(() => setIsTransitionEnabled(true));
+          return 1;
+        }
+        if (curr <= 0) {
+          setIsTransitionEnabled(false);
+          if (trackRef.current) void trackRef.current.offsetHeight;
+          requestAnimationFrame(() => setIsTransitionEnabled(true));
+          return count;
+        }
+        return curr;
+      });
       isTransitioningRef.current = false;
-    }, 750);
+    }, 700);
   }, [count]);
 
-  // Directly jump to a specific dot slide
+  // Jump to dot index
   const handleDotClick = useCallback(
     (targetIndex: number) => {
       if (count <= 1 || isTransitioningRef.current) return;
@@ -122,12 +154,12 @@ export default function Hero({
       }
       transitionSafetyTimeoutRef.current = setTimeout(() => {
         isTransitioningRef.current = false;
-      }, 750);
+      }, 700);
     },
     [count, activeVehicleIndex]
   );
 
-  // Seamless infinite loop transition reset
+  // Seamless infinite loop transition reset with DOM reflow
   const handleTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
     if (e.target !== trackRef.current) return;
 
@@ -141,6 +173,11 @@ export default function Hero({
       setIsTransitionEnabled(false);
       setTrackIndex(1);
 
+      // Force browser layout flush so the transform snaps instantly without animating
+      if (trackRef.current) {
+        void trackRef.current.offsetHeight;
+      }
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setIsTransitionEnabled(true);
@@ -151,6 +188,10 @@ export default function Hero({
       // Slid backward into cloned last slide -> instantly snap back to real last slide
       setIsTransitionEnabled(false);
       setTrackIndex(count);
+
+      if (trackRef.current) {
+        void trackRef.current.offsetHeight;
+      }
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -163,7 +204,7 @@ export default function Hero({
     }
   };
 
-  // Robust automatic playback ticker (fires consistently every 4.2 seconds)
+  // Robust automatic playback ticker (fires consistently every 4.5 seconds)
   const resetAutoPlay = useCallback(() => {
     if (autoPlayTimerRef.current) {
       clearInterval(autoPlayTimerRef.current);
@@ -172,10 +213,10 @@ export default function Hero({
     if (count <= 1) return;
 
     autoPlayTimerRef.current = setInterval(() => {
-      if (!isDraggingRef.current) {
+      if (!isDraggingRef.current && !document.hidden) {
         handleNext();
       }
-    }, 4200);
+    }, 4500);
   }, [count, handleNext]);
 
   useEffect(() => {
@@ -191,6 +232,30 @@ export default function Hero({
       }
     };
   }, [resetAutoPlay]);
+
+  // Pause on tab hidden, resume cleanly on tab visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (autoPlayTimerRef.current) {
+          clearInterval(autoPlayTimerRef.current);
+          autoPlayTimerRef.current = null;
+        }
+      } else {
+        // Recover cleanly if track got desynchronized while in background
+        setTrackIndex((curr) => {
+          if (curr < 1 || curr > count) return 1;
+          return curr;
+        });
+        resetAutoPlay();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [count, resetAutoPlay]);
 
   // Touch and mouse gesture handlers for mobile & desktop swiping
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -350,18 +415,10 @@ export default function Hero({
                   onMouseUp={handleTouchEnd}
                   onMouseLeave={handleTouchEnd}
                 >
-                  {/* Persistent background fallback image - ensures zero blank screen */}
-                  {activeVehicle && (
-                    <div className="absolute inset-0 pointer-events-none z-0">
-                      <img
-                        src={getOptimizedImageUrl(activeVehicle.images?.[0], 'card')}
-                        alt=""
-                        aria-hidden="true"
-                        className="w-full h-full object-cover filter blur-[2px] scale-105 opacity-60"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/40" />
-                    </div>
-                  )}
+                  {/* Elegant solid dark backing with subtle vignette to ensure zero blank flashes */}
+                  <div className="absolute inset-0 bg-slate-950 pointer-events-none z-0">
+                    <div className="w-full h-full bg-gradient-to-t from-slate-950 via-slate-900 to-slate-950 opacity-90" />
+                  </div>
 
                   {/* Infinite Continuous Track */}
                   <div
@@ -377,35 +434,44 @@ export default function Hero({
                     }}
                     onTransitionEnd={handleTransitionEnd}
                   >
-                    {trackSlides.map((veh, idx) => (
-                      <div
-                        key={`${veh.id}-${idx}`}
-                        className="relative w-full h-full flex-none shrink-0 overflow-hidden bg-slate-900"
-                        style={{ width: '100%', height: '100%' }}
-                      >
-                        <img
-                          src={getOptimizedImageUrl(veh.images?.[0], 'card')}
-                          srcSet={getVehicleCardSrcSet(veh.images?.[0])}
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
-                          width={640}
-                          height={440}
-                          alt={`${veh.year} ${veh.make} ${veh.model}`}
-                          loading="eager"
-                          fetchPriority={idx === trackIndex ? 'high' : 'auto'}
-                          decoding="async"
-                          className="w-full h-full object-cover select-none pointer-events-none"
-                          draggable={false}
-                          style={{ imageRendering: 'auto' }}
-                        />
+                    {trackSlides.map((veh, idx) => {
+                      const imageSrc = getOptimizedImageUrl(veh.images?.[0], 'card') || FALLBACK_VEHICLE_IMAGE;
+                      return (
+                        <div
+                          key={`${veh.id}-${idx}`}
+                          className="relative w-full h-full flex-none shrink-0 overflow-hidden bg-slate-900"
+                          style={{ width: '100%', height: '100%' }}
+                        >
+                          <img
+                            src={imageSrc}
+                            srcSet={getVehicleCardSrcSet(veh.images?.[0])}
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
+                            width={640}
+                            height={440}
+                            alt={`${veh.year} ${veh.make} ${veh.model}`}
+                            loading="eager"
+                            fetchPriority={idx === trackIndex ? 'high' : 'auto'}
+                            decoding="async"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement;
+                              if (target.src !== FALLBACK_VEHICLE_IMAGE) {
+                                target.src = FALLBACK_VEHICLE_IMAGE;
+                              }
+                            }}
+                            className="w-full h-full object-cover select-none pointer-events-none"
+                            draggable={false}
+                            style={{ imageRendering: 'auto' }}
+                          />
 
-                        {/* Clean Condition Badge on each slide */}
-                        <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none">
-                          <span className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md bg-slate-950/85 text-amber-300 border border-white/10 backdrop-blur-sm">
-                            {veh.condition || 'Foreign Used'}
-                          </span>
+                          {/* Clean Condition Badge on each slide */}
+                          <div className="absolute top-3.5 left-3.5 z-10 pointer-events-none">
+                            <span className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md bg-slate-950/85 text-amber-300 border border-white/10 backdrop-blur-sm">
+                              {veh.condition || 'Foreign Used'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Navigation Arrows (if multiple slideshow items) */}
