@@ -584,6 +584,43 @@ export async function resendEmailOtp(preAuthToken: string): Promise<{
 }
 
 /**
+ * Authenticates administrator using master password.
+ */
+export async function authenticateAdmin(password: string): Promise<{ success: boolean; error?: string; role?: string; token?: string }> {
+  try {
+    const res = await fetch('/api/admin-auth?action=login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || 'Incorrect administrator password. Please try again.',
+      };
+    }
+
+    if (typeof window !== 'undefined' && data.token) {
+      sessionStorage.setItem('jite_admin_session_active', data.token);
+      localStorage.setItem('jite_admin_session_active', data.token);
+    }
+
+    return {
+      success: true,
+      role: data.role || 'admin',
+      token: data.token,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error during authentication. Please try again.',
+    };
+  }
+}
+
+/**
  * Verifies if an active, unexpired administrator session is present
  */
 export async function verifyAdminSession(): Promise<boolean> {
