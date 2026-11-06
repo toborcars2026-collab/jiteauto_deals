@@ -1083,28 +1083,116 @@ export function getVehicles(): Vehicle[] {
 }
 
 // ============================================================================
-// FIREBASE STORAGE IMAGE UPLOADS
+// FIREBASE STORAGE IMAGE UPLOADS & HIGH-SPEED OPTIMIZATION ENGINE
 // ============================================================================
 
+// Memory cache for Firebase Storage bucket reachability to prevent repeated timeout stalls
+let storageBucketReachable: boolean | null = null;
+let lastStorageProbeTime = 0;
+
 /**
- * Client-side fast image optimizer:
- * Uses fast asynchronous decoding (createImageBitmap or ObjectURL) and high-fidelity canvas downscaling (max 2560px, JPEG 0.92)
- * to convert multi-megabyte camera photos into crisp, ultra-high-definition web images in milliseconds without quality degradation or blurring.
+ * Checks if the configured Firebase Storage bucket is actively responding.
+ * Fast-fails in < 3 seconds so uploads never hang for 120s if bucket activation is pending.
  */
-export async function compressImageFile(file: File, maxWidth = 2560, maxHeight = 2560, quality = 0.92): Promise<Blob | File> {
-  // If already reasonable size (< 1.5MB) and standard web format, skip canvas re-encoding to preserve 100% original pixel data
-  if (file.size <= 1500 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/webp' || file.type === 'image/png')) {
-    return file;
+export async function isFirebaseStorageReachable(): Promise<boolean> {
+  const now = Date.now();
+  if (storageBucketReachable !== null && now - lastStorageProbeTime < 60000) {
+    return storageBucketReachable;
   }
 
-  // Fast path: createImageBitmap (runs asynchronously off main UI thread)
+  try {
+    const bucket = storage.app.options.storageBucket;
+    if (!bucket) {
+      storageBucketReachable = false;
+      lastStorageProbeTime = now;
+      return false;
+    }
+
+    // Quick non-blocking probe to Storage bucket metadata endpoint with 2.5s abort timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    const probeUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?maxResults=1`;
+    const res = await fetch(probeUrl, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    // If bucket exists, Firebase returns 200 or 401/403 (auth required).
+    // A 404 indicates the Cloud Storage bucket is not created or activated yet.
+    if (res.status === 404) {
+      storageBucketReachable = false;
+    } else {
+      storageBucketReachable = true;
+    }
+  } catch {
+    storageBucketReachable = false;
+  }
+
+  lastStorageProbeTime = now;
+  return storageBucketReachable;
+}
+
+export interface OptimizedImageResult {
+  blob: Blob;
+  mimeType: string;
+  originalSize: number;
+  optimizedSize: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * High-performance, non-blocking client-side image optimizer (Part 4):
+ * - Resizes large photos to approx 1920px max dimension, preserving exact aspect ratio.
+ * - Compresses using high-efficiency WebP (quality 82%), with fallback to JPEG.
+ * - Uses asynchronous createImageBitmap off main thread to prevent Android UI freezing.
+ * - Skips re-compressing already lightweight images (< 200KB).
+ */
+export async function optimizeVehicleImage(
+  file: File | Blob,
+  maxWidth = 1920,
+  maxHeight = 1920,
+  quality = 0.82
+): Promise<OptimizedImageResult> {
+  const originalSize = file.size;
+
+  // Detect WebP support in canvas
+  let targetMimeType = 'image/webp';
+  if (typeof document !== 'undefined') {
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 1;
+    testCanvas.height = 1;
+    if (!testCanvas.toDataURL('image/webp').startsWith('data:image/webp')) {
+      targetMimeType = 'image/jpeg';
+    }
+  }
+
+  // If already compact (< 220KB) and in standard web format, avoid unnecessary re-compression
+  if (
+    originalSize <= 220 * 1024 &&
+    (file.type === 'image/webp' || file.type === 'image/jpeg' || file.type === 'image/png')
+  ) {
+    return {
+      blob: file,
+      mimeType: file.type || targetMimeType,
+      originalSize,
+      optimizedSize: originalSize,
+      width: 0,
+      height: 0,
+    };
+  }
+
+  // 1. Off-thread fast path: createImageBitmap (keeps Android UI buttery smooth)
   if (typeof createImageBitmap !== 'undefined') {
     try {
       const bitmap = await createImageBitmap(file);
       let { width, height } = bitmap;
 
+      // Calculate constrained dimensions preserving aspect ratio
       if (width > maxWidth || height > maxHeight) {
-        if (width > height) {
+        if (width / maxWidth > height / maxHeight) {
           height = Math.round((height * maxWidth) / width);
           width = maxWidth;
         } else {
@@ -1117,34 +1205,46 @@ export async function compressImageFile(file: File, maxWidth = 2560, maxHeight =
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) {
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(bitmap, 0, 0, width, height);
         bitmap.close();
-        return file;
+
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, targetMimeType, quality)
+        );
+
+        if (blob && blob.size < originalSize) {
+          return {
+            blob,
+            mimeType: targetMimeType,
+            originalSize,
+            optimizedSize: blob.size,
+            width,
+            height,
+          };
+        }
+      } else {
+        bitmap.close();
       }
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(bitmap, 0, 0, width, height);
-      bitmap.close();
-
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
-      return blob && blob.size < file.size ? blob : file;
     } catch {
-      // fallback to Image element below if createImageBitmap encounters unsupported format
+      // Fall through to Image element path
     }
   }
 
-  // Fallback path: URL.createObjectURL (avoids heavy readAsDataURL memory allocations)
+  // 2. Fallback path: HTMLImageElement with ObjectURL
   return new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
+
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
       let width = img.naturalWidth || img.width;
       let height = img.naturalHeight || img.height;
 
       if (width > maxWidth || height > maxHeight) {
-        if (width > height) {
+        if (width / maxWidth > height / maxHeight) {
           height = Math.round((height * maxWidth) / width);
           width = maxWidth;
         } else {
@@ -1158,107 +1258,191 @@ export async function compressImageFile(file: File, maxWidth = 2560, maxHeight =
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(file);
+        resolve({
+          blob: file,
+          mimeType: file.type || targetMimeType,
+          originalSize,
+          optimizedSize: originalSize,
+          width,
+          height,
+        });
         return;
       }
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
+
       canvas.toBlob(
         (blob) => {
-          if (blob && blob.size < file.size) {
-            resolve(blob);
+          if (blob && blob.size < originalSize) {
+            resolve({
+              blob,
+              mimeType: targetMimeType,
+              originalSize,
+              optimizedSize: blob.size,
+              width,
+              height,
+            });
           } else {
-            resolve(file);
+            resolve({
+              blob: file,
+              mimeType: file.type || targetMimeType,
+              originalSize,
+              optimizedSize: originalSize,
+              width,
+              height,
+            });
           }
         },
-        'image/jpeg',
+        targetMimeType,
         quality
       );
     };
+
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      resolve(file);
+      resolve({
+        blob: file,
+        mimeType: file.type || targetMimeType,
+        originalSize,
+        optimizedSize: originalSize,
+        width: 0,
+        height: 0,
+      });
     };
+
     img.src = objectUrl;
   });
 }
 
 /**
- * Uploads a local File or Blob directly to Firebase Storage (or server fallback CDN)
- * and returns its permanent download URL.
+ * Backward compatibility alias for compressImageFile.
+ */
+export async function compressImageFile(
+  file: File,
+  maxWidth = 1920,
+  maxHeight = 1920,
+  quality = 0.82
+): Promise<Blob | File> {
+  const result = await optimizeVehicleImage(file, maxWidth, maxHeight, quality);
+  return result.blob;
+}
+
+/**
+ * Uploads a local File or Blob directly to Firebase Storage with resumable tracking.
+ * If Firebase Storage is unreachable or unactivated, seamlessly falls back to the serverless
+ * upload endpoint with genuine byte-level progress reporting via XMLHttpRequest.
  */
 export async function uploadVehicleImageFile(
   file: File | Blob,
   vehicleId: string,
   index: number,
-  onProgress?: (progressPercent: number) => void
+  onProgress?: (progressPercent: number, bytesTransferred?: number, totalBytes?: number) => void
 ): Promise<string> {
   const cleanId = (vehicleId || 'car').replace(/[^a-zA-Z0-9_-]/g, '_');
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
-  // 1. Optimize image locally on client (JPEG max 1600px, quality 0.85)
-  const optimized = file instanceof File ? await compressImageFile(file) : file;
+  // Step 1: Optimize locally on client (max 1920px, WebP/JPEG 82% quality)
+  const optimizedResult = await optimizeVehicleImage(file, 1920, 1920, 0.82);
+  const optimizedBlob = optimizedResult.blob;
+  const isWebP = optimizedResult.mimeType.includes('webp');
+  const fileExt = isWebP ? 'webp' : 'jpg';
+  const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.${fileExt}`;
 
-  // 2. Attempt direct upload to Firebase Storage with progress tracking
-  try {
-    const storageRef = ref(storage, filename);
-    const uploadTask = uploadBytesResumable(storageRef, optimized, {
-      contentType: 'image/jpeg',
-      cacheControl: 'public, max-age=31536000',
-    });
-
-    if (onProgress) {
-      uploadTask.on('state_changed', (snapshot) => {
-        const percent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        onProgress(Math.min(99, percent));
-      });
-    }
-
-    const snapshot = await uploadTask;
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    if (onProgress) onProgress(100);
-    return downloadUrl;
-  } catch (storageErr) {
-    console.warn('[Firebase Storage Notice] Using high-speed server CDN fallback:', storageErr);
-
-    // 3. Fallback to resilient server upload endpoint
-    const base64Data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(optimized);
-    });
-
-    const response = await fetch('/api/upload-vehicle-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        vehicleId: cleanId,
-        base64Data,
-        filename: `img_${index + 1}.jpg`,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Failed to upload photo ${index + 1}: ${errText || response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.url) {
-      throw new Error(`Upload endpoint did not return an image URL for photo ${index + 1}`);
-    }
-
-    if (onProgress) onProgress(100);
-    return data.url;
+  // Notify initial preparation complete
+  if (onProgress) {
+    onProgress(5, 0, optimizedBlob.size);
   }
+
+  // Step 2: Check if Firebase Storage bucket is actively usable
+  const isStorageReady = await isFirebaseStorageReachable();
+
+  if (isStorageReady) {
+    try {
+      const storageRef = ref(storage, filename);
+      const uploadTask = uploadBytesResumable(storageRef, optimizedBlob, {
+        contentType: optimizedResult.mimeType,
+        cacheControl: 'public, max-age=31536000',
+      });
+
+      if (onProgress) {
+        uploadTask.on('state_changed', (snapshot) => {
+          if (snapshot.totalBytes > 0) {
+            const rawPercent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            // Reserve 100% for after getDownloadURL completes
+            onProgress(Math.min(99, Math.max(5, rawPercent)), snapshot.bytesTransferred, snapshot.totalBytes);
+          }
+        });
+      }
+
+      const snapshot = await uploadTask;
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      storageBucketReachable = true;
+      if (onProgress) onProgress(100, optimizedBlob.size, optimizedBlob.size);
+      return downloadUrl;
+    } catch (storageErr: any) {
+      console.warn('[Firebase Storage Notice] Using high-speed direct upload route:', storageErr?.message || storageErr);
+      storageBucketReachable = false;
+    }
+  }
+
+  // Step 3: Resilient high-speed upload fallback with live byte progress tracking
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image data'));
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload-vehicle-image', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+
+      if (xhr.upload && onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && e.total > 0) {
+            const rawPercent = Math.round((e.loaded / e.total) * 100);
+            onProgress(Math.min(99, Math.max(10, rawPercent)), e.loaded, e.total);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText);
+            if (res.url) {
+              if (onProgress) onProgress(100, optimizedBlob.size, optimizedBlob.size);
+              resolve(res.url);
+            } else {
+              reject(new Error('Server did not return a valid photo URL'));
+            }
+          } catch (e: any) {
+            reject(new Error('Invalid response from upload server: ' + e.message));
+          }
+        } else {
+          reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.statusText}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during photo upload. Please check your connection.'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out. Please retry.'));
+      xhr.timeout = 45000;
+
+      xhr.send(
+        JSON.stringify({
+          vehicleId: cleanId,
+          base64Data,
+          filename: `img_${index + 1}.${fileExt}`,
+        })
+      );
+    };
+
+    reader.readAsDataURL(optimizedBlob);
+  });
 }
 
 /**
- * Uploads a base64 Data URL string to Firebase Storage or server CDN and returns its permanent download URL.
+ * Uploads a base64 Data URL string to Firebase Storage or direct CDN with progress tracking.
  */
 export async function uploadVehicleImageDataUrl(
   dataUrl: string,
@@ -1270,42 +1454,46 @@ export async function uploadVehicleImageDataUrl(
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
-  try {
-    const storageRef = ref(storage, filename);
-    const snapshot = await uploadString(storageRef, dataUrl, 'data_url', {
-      contentType: 'image/jpeg',
-      cacheControl: 'public, max-age=31536000',
-    });
+  const isStorageReady = await isFirebaseStorageReachable();
 
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    if (onProgress) onProgress(100);
-    return downloadUrl;
-  } catch (storageErr) {
-    console.warn('[Firebase Storage Notice] Using high-speed server CDN fallback for dataUrl:', storageErr);
+  if (isStorageReady) {
+    try {
+      const storageRef = ref(storage, filename);
+      const snapshot = await uploadString(storageRef, dataUrl, 'data_url', {
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+      });
 
-    const response = await fetch('/api/upload-vehicle-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        vehicleId: cleanId,
-        base64Data: dataUrl,
-        filename: `img_${index + 1}.jpg`,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to upload photo ${index + 1}`);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      if (onProgress) onProgress(100);
+      return downloadUrl;
+    } catch {
+      storageBucketReachable = false;
     }
-
-    const data = await response.json();
-    if (onProgress) onProgress(100);
-    return data.url;
   }
+
+  // Fallback to server route
+  const response = await fetch('/api/upload-vehicle-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      vehicleId: cleanId,
+      base64Data: dataUrl,
+      filename: `img_${index + 1}.jpg`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upload photo ${index + 1}`);
+  }
+
+  const data = await response.json();
+  if (onProgress) onProgress(100);
+  return data.url;
 }
 
 /**
- * Universal vehicle image processor: converts local files or data URLs to permanent CDN URLs,
- * or normalizes remote image links.
+ * Universal vehicle image processor: converts local files or data URLs to permanent CDN URLs.
  */
 export async function uploadVehicleImage(
   source: File | Blob | string,
@@ -1319,15 +1507,35 @@ export async function uploadVehicleImage(
     return uploadVehicleImageFile(source, vehicleId, index, onProgress);
   }
 
-  if (typeof source === 'string') {
-    if (source.startsWith('data:image/')) {
-      return uploadVehicleImageDataUrl(source, vehicleId, index, onProgress);
-    }
-    if (onProgress) onProgress(100);
-    return normalizeImageInput(source);
+  if (typeof source === 'string' && source.startsWith('data:image/')) {
+    return uploadVehicleImageDataUrl(source, vehicleId, index, onProgress);
   }
 
-  return '';
+  return normalizeImageInput(source);
+}
+
+/**
+ * Controlled Concurrency Worker Pool (Part 3):
+ * Executes asynchronous tasks with a strict concurrency limit (default 3 concurrent uploads).
+ * Ensures smooth network utilization and non-blocking performance on mobile networks.
+ */
+export async function runConcurrentQueue<T, R>(
+  items: T[],
+  concurrencyLimit = 3,
+  workerFn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const pool = Array.from({ length: Math.min(concurrencyLimit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex++;
+      results[currentIndex] = await workerFn(items[currentIndex], currentIndex);
+    }
+  });
+
+  await Promise.all(pool);
+  return results;
 }
 
 /**

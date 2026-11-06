@@ -16,12 +16,13 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  Camera
+  Camera,
 } from 'lucide-react';
 import { Vehicle } from '../../types';
 import {
   saveVehicleToFirestore,
   uploadVehicleImageFile,
+  runConcurrentQueue,
   normalizeVehicleData,
   normalizeImageInput,
   resolveImageLink,
@@ -41,8 +42,10 @@ export interface PhotoCardItem {
   previewUrl: string;
   isExistingUrl?: boolean;
   uploadedUrl?: string;
-  status: 'ready' | 'uploading' | 'done' | 'error';
+  status: 'ready' | 'waiting' | 'optimizing' | 'uploading' | 'done' | 'error';
   progress: number;
+  bytesTransferred?: number;
+  totalBytes?: number;
   errorMessage?: string;
   fileName?: string;
   fileSizeText?: string;
@@ -256,6 +259,70 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     }
   };
 
+  // Retry uploading a single failed photograph (Part 7)
+  const handleRetrySinglePhoto = async (id: string) => {
+    const item = photoCards.find((p) => p.id === id);
+    if (!item || !item.file || item.uploadedUrl) return;
+
+    setErrorMsg(null);
+    const targetVehicleId =
+      carData.id || `${carData.year || 2021}-${(carData.make || 'car').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+
+    setPhotoCards((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: 'optimizing', progress: 5, errorMessage: undefined } : p))
+    );
+
+    try {
+      const idx = photoCards.findIndex((p) => p.id === id);
+      const uploadedUrl = await uploadVehicleImageFile(
+        item.file,
+        targetVehicleId,
+        idx,
+        (percent, transferred, total) => {
+          setPhotoCards((prev) =>
+            prev.map((p) =>
+              p.id === id
+                ? {
+                    ...p,
+                    status: 'uploading',
+                    progress: percent,
+                    bytesTransferred: transferred,
+                    totalBytes: total,
+                  }
+                : p
+            )
+          );
+        }
+      );
+
+      setPhotoCards((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                status: 'done',
+                progress: 100,
+                uploadedUrl,
+                errorMessage: undefined,
+              }
+            : p
+        )
+      );
+    } catch (err: any) {
+      setPhotoCards((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                status: 'error',
+                errorMessage: err.message || 'Retry failed',
+              }
+            : p
+        )
+      );
+    }
+  };
+
   // Reset form to publish another vehicle
   const handleResetForNew = () => {
     setPublishedVehicle(null);
@@ -281,7 +348,12 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     setErrorMsg(null);
   };
 
-  // STEP 7: PUBLISH VEHICLE (Upload photographs + Cloud Firestore document write)
+  // PUBLISHING WORKFLOW (Parts 2, 3, 4, 8):
+  // 1. Validate form fields
+  // 2. Controlled parallel photo upload (max 3 concurrent) with genuine byte progress
+  // 3. Confirm all URLs generated
+  // 4. Single atomic write to Cloud Firestore
+  // 5. Confirm publication with zero data duplication
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isPublishing) return;
@@ -292,7 +364,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     const year = Number(carData.year) || 2021;
     const price = Number(carData.price) || 0;
 
-    // Validation
+    // Form Validation
     if (!make || !model) {
       setErrorMsg('Please specify both the Vehicle Brand/Make and Model Name.');
       return;
@@ -309,7 +381,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     }
 
     setIsPublishing(true);
-    setPublishStatusText('Preparing vehicle specifications...');
+    setPublishStatusText('Optimizing & preparing photographs...');
 
     try {
       const cleanMake = make.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -317,69 +389,119 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       const targetVehicleId =
         carData.id || `${year}-${cleanMake}-${cleanModel}-${Date.now().toString(36)}`;
 
-      // STEP 8: Upload Photographs with individual progress tracking
-      const finalImageUrls: string[] = [];
+      // Mark all un-uploaded files as 'waiting in queue'
+      setPhotoCards((prev) =>
+        prev.map((p) => (!p.uploadedUrl && p.file ? { ...p, status: 'waiting', progress: 0 } : p))
+      );
+
+      // Controlled concurrency pool (default 3 simultaneous photograph uploads)
+      const concurrencyLimit = 3;
+      const uploadedMap = new Map<string, string>();
+
+      // Populate already uploaded items to avoid re-uploading
+      photoCards.forEach((p) => {
+        if (p.uploadedUrl) {
+          uploadedMap.set(p.id, p.uploadedUrl);
+        } else if (p.previewUrl && !p.file) {
+          uploadedMap.set(p.id, p.previewUrl);
+        }
+      });
+
       const pendingUploads = photoCards.filter((p) => !p.uploadedUrl && p.file);
 
-      for (let i = 0; i < photoCards.length; i++) {
-        const item = photoCards[i];
+      if (pendingUploads.length > 0) {
+        setPublishStatusText(`Uploading photographs (3 concurrent workers)...`);
 
-        if (item.uploadedUrl) {
-          finalImageUrls.push(item.uploadedUrl);
-          continue;
-        }
+        await runConcurrentQueue<PhotoCardItem, string>(
+          pendingUploads,
+          concurrencyLimit,
+          async (item: PhotoCardItem, queueIdx: number) => {
+            const originalIndex = photoCards.findIndex((p) => p.id === item.id);
+            const displayIndex = originalIndex >= 0 ? originalIndex + 1 : queueIdx + 1;
 
-        if (item.file) {
-          setPublishStatusText(`Uploading photograph ${finalImageUrls.length + 1} of ${photoCards.length}...`);
-
-          // Mark item as uploading
-          setPhotoCards((prev) =>
-            prev.map((p) => (p.id === item.id ? { ...p, status: 'uploading', progress: 10 } : p))
-          );
-
-          try {
-            const uploadedUrl = await uploadVehicleImageFile(
-              item.file,
-              targetVehicleId,
-              i,
-              (percent) => {
-                setPhotoCards((prev) =>
-                  prev.map((p) => (p.id === item.id ? { ...p, progress: percent } : p))
-                );
-              }
-            );
-
-            finalImageUrls.push(uploadedUrl);
-
-            // Mark item as done
+            // Mark this specific item as optimizing
             setPhotoCards((prev) =>
               prev.map((p) =>
-                p.id === item.id
-                  ? { ...p, status: 'done', progress: 100, uploadedUrl }
-                  : p
+                p.id === item.id ? { ...p, status: 'optimizing', progress: 5, errorMessage: undefined } : p
               )
             );
-          } catch (uploadErr: any) {
-            setPhotoCards((prev) =>
-              prev.map((p) =>
-                p.id === item.id
-                  ? { ...p, status: 'error', errorMessage: uploadErr.message || 'Upload failed' }
-                  : p
-              )
-            );
-            throw new Error(`Failed to upload "${item.fileName || `Photo #${i + 1}`}": ${uploadErr.message}`);
+
+            try {
+              const uploadedUrl = await uploadVehicleImageFile(
+                item.file!,
+                targetVehicleId,
+                originalIndex >= 0 ? originalIndex : queueIdx,
+                (percent, transferred, total) => {
+                  setPhotoCards((prev) =>
+                    prev.map((p) =>
+                      p.id === item.id
+                        ? {
+                            ...p,
+                            status: 'uploading',
+                            progress: percent,
+                            bytesTransferred: transferred,
+                            totalBytes: total,
+                          }
+                        : p
+                    )
+                  );
+                }
+              );
+
+              uploadedMap.set(item.id, uploadedUrl);
+
+              // Mark as done
+              setPhotoCards((prev) =>
+                prev.map((p) =>
+                  p.id === item.id
+                    ? {
+                        ...p,
+                        status: 'done',
+                        progress: 100,
+                        uploadedUrl,
+                        errorMessage: undefined,
+                      }
+                    : p
+                )
+              );
+
+              return uploadedUrl;
+            } catch (uploadErr: any) {
+              setPhotoCards((prev) =>
+                prev.map((p) =>
+                  p.id === item.id
+                    ? {
+                        ...p,
+                        status: 'error',
+                        errorMessage: uploadErr.message || 'Upload failed',
+                      }
+                    : p
+                )
+              );
+              throw new Error(`Photograph ${displayIndex} failed: ${uploadErr.message}`);
+            }
           }
-        } else if (item.previewUrl) {
-          finalImageUrls.push(item.previewUrl);
+        );
+      }
+
+      // Assemble all final image URLs in their exact user-arranged order
+      const finalImageUrls: string[] = [];
+      for (const card of photoCards) {
+        const url = uploadedMap.get(card.id) || card.uploadedUrl || (card.isExistingUrl ? card.previewUrl : '');
+        if (url) {
+          finalImageUrls.push(url);
         }
       }
 
       if (finalImageUrls.length === 0) {
-        throw new Error('No valid photograph URLs were produced. Please check your photos and retry.');
+        throw new Error('No photographs could be uploaded. Please check your network connection and retry.');
       }
 
-      // STEP 9: Save complete vehicle listing to existing Firestore vehicles collection
-      setPublishStatusText('Saving vehicle listing to Cloud Firestore...');
+      // Transition smoothly between upload completion and Firestore document save
+      setPublishStatusText('ALL PHOTOGRAPHS UPLOADED SUCCESSFULLY.');
+      await new Promise((resolve) => setTimeout(resolve, 450));
+
+      setPublishStatusText('PUBLISHING VEHICLE DETAILS TO CLOUD FIRESTORE...');
 
       const payload: Vehicle = normalizeVehicleData({
         id: targetVehicleId,
@@ -405,10 +527,13 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
         updatedAt: new Date().toISOString(),
       });
 
-      // Direct write to Cloud Firestore
+      // Single authoritative Cloud Firestore write
       const confirmed = await saveVehicleToFirestore(payload);
 
-      // STEP 10: Confirm successful publication
+      // Confirm successful publication
+      setPublishStatusText('VEHICLE SUCCESSFULLY PUBLISHED!');
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
       setPublishedVehicle(confirmed);
       onSuccess(confirmed);
     } catch (err: any) {
@@ -416,7 +541,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       setErrorMsg(
         err?.message?.includes('permission') || err?.message?.includes('PERMISSION_DENIED')
           ? 'Cloud Firestore write error: Missing or insufficient permissions. Please ensure you are signed in with the authorized Google Account (blwuniabuja@gmail.com) in the Admin Command Center.'
-          : err?.message || 'Failed to publish vehicle to Cloud Firestore. Please retry.'
+          : err?.message || 'Failed to complete publishing. Uploaded images have been preserved; please retry.'
       );
     } finally {
       setIsPublishing(false);
@@ -809,6 +934,74 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
           {/* Previews and Photo Cards Management Grid */}
           {photoCards.length > 0 && (
             <div className="space-y-4">
+              {/* PART 2 & PART 9: REAL-TIME UPLOAD PROGRESS MONITOR */}
+              {isPublishing && (
+                <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-xl text-white space-y-3 animate-fadeIn">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin text-amber-400" />
+                      <span className="text-xs uppercase tracking-widest font-mono font-bold text-amber-400">
+                        UPLOADING VEHICLE PHOTOGRAPHS
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-slate-300">
+                      {photoCards.filter((p) => p.status === 'done' || p.uploadedUrl).length} of {photoCards.length} Uploaded (
+                      {Math.round(
+                        photoCards.reduce((acc, c) => acc + (c.uploadedUrl ? 100 : c.progress || 0), 0) /
+                          Math.max(1, photoCards.length)
+                      )}
+                      %)
+                    </span>
+                  </div>
+
+                  {/* Overall Progress Bar */}
+                  <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
+                    <div
+                      className="bg-gradient-to-r from-amber-500 to-amber-300 h-full transition-all duration-300"
+                      style={{
+                        width: `${Math.round(
+                          photoCards.reduce((acc, c) => acc + (c.uploadedUrl ? 100 : c.progress || 0), 0) /
+                            Math.max(1, photoCards.length)
+                        )}%`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Individual Status List Summary */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 text-[11px] font-mono">
+                    {photoCards.map((card, i) => (
+                      <div
+                        key={card.id}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800"
+                      >
+                        <span className="text-slate-300 truncate">Photo #{i + 1}</span>
+                        <span
+                          className={`font-bold ${
+                            card.status === 'done' || card.uploadedUrl
+                              ? 'text-emerald-400'
+                              : card.status === 'error'
+                              ? 'text-rose-400'
+                              : card.status === 'waiting'
+                              ? 'text-slate-400'
+                              : 'text-amber-400'
+                          }`}
+                        >
+                          {card.status === 'done' || card.uploadedUrl
+                            ? '100% · Done'
+                            : card.status === 'waiting'
+                            ? 'Waiting in queue'
+                            : card.status === 'optimizing'
+                            ? 'Optimizing WebP...'
+                            : card.status === 'error'
+                            ? 'Failed'
+                            : `${card.progress}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {photoCards.map((item, index) => {
                   const isPrimary = index === 0;
@@ -856,11 +1049,31 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                           </button>
                         )}
 
+                        {/* Waiting in Queue Overlay */}
+                        {item.status === 'waiting' && (
+                          <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-white space-y-1.5 z-20">
+                            <span className="text-[11px] font-mono font-medium text-slate-300">Waiting in queue...</span>
+                            <div className="w-16 bg-slate-800 rounded-full h-1 overflow-hidden">
+                              <div className="bg-slate-500 h-full w-1/3 animate-pulse" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Optimizing WebP Overlay */}
+                        {item.status === 'optimizing' && (
+                          <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-white space-y-2 z-20">
+                            <Loader2 size={20} className="animate-spin text-amber-400" />
+                            <span className="text-[11px] font-mono font-bold text-amber-300">
+                              Optimizing WebP...
+                            </span>
+                          </div>
+                        )}
+
                         {/* Upload Progress Overlay */}
                         {item.status === 'uploading' && (
-                          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-white space-y-2 z-20">
+                          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-white space-y-2 z-20">
                             <Loader2 size={20} className="animate-spin text-amber-400" />
-                            <span className="text-[11px] font-mono font-bold">
+                            <span className="text-[11px] font-mono font-bold text-amber-300">
                               Uploading {item.progress}%
                             </span>
                             <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
@@ -869,20 +1082,35 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                                 style={{ width: `${item.progress}%` }}
                               />
                             </div>
+                            {item.bytesTransferred && item.totalBytes ? (
+                              <span className="text-[9px] font-mono text-slate-300">
+                                {formatFileSize(item.bytesTransferred)} / {formatFileSize(item.totalBytes)}
+                              </span>
+                            ) : null}
                           </div>
                         )}
 
-                        {item.status === 'done' && (
-                          <div className="absolute bottom-2 right-2 bg-emerald-500/90 text-white text-[10px] font-mono px-2 py-0.5 rounded-md font-bold flex items-center gap-1 shadow">
+                        {/* Done Ready Badge */}
+                        {(item.status === 'done' || item.uploadedUrl) && (
+                          <div className="absolute bottom-2 right-2 bg-emerald-500/95 text-white text-[10px] font-mono px-2 py-0.5 rounded-md font-bold flex items-center gap-1 shadow-md">
                             <CheckCircle2 size={11} />
                             <span>Ready</span>
                           </div>
                         )}
 
+                        {/* Error Overlay with Single Photo Retry Button (Part 7) */}
                         {item.status === 'error' && (
-                          <div className="absolute inset-0 bg-rose-950/85 flex flex-col items-center justify-center p-2 text-rose-200 text-center text-[10px] font-mono">
-                            <AlertCircle size={18} className="text-rose-400 mb-1" />
-                            <span>{item.errorMessage || 'Upload failed'}</span>
+                          <div className="absolute inset-0 bg-rose-950/90 flex flex-col items-center justify-center p-3 text-rose-200 text-center text-[10px] font-mono z-20 space-y-2">
+                            <AlertCircle size={20} className="text-rose-400 shrink-0" />
+                            <span className="line-clamp-2 text-rose-300 font-semibold">{item.errorMessage || 'Upload failed'}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRetrySinglePhoto(item.id)}
+                              className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all active:scale-95 shadow flex items-center gap-1"
+                            >
+                              <RefreshCw size={11} />
+                              <span>Retry Photo</span>
+                            </button>
                           </div>
                         )}
                       </div>

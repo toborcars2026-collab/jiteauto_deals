@@ -27,8 +27,15 @@ try {
   // Ignore
 }
 
-// Initialize Firebase Storage
+// Initialize Firebase Storage with fast, responsive timeout thresholds
 export const storage = getStorage(app);
+try {
+  // Prevent SDK from stalling for 120 seconds in exponential backoff when a network glitch occurs
+  storage.maxUploadRetryTime = 4000;
+  storage.maxOperationRetryTime = 4000;
+} catch {
+  // Ignore in environments where properties are read-only
+}
 
 export enum OperationType {
   CREATE = 'create',
