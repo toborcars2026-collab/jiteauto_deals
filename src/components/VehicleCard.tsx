@@ -63,6 +63,8 @@ export default function VehicleCard({
             transition={{ duration: 0.2 }}
             src={getImageUrl(images[currentImgIdx])}
             alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            width={480}
+            height={300}
             loading="lazy"
             decoding="async"
             className={`h-full w-full object-cover cursor-pointer transition-transform duration-500 ${

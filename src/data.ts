@@ -1,6 +1,7 @@
 import { Vehicle } from "./types";
+import seedVehicles from "./seed_vehicles.json";
 
-export const INITIAL_VEHICLES: Vehicle[] = [];
+export const INITIAL_VEHICLES: Vehicle[] = (seedVehicles as unknown as Vehicle[]) || [];
 
 export const HOW_IT_WORKS_STEPS = [
   {

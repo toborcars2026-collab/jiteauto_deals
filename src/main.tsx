@@ -8,3 +8,10 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// Seamlessly transition out the initial branded loading screen
+if (typeof window !== 'undefined') {
+  requestAnimationFrame(() => {
+    (window as any).__dismissInitialLoader?.();
+  });
+}

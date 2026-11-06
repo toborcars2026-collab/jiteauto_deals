@@ -45,6 +45,8 @@
 }
 
 html {
+  background-color: #020617;
+  color: #f8fafc;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
@@ -52,8 +54,17 @@ html {
 }
 
 body {
+  background-color: #020617;
+  color: #f8fafc;
   overflow-x: hidden;
   width: 100%;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: #020617;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Custom Scrollbar and layout adjustments */

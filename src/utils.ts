@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnaps
 import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
+import { INITIAL_VEHICLES } from './data';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
 const VEHICLES_KEY = 'jite_vehicles_v14';
@@ -1064,21 +1065,22 @@ export function getInitialVehicleRoute(): { slugOrId: string | null; qualify: bo
 }
 
 /**
- * Gets cached vehicles from localStorage. Returns empty array if no cache exists.
+ * Gets cached vehicles from localStorage, seamlessly falling back to INITIAL_VEHICLES.
+ * Guarantees zero blank gaps, zero layout shifts, and instant spotlight rendering.
  */
 export function getVehicles(): Vehicle[] {
   try {
     const data = localStorage.getItem(VEHICLES_KEY);
-    if (!data) return [];
+    if (!data) return INITIAL_VEHICLES;
     const parsed = JSON.parse(data) as Vehicle[];
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_VEHICLES;
     const list = parsed.map(normalizeVehicleData);
     if (list.length > 0 && activeVehiclesCache.length === 0) {
       activeVehiclesCache = list;
     }
     return list;
   } catch (e) {
-    return [];
+    return INITIAL_VEHICLES;
   }
 }
 

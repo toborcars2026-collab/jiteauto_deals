@@ -276,6 +276,11 @@ export default function App() {
 
   // 1. Initial Page Load and Data Prioritization
   useEffect(() => {
+    // Dismiss initial branded loader smoothly once App component tree is mounted
+    if (typeof window !== 'undefined' && (window as any).__dismissInitialLoader) {
+      (window as any).__dismissInitialLoader();
+    }
+
     const route = getInitialVehicleRoute();
     const searchParams = new URLSearchParams(window.location.search);
     const tabParam = searchParams.get('tab') as NavigationTab | null;
@@ -469,7 +474,7 @@ export default function App() {
   }, [vehicles]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 flex flex-col font-sans text-slate-900 selection:bg-amber-400 selection:text-slate-950">
       {/* Top Header Navigation */}
       <Header
         currentTab={currentTab}
