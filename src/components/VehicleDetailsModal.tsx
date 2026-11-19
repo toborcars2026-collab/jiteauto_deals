@@ -1,31 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import {
   X,
   MapPin,
-  Gauge,
   ShieldCheck,
   Phone,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   CircleDollarSign,
-  Maximize2,
   Share2,
   Car,
-  ArrowLeft,
   ArrowUpRight,
-  Search,
   AlertTriangle,
+  RotateCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle, BusinessSettings } from '../types';
 import { AppHistoryState } from '../App';
 import ShareVehicleModal from './ShareVehicleModal';
 import VehicleFullscreenViewer from './VehicleFullscreenViewer';
+import VehicleImageFallback from './VehicleImageFallback';
+import { FALLBACK_VEHICLE_IMAGE } from '../assets/visuals';
 import {
   formatCurrency,
-  formatMileage,
   getWhatsAppLink,
   safeOpenWhatsApp,
   getVehicleInquiryMessage,
@@ -36,6 +33,8 @@ import {
   getBusinessPhoneDisplay,
   getBusinessPhoneCallUrl,
 } from '../utils';
+
+const Vehicle360Viewer = lazy(() => import('./Vehicle360Viewer'));
 
 interface VehicleDetailsModalProps {
   vehicle: Vehicle | null;
@@ -63,12 +62,21 @@ export default function VehicleDetailsModal({
   businessSettings,
 }: VehicleDetailsModalProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [show360, setShow360] = useState(false);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [isFullscreenZoom, setIsFullscreenZoom] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [direction, setDirection] = useState(1);
   const dragOccurredRef = useRef(false);
   const pointerDownPosRef = useRef({ x: 0, y: 0 });
   const modalThumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Reset gallery & 360 state whenever active vehicle changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+    setShow360(false);
+    setFailedImages({});
+  }, [vehicle?.id]);
 
   // Smooth-scroll active thumbnail into view
   useEffect(() => {
@@ -412,8 +420,9 @@ export default function VehicleDetailsModal({
 
   // Ensure unique image list
   const uniqueImages = Array.from(new Set(vehicle.images.filter(Boolean)));
-  const images = uniqueImages.length > 0 ? uniqueImages : ['https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200'];
+  const images = uniqueImages.length > 0 ? uniqueImages : [FALLBACK_VEHICLE_IMAGE];
   const currentImageIndex = activeImageIndex >= images.length ? 0 : activeImageIndex;
+  const has360Frames = Boolean(vehicle.frames360 && vehicle.frames360.length >= 6);
 
   const handleNextImage = () => {
     setDirection(1);
@@ -530,118 +539,169 @@ export default function VehicleDetailsModal({
             <div className="lg:col-span-6 space-y-4">
               <div
                 onClick={() => {
-                  if (!dragOccurredRef.current) {
+                  if (!show360 && !dragOccurredRef.current) {
                     handleOpenFullscreenZoom();
                   }
                 }}
-                className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none cursor-pointer"
-                title="Tap anywhere to view full photo"
-                role="button"
+                className={`relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 group select-none ${
+                  show360 ? 'cursor-grab' : 'cursor-pointer'
+                }`}
+                title={show360 ? 'Drag horizontally to rotate vehicle' : 'Tap anywhere to view full photo'}
+                role={show360 ? 'region' : 'button'}
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (!show360 && (e.key === 'Enter' || e.key === ' ')) {
                     e.preventDefault();
                     handleOpenFullscreenZoom();
                   }
                 }}
               >
-                <AnimatePresence initial={false} custom={direction} mode="popLayout">
-                  <motion.img
-                    key={currentImageIndex}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                      x: { type: 'spring', stiffness: 300, damping: 30 },
-                      opacity: { duration: 0.2 },
-                    }}
-                    src={getOptimizedImageUrl(images[currentImageIndex], 'detail')}
-                    alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover transition-transform cursor-pointer"
-                    loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
-                    decoding="async"
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.2}
-                    onPointerDown={(e) => {
-                      dragOccurredRef.current = false;
-                      pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
-                    }}
-                    onPointerUp={(e) => {
-                      const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
-                      const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
-                      if (dx < 10 && dy < 10) {
-                        dragOccurredRef.current = false;
-                        handleOpenFullscreenZoom();
-                      }
-                    }}
-                    onDragStart={() => {
-                      dragOccurredRef.current = false;
-                    }}
-                    onDragEnd={handleDragEnd}
+                {has360Frames && (
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!dragOccurredRef.current) {
-                        handleOpenFullscreenZoom();
-                      }
+                      setShow360((prev) => !prev);
                     }}
-                    onError={(e) => {
-                      e.currentTarget.src =
-                        'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
-                    }}
-                    referrerPolicy="no-referrer"
-                  />
-                </AnimatePresence>
-
-                {/* Clear "TAP TO VIEW FULL PHOTO" Overlay Indication */}
-                <button
-                  type="button"
-                  id="details_tap_to_view_photo_btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenFullscreenZoom();
-                  }}
-                  className="absolute bottom-3 left-3 bg-slate-950/85 hover:bg-slate-950 active:scale-95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-black tracking-wider border border-white/20 z-10 cursor-pointer flex items-center gap-1.5 shadow-xl transition-all select-none group/tap"
-                  aria-label="TAP TO VIEW FULL PHOTO"
-                  title="TAP TO VIEW FULL PHOTO"
-                >
-                  <ArrowUpRight size={14} className="text-amber-400 group-hover/tap:translate-x-0.5 group-hover/tap:-translate-y-0.5 transition-transform" />
-                  <span className="font-sans uppercase">TAP TO VIEW FULL PHOTO</span>
-                </button>
-
-                {images.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrevImage();
-                      }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
-                      aria-label="Previous image"
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNextImage();
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
-                      aria-label="Next image"
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  </>
+                    className={`absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold uppercase tracking-wider border backdrop-blur-md transition-colors cursor-pointer ${
+                      show360
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-lg'
+                        : 'bg-slate-950/85 text-amber-300 border-white/15 hover:bg-slate-950'
+                    }`}
+                    aria-pressed={show360}
+                  >
+                    <RotateCw size={12} />
+                    <span>{show360 ? 'Back to Photos' : '360° Turntable'}</span>
+                  </button>
                 )}
 
-                {/* Photo Counter Tag */}
-                <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white font-mono font-medium border border-white/10 z-10">
-                  {currentImageIndex + 1} / {images.length}
-                </div>
+                {show360 && has360Frames ? (
+                  <Suspense
+                    fallback={
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-400 text-xs font-mono gap-2">
+                        <div className="h-6 w-6 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                        <span>Loading 360° turntable...</span>
+                      </div>
+                    }
+                  >
+                    <Vehicle360Viewer
+                      frames={vehicle.frames360!}
+                      vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    />
+                  </Suspense>
+                ) : (
+                  <>
+                    {failedImages[currentImageIndex] ? (
+                      <VehicleImageFallback
+                        title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                        className="w-full h-full"
+                      />
+                    ) : (
+                      <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                        <motion.img
+                          key={currentImageIndex}
+                          custom={direction}
+                          variants={slideVariants}
+                          initial="enter"
+                          animate="center"
+                          exit="exit"
+                          transition={{
+                            x: { type: 'spring', stiffness: 300, damping: 30 },
+                            opacity: { duration: 0.2 },
+                          }}
+                          src={getOptimizedImageUrl(images[currentImageIndex], 'detail')}
+                          alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
+                          className="w-full h-full object-cover transition-transform cursor-pointer"
+                          loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
+                          decoding="async"
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.2}
+                          onPointerDown={(e) => {
+                            dragOccurredRef.current = false;
+                            pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+                          }}
+                          onPointerUp={(e) => {
+                            const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
+                            const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
+                            if (dx < 10 && dy < 10) {
+                              dragOccurredRef.current = false;
+                              handleOpenFullscreenZoom();
+                            }
+                          }}
+                          onDragStart={() => {
+                            dragOccurredRef.current = false;
+                          }}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!dragOccurredRef.current) {
+                              handleOpenFullscreenZoom();
+                            }
+                          }}
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (!el.dataset.fallbackApplied) {
+                              el.dataset.fallbackApplied = '1';
+                              el.src = FALLBACK_VEHICLE_IMAGE;
+                            } else {
+                              setFailedImages((prev) => ({ ...prev, [currentImageIndex]: true }));
+                            }
+                          }}
+                          referrerPolicy="no-referrer"
+                        />
+                      </AnimatePresence>
+                    )}
+
+                    {/* Clear "TAP TO VIEW FULL PHOTO" Overlay Indication */}
+                    <button
+                      type="button"
+                      id="details_tap_to_view_photo_btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenFullscreenZoom();
+                      }}
+                      className="absolute bottom-3 left-3 bg-slate-950/85 hover:bg-slate-950 active:scale-95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-black tracking-wider border border-white/20 z-10 cursor-pointer flex items-center gap-1.5 shadow-xl transition-all select-none group/tap"
+                      aria-label="TAP TO VIEW FULL PHOTO"
+                      title="TAP TO VIEW FULL PHOTO"
+                    >
+                      <ArrowUpRight size={14} className="text-amber-400 group-hover/tap:translate-x-0.5 group-hover/tap:-translate-y-0.5 transition-transform" />
+                      <span className="font-sans uppercase">TAP TO VIEW FULL PHOTO</span>
+                    </button>
+
+                    {images.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrevImage();
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
+                          aria-label="Previous image"
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleNextImage();
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md z-10 cursor-pointer"
+                          aria-label="Next image"
+                        >
+                          <ChevronRight size={18} />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Photo Counter Tag */}
+                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white font-mono font-medium border border-white/10 z-10 tabular-nums">
+                      {currentImageIndex + 1} / {images.length}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Thumbnails Row */}
@@ -653,9 +713,12 @@ export default function VehicleDetailsModal({
                       ref={(el) => {
                         modalThumbnailRefs.current[idx] = el;
                       }}
-                      onClick={() => setActiveImageIndex(idx)}
+                      onClick={() => {
+                        setShow360(false);
+                        setActiveImageIndex(idx);
+                      }}
                       className={`relative h-14 w-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer opacity-100 ${
-                        currentImageIndex === idx
+                        !show360 && currentImageIndex === idx
                           ? 'border-amber-500 scale-95 shadow-md ring-2 ring-amber-500/40'
                           : 'border-slate-200 hover:border-slate-400'
                       }`}
@@ -668,8 +731,11 @@ export default function VehicleDetailsModal({
                         decoding="async"
                         className="h-full w-full object-cover"
                         onError={(e) => {
-                          e.currentTarget.src =
-                            'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                          const el = e.currentTarget;
+                          if (!el.dataset.fallbackApplied) {
+                            el.dataset.fallbackApplied = '1';
+                            el.src = FALLBACK_VEHICLE_IMAGE;
+                          }
                         }}
                         referrerPolicy="no-referrer"
                       />
@@ -707,7 +773,7 @@ export default function VehicleDetailsModal({
                   </div>
                 </div>
                 <div
-                  className={`text-3xl font-mono font-extrabold tracking-tight ${
+                  className={`text-3xl font-mono font-extrabold tracking-tight tabular-nums ${
                     vehicle.status === 'Sold' ? 'text-slate-400 line-through' : 'text-slate-900'
                   }`}
                 >

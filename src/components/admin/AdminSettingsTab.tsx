@@ -12,7 +12,8 @@ import {
   MessageSquare,
   Globe,
   ShieldCheck,
-  Lock
+  Lock,
+  BookOpen,
 } from 'lucide-react';
 import { BusinessSettings } from '../../types';
 import {
@@ -22,6 +23,7 @@ import {
   DEFAULT_BUSINESS_SETTINGS,
 } from '../../utils';
 import AdminSecuritySection from './AdminSecuritySection';
+import AdminEditorialSection from './AdminEditorialSection';
 
 interface AdminSettingsTabProps {
   currentUser?: { email: string | null } | null;
@@ -34,7 +36,7 @@ export default function AdminSettingsTab({
   onSignOut,
   onSettingsSaved,
 }: AdminSettingsTabProps) {
-  const [subTab, setSubTab] = useState<'profile' | 'security'>('profile');
+  const [subTab, setSubTab] = useState<'profile' | 'editorial' | 'security'>('profile');
   const [settings, setSettings] = useState<BusinessSettings>(() => getBusinessSettings());
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -84,8 +86,8 @@ export default function AdminSettingsTab({
 
   return (
     <div className="space-y-6">
-      {/* Sub-tab Switcher: Profile vs Security */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl w-fit border border-slate-200">
+      {/* Sub-tab Switcher: Profile vs Editorial vs Security */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl w-fit border border-slate-200">
         <button
           type="button"
           onClick={() => setSubTab('profile')}
@@ -97,6 +99,19 @@ export default function AdminSettingsTab({
         >
           <Building2 size={15} className={subTab === 'profile' ? 'text-amber-500' : 'text-slate-400'} />
           <span>Business Profile & Channels</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('editorial')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            subTab === 'editorial'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <BookOpen size={15} className={subTab === 'editorial' ? 'text-amber-500' : 'text-slate-400'} />
+          <span>Editorial Insights</span>
         </button>
 
         <button
@@ -115,6 +130,8 @@ export default function AdminSettingsTab({
 
       {subTab === 'security' ? (
         <AdminSecuritySection currentUser={currentUser || null} onSignOut={onSignOut} />
+      ) : subTab === 'editorial' ? (
+        <AdminEditorialSection />
       ) : (
         <div className="space-y-6 animate-fadeIn">
           <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

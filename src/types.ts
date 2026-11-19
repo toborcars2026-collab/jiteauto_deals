@@ -25,6 +25,30 @@ export interface Vehicle {
   status?: VehicleStatus;
   createdAt?: string;
   updatedAt?: string;
+  /** Optional genuine 3D model URL (.glb / .gltf) if uploaded for the vehicle */
+  model3dUrl?: string;
+  /** Optional array of sequential 360 turntable frame URLs if uploaded for the vehicle */
+  frames360?: string[];
+}
+
+export type EditorialCategory =
+  | 'Inspection Guide'
+  | 'Buyer Strategy'
+  | 'Vehicle Walkaround'
+  | 'Market Brief';
+
+export interface EditorialPost {
+  id: string;
+  title: string;
+  category: EditorialCategory;
+  summary: string;
+  body: string;
+  readTime: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  publishedAt: string;
+  isPublished: boolean;
+  featuredOrder?: number;
 }
 
 export type LeadStatus = 'New' | 'Contacted' | 'In Progress' | 'Completed' | 'Closed';

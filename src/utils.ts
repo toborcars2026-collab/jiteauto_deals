@@ -1,14 +1,20 @@
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, OperationType, handleFirestoreError } from './firebase';
-import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus } from './types';
+import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
 import { INITIAL_VEHICLES } from './data';
+import {
+  FALLBACK_VEHICLE_IMAGE,
+  EDITORIAL_INSPECTION_IMAGE,
+  EDITORIAL_EXECUTIVE_IMAGE,
+} from './assets/visuals';
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
 const VEHICLES_KEY = 'jite_vehicles_v14';
 const LEADS_KEY = 'jite_leads_v2';
 const INQUIRIES_KEY = 'jite_inquiries_v2';
 const SETTINGS_KEY = 'jite_business_settings_v1';
+const EDITORIAL_KEY = 'jite_editorial_posts_v1';
 
 // Format Currency to Nigerian Naira (₦)
 export function formatCurrency(amount: number): string {
@@ -716,31 +722,40 @@ export async function resolveImageLink(url: string): Promise<string> {
 
 export function getImageUrl(url: string | undefined | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    return 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=100&w=2400';
+    return FALLBACK_VEHICLE_IMAGE;
   }
 
-  return normalizeImageInput(url);
+  const normalized = normalizeImageInput(url);
+  if (normalized.includes('images.unsplash.com')) {
+    return FALLBACK_VEHICLE_IMAGE;
+  }
+  return normalized;
+}
+
+function buildCloudinaryUrl(url: string, width: number, quality = 'auto:good'): string {
+  // Inject Cloudinary responsive delivery transforms only when `/upload/` is present cleanly
+  const uploadToken = '/image/upload/';
+  const idx = url.indexOf(uploadToken);
+  if (idx === -1) return url;
+  const prefix = url.slice(0, idx + uploadToken.length);
+  const rest = url.slice(idx + uploadToken.length);
+  // Skip if custom transforms already start right after /upload/ (avoid stacking duplicate w_/f_)
+  const firstSegment = rest.split('/')[0] || '';
+  if (firstSegment && !firstSegment.startsWith('v') && firstSegment.includes(',')) {
+    return url;
+  }
+  return `${prefix}c_limit,w_${width},q_${quality},f_auto/${rest}`;
 }
 
 export function getOptimizedImageUrl(url: string | undefined | null, preset: 'card' | 'thumb' | 'detail' | 'fullscreen' | string = 'card'): string {
   const base = getImageUrl(url);
-  if (!base) return '';
+  if (!base) return FALLBACK_VEHICLE_IMAGE;
 
-  // If unsplash image, dynamically adjust quality & dimensions per preset
-  if (base.includes('unsplash.com')) {
-    const cleanBase = base.split('?')[0];
-    if (preset === 'thumb') {
-      return `${cleanBase}?auto=format&fit=crop&q=95&w=600`;
-    }
-    if (preset === 'card') {
-      return `${cleanBase}?auto=format&fit=crop&q=95&w=1200`;
-    }
-    if (preset === 'detail') {
-      return `${cleanBase}?auto=format&fit=crop&q=95&w=1800`;
-    }
-    if (preset === 'fullscreen') {
-      return `${cleanBase}?auto=format&fit=crop&q=98&w=2560`;
-    }
+  if (base.includes('res.cloudinary.com') && base.includes('/image/upload/')) {
+    if (preset === 'thumb') return buildCloudinaryUrl(base, 480, 'auto:eco');
+    if (preset === 'card') return buildCloudinaryUrl(base, 800, 'auto:good');
+    if (preset === 'detail') return buildCloudinaryUrl(base, 1400, 'auto:good');
+    if (preset === 'fullscreen') return buildCloudinaryUrl(base, 2200, 'auto:best');
   }
 
   return base;
@@ -749,8 +764,8 @@ export function getOptimizedImageUrl(url: string | undefined | null, preset: 'ca
 export function getVehicleCardSrcSet(url: string | undefined | null): string | undefined {
   const base = getImageUrl(url);
   if (!base) return undefined;
-  if (base.includes('unsplash.com')) {
-    return `${base}&w=480 480w, ${base}&w=800 800w, ${base}&w=1200 1200w`;
+  if (base.includes('res.cloudinary.com') && base.includes('/image/upload/')) {
+    return `${buildCloudinaryUrl(base, 480, 'auto:eco')} 480w, ${buildCloudinaryUrl(base, 800, 'auto:good')} 800w, ${buildCloudinaryUrl(base, 1200, 'auto:good')} 1200w`;
   }
   return undefined;
 }
@@ -2270,6 +2285,145 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
   }
 
   return updated;
+}
+
+// ============================================================================
+// EDITORIAL & AUTOMOTIVE INSIGHTS FIRESTORE INTEGRATION (settings/editorial)
+// ============================================================================
+
+export const DEFAULT_EDITORIAL_POSTS: EditorialPost[] = [
+  {
+    id: 'guide-tokunbo-vs-nigerian-used',
+    title: 'Foreign Used vs. Nigerian Used: What Actually Determines Long-Term Reliability',
+    category: 'Buyer Strategy',
+    summary:
+      'Beyond fresh exterior paintwork: the mechanical, customs documentation, and service-history checks that separate a sound acquisition from a costly repair bill.',
+    body:
+      'Many buyers assume a foreign-used label guarantees mechanical soundness while a locally driven vehicle automatically carries hidden defects. In practice, physical condition, cooling system integrity, transmission fluid health, and verifiable ownership paperwork matter far more than classification alone.\n\nBefore committing a deposit, inspect cold-start engine behavior, scan onboard control modules for cleared fault codes, confirm customs duty authenticity on imported units, and verify body panels for flood or structural repair.',
+    readTime: '4 min guide',
+    imageUrl: EDITORIAL_INSPECTION_IMAGE,
+    publishedAt: '2026-03-10',
+    isPublished: true,
+    featuredOrder: 1,
+  },
+  {
+    id: 'guide-pre-purchase-inspection-checklist',
+    title: 'The Pre-Purchase Inspection Protocol Before Transferring Any Vehicle Funds',
+    category: 'Inspection Guide',
+    summary:
+      'A practical step-by-step physical verification routine covering diagnostics, suspension geometry, VIN verification, and test-drive checks in Nigeria.',
+    body:
+      'A structured pre-purchase inspection protects your capital before ownership changes hands. Every physical inspection arranged through Jite Auto Deals follows four disciplined stages:\n\n1. VIN and Paperwork Verification: Confirm chassis numbers match registration, customs papers, and seller identity.\n2. Diagnostic Computer Scan: Read stored engine, ABS, airbag, and transmission codes before clearing memory.\n3. Underbody & Cooling Audit: Check radiator condition, AC compressor engagement, bushings, and fluid leaks.\n4. Road Test Under Load: Evaluate gear shifts at highway speed and braking stability.',
+    readTime: '5 min guide',
+    imageUrl: EDITORIAL_EXECUTIVE_IMAGE,
+    publishedAt: '2026-03-04',
+    isPublished: true,
+    featuredOrder: 2,
+  },
+  {
+    id: 'guide-total-ownership-cost-planning',
+    title: 'Budgeting Beyond the Sticker Price: Clearing, Servicing, and Insurance Planning',
+    category: 'Market Brief',
+    summary:
+      'How smart buyers structure a realistic acquisition budget that reserves room for immediate preventative servicing and registration.',
+    body:
+      'Allocating 100% of your available funds strictly to a vehicle purchase price leaves zero buffer for day-one fluids, tire replacements, comprehensive insurance, or licensing.\n\nWe advise clients to set aside an initial maintenance reserve so your first service—engine oil, filters, brake pads, and alignment—is completed immediately after inspection.',
+    readTime: '3 min guide',
+    imageUrl: FALLBACK_VEHICLE_IMAGE,
+    publishedAt: '2026-02-22',
+    isPublished: true,
+    featuredOrder: 3,
+  },
+];
+
+export function getEditorialPosts(): EditorialPost[] {
+  try {
+    const raw = localStorage.getItem(EDITORIAL_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_EDITORIAL_POSTS;
+}
+
+export async function fetchEditorialPosts(): Promise<EditorialPost[]> {
+  try {
+    const docRef = doc(db, 'settings', 'editorial');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (Array.isArray(data?.posts) && data.posts.length > 0) {
+        try {
+          localStorage.setItem(EDITORIAL_KEY, JSON.stringify(data.posts));
+        } catch {}
+        return data.posts as EditorialPost[];
+      }
+    }
+  } catch (error) {
+    console.warn('[Firestore] Notice loading editorial posts:', error);
+  }
+  return getEditorialPosts();
+}
+
+export function subscribeToEditorialPosts(onUpdate: (posts: EditorialPost[]) => void): () => void {
+  try {
+    const docRef = doc(db, 'settings', 'editorial');
+    return onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data?.posts) && data.posts.length > 0) {
+            try {
+              localStorage.setItem(EDITORIAL_KEY, JSON.stringify(data.posts));
+            } catch {}
+            onUpdate(data.posts as EditorialPost[]);
+            return;
+          }
+        }
+        onUpdate(getEditorialPosts());
+      },
+      () => {
+        onUpdate(getEditorialPosts());
+      }
+    );
+  } catch {
+    onUpdate(getEditorialPosts());
+    return () => {};
+  }
+}
+
+export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Promise<EditorialPost[]> {
+  const sanitized = posts.map((post, idx) =>
+    cleanFirestoreData({
+      ...post,
+      featuredOrder: typeof post.featuredOrder === 'number' ? post.featuredOrder : idx + 1,
+    })
+  ) as EditorialPost[];
+
+  try {
+    localStorage.setItem(EDITORIAL_KEY, JSON.stringify(sanitized));
+  } catch {}
+
+  try {
+    const docRef = doc(db, 'settings', 'editorial');
+    await setDoc(
+      docRef,
+      {
+        posts: sanitized,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
+    throw error;
+  }
+
+  return sanitized;
 }
 
 // ============================================================================

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, ArrowLeft, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Vehicle } from '../types';
 import { getOptimizedImageUrl } from '../utils';
+import { FALLBACK_VEHICLE_IMAGE } from '../assets/visuals';
 
 interface VehicleFullscreenViewerProps {
   vehicle: Vehicle;
@@ -428,8 +429,10 @@ export default function VehicleFullscreenViewer({
           decoding="async"
           onLoad={() => setHighResLoaded(true)}
           onError={(e) => {
-            e.currentTarget.src =
-              'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+            const target = e.currentTarget as HTMLImageElement;
+            if (target.src !== FALLBACK_VEHICLE_IMAGE) {
+              target.src = FALLBACK_VEHICLE_IMAGE;
+            }
           }}
           className="max-h-full max-w-full object-contain pointer-events-none transition-transform duration-75 ease-out select-none"
           style={{

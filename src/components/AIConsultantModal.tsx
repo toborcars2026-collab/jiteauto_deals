@@ -20,6 +20,7 @@ import {
   Clock
 } from 'lucide-react';
 import { Vehicle, AIConsultantMessage, BusinessSettings } from '../types';
+import { FALLBACK_VEHICLE_IMAGE } from '../assets/visuals';
 import {
   formatCurrency,
   getImageUrl,
@@ -411,9 +412,12 @@ You can also start an immediate WhatsApp chat below:`,
                               alt={`${car.year} ${car.make} ${car.model}`}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               onError={(e) => {
-                                e.currentTarget.src =
-                                  'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=1200';
+                                const target = e.currentTarget as HTMLImageElement;
+                                if (target.src !== FALLBACK_VEHICLE_IMAGE) {
+                                  target.src = FALLBACK_VEHICLE_IMAGE;
+                                }
                               }}
+                              referrerPolicy="no-referrer"
                             />
                             <div className="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold text-amber-400 border border-amber-500/20">
                               {car.condition || 'Foreign Used'}

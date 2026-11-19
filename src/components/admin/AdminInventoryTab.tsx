@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Vehicle, VehicleStatus } from '../../types';
+import { FALLBACK_VEHICLE_IMAGE } from '../../assets/visuals';
 import {
   formatCurrency,
   isVehicleActive,
@@ -331,8 +332,10 @@ export default function AdminInventoryTab({
                       style={{ imageRendering: '-webkit-optimize-contrast' }}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
-                        e.currentTarget.src =
-                          'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=95&w=2000';
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (target.src !== FALLBACK_VEHICLE_IMAGE) {
+                          target.src = FALLBACK_VEHICLE_IMAGE;
+                        }
                       }}
                     />
                     <span className="absolute bottom-1.5 left-1.5 bg-black/80 backdrop-blur-xs text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded">

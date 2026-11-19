@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Phone, Car, Search, Share2, HelpCircle, UserCheck, MessageSquare, Smartphone, Download } from 'lucide-react';
+import { Menu, X, Phone, Car, Search, Share2, HelpCircle, UserCheck, MessageSquare } from 'lucide-react';
 import { NavigationTab, BusinessSettings } from '../types';
 import { getBusinessPhoneDisplay, getBusinessPhoneCallUrl } from '../utils';
 
@@ -7,8 +7,6 @@ interface HeaderProps {
   currentTab: NavigationTab;
   setCurrentTab: (tab: NavigationTab) => void;
   onOpenConsultation: () => void;
-  onOpenAndroidSimulator?: () => void;
-  onOpenDownloadApp?: () => void;
   businessSettings?: BusinessSettings;
 }
 
@@ -16,9 +14,7 @@ export default function Header({
   currentTab,
   setCurrentTab,
   onOpenConsultation,
-  onOpenAndroidSimulator,
-  onOpenDownloadApp,
-  businessSettings
+  businessSettings,
 }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -27,7 +23,7 @@ export default function Header({
 
   const navigationItems: { id: NavigationTab; label: string; icon: any }[] = [
     { id: 'home', label: 'Home', icon: Car },
-    { id: 'browse', label: 'Browse Cars', icon: Car },
+    { id: 'browse', label: 'Inventory', icon: Car },
     { id: 'find-car', label: 'Find My Car', icon: Search },
     { id: 'source-car', label: 'Source a Car', icon: Share2 },
     { id: 'how-it-works', label: 'How It Works', icon: HelpCircle },
@@ -53,28 +49,26 @@ export default function Header({
   };
 
   return (
-    <header id="site_header" className="sticky top-0 z-50 w-full bg-slate-950 text-white border-b border-slate-800/90 shadow-lg backdrop-blur-md">
+    <header
+      id="site_header"
+      className="sticky top-0 z-50 w-full bg-slate-950/95 text-white border-b border-slate-800/90 backdrop-blur-md"
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-18 items-center justify-between">
-          {/* Brand Logo & Vehicle Consultant Tag */}
-          <div
-            className="flex items-center gap-3 cursor-pointer select-none py-2"
-            onClick={() => handleNavClick('home')}
+        <div className="flex h-16 items-center justify-between gap-8">
+          {/* Zone 1: Clean single-line brand wordmark */}
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              handleNavClick('home');
+            }}
+            className="font-display font-black text-xl sm:text-2xl tracking-tight text-white whitespace-nowrap shrink-0 select-none"
           >
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="font-display font-black text-xl sm:text-2xl tracking-tight text-white">
-                  Jite Auto <span className="text-amber-400">Deals</span>
-                </span>
-              </div>
-              <span className="text-[10px] sm:text-[11px] font-mono tracking-widest text-slate-400 uppercase -mt-0.5">
-                Vehicle Consultant
-              </span>
-            </div>
-          </div>
+            Jite Auto <span className="text-amber-400">Deals</span>
+          </a>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-1">
+          {/* Zone 2: Clean typographic navigation links with subtle gold indicator */}
+          <nav className="hidden lg:flex items-center gap-6" aria-label="Primary navigation">
             {navigationItems.map((item) => {
               const isActive = currentTab === item.id;
               return (
@@ -85,62 +79,45 @@ export default function Header({
                   onClick={() => handleNavClick(item.id)}
                   onMouseEnter={() => handlePrefetchTab(item.id)}
                   onTouchStart={() => handlePrefetchTab(item.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`relative py-2 text-sm font-medium transition-colors duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                      ? 'text-amber-400 font-semibold'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`absolute left-0 right-0 bottom-0 h-0.5 bg-amber-400 transition-transform duration-200 origin-left ${
+                      isActive ? 'scale-x-100' : 'scale-x-0'
+                    }`}
+                  />
                 </button>
               );
             })}
           </nav>
 
-          {/* Right Action CTA & Phone Link */}
-          <div className="hidden sm:flex items-center gap-2.5">
-            <button
-              type="button"
-              id="header_download_app_btn"
-              onClick={onOpenDownloadApp || onOpenAndroidSimulator}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 text-xs font-bold transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
-              title="Download or Install Jite Auto Deals App on your phone"
-            >
-              <Download size={14} />
-              <span>Get App</span>
-            </button>
-
-            <a
-              href={phoneCallUrl}
-              id="header_call_btn"
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white hover:border-amber-500/40 text-xs font-mono transition-all duration-200 shadow-sm active:scale-95 group"
-              title={`Call Jite Auto Deals at ${phoneDisplay}`}
-            >
-              <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
-                <Phone size={12} className="stroke-[2.5]" />
-              </div>
-              <span className="font-semibold tracking-wide">{phoneDisplay}</span>
-            </a>
-
+          {/* Zone 3: Primary action button */}
+          <div className="hidden lg:flex items-center shrink-0">
             <button
               type="button"
               id="header_btn_consultant"
               onClick={onOpenConsultation}
               onMouseEnter={handlePrefetchConsultant}
               onTouchStart={handlePrefetchConsultant}
-              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md shadow-amber-500/10 hover:shadow-lg transition-all duration-200 cursor-pointer select-none"
+              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer select-none whitespace-nowrap shrink-0"
             >
-              <MessageSquare size={15} />
+              <MessageSquare size={14} />
               <span>Talk to a Consultant</span>
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex lg:hidden items-center gap-2">
+          {/* Mobile Controls (keeps top height compact within 15% cap) */}
+          <div className="flex lg:hidden items-center gap-2 shrink-0">
             <a
               href={phoneCallUrl}
               id="header_mobile_quick_call"
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 active:scale-90 transition-all"
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 active:scale-90 transition-all"
               title={`Call ${phoneDisplay}`}
               aria-label="Call Jite Auto Deals"
             >
@@ -153,7 +130,7 @@ export default function Header({
               onClick={onOpenConsultation}
               onMouseEnter={handlePrefetchConsultant}
               onTouchStart={handlePrefetchConsultant}
-              className="sm:hidden flex items-center gap-1 bg-amber-500 text-slate-950 px-2.5 py-1.5 rounded-lg text-xs font-extrabold"
+              className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-3 min-h-[40px] rounded-xl text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
             >
               <MessageSquare size={13} />
               <span>Consult</span>
@@ -163,11 +140,11 @@ export default function Header({
               type="button"
               id="mobile_menu_toggle"
               onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-slate-300 hover:bg-slate-900 hover:text-white focus:outline-none transition-colors"
+              className="inline-flex items-center justify-center rounded-xl w-10 h-10 text-slate-300 hover:bg-slate-900 hover:text-white focus:outline-none transition-colors cursor-pointer"
               aria-expanded={isOpen}
               aria-label="Toggle Navigation Menu"
             >
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+              {isOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
@@ -187,7 +164,7 @@ export default function Header({
                 onClick={() => handleNavClick(item.id)}
                 onMouseEnter={() => handlePrefetchTab(item.id)}
                 onTouchStart={() => handlePrefetchTab(item.id)}
-                className={`flex w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex w-full items-center gap-3 px-4 min-h-[44px] rounded-xl text-sm font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-amber-500 text-slate-950'
                     : 'text-slate-300 hover:bg-slate-900 hover:text-white'
@@ -202,35 +179,6 @@ export default function Header({
           <div className="pt-4 border-t border-slate-800/80 mt-3 space-y-2.5">
             <button
               type="button"
-              id="mobile_drawer_btn_download_app"
-              onClick={() => {
-                setIsOpen(false);
-                if (onOpenDownloadApp) onOpenDownloadApp();
-                else if (onOpenAndroidSimulator) onOpenAndroidSimulator();
-              }}
-              className="flex w-full items-center justify-center gap-2 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-extrabold rounded-xl shadow-md cursor-pointer"
-            >
-              <Download size={16} />
-              <span>Download & Install App</span>
-            </button>
-
-            {onOpenAndroidSimulator && (
-              <button
-                type="button"
-                id="mobile_drawer_btn_android"
-                onClick={() => {
-                  setIsOpen(false);
-                  onOpenAndroidSimulator();
-                }}
-                className="flex w-full items-center justify-center gap-2 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold rounded-xl shadow-sm cursor-pointer"
-              >
-                <Smartphone size={15} className="text-amber-400" />
-                <span>Launch Android Simulator</span>
-              </button>
-            )}
-
-            <button
-              type="button"
               id="mobile_drawer_btn_consultant"
               onClick={() => {
                 setIsOpen(false);
@@ -238,7 +186,7 @@ export default function Header({
               }}
               onMouseEnter={handlePrefetchConsultant}
               onTouchStart={handlePrefetchConsultant}
-              className="flex w-full items-center justify-center gap-2 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-extrabold rounded-xl shadow-md cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 min-h-[44px] py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-extrabold rounded-xl cursor-pointer"
             >
               <MessageSquare size={16} />
               <span>Talk to a Consultant</span>
@@ -248,7 +196,7 @@ export default function Header({
               href={phoneCallUrl}
               id="mobile_drawer_call_btn"
               onClick={() => setIsOpen(false)}
-              className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] text-white font-mono text-sm font-bold transition-all shadow-sm"
+              className="flex items-center justify-center gap-2.5 w-full min-h-[44px] py-3 rounded-xl border border-slate-800 bg-slate-900 text-white font-mono text-sm font-bold transition-all"
             >
               <Phone size={16} className="text-amber-400" />
               <span>Call: {phoneDisplay}</span>

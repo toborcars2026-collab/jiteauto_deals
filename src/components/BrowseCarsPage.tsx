@@ -1,14 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
-  Filter,
   X,
   ArrowLeft,
   SlidersHorizontal,
   Car,
   RefreshCw,
-  Check,
-  ChevronDown,
 } from 'lucide-react';
 import { Vehicle } from '../types';
 import VehicleCard from './VehicleCard';
@@ -17,26 +14,23 @@ import { formatCurrency } from '../utils';
 interface BrowseCarsPageProps {
   vehicles: Vehicle[];
   onViewDetails: (vehicle: Vehicle) => void;
-  onBookInspection?: (vehicle: Vehicle) => void;
-  onAskAboutCar?: (vehicle: Vehicle) => void;
-  onConsultVehicle?: (vehicle: Vehicle) => void;
+  onBookInspection: (vehicle: Vehicle) => void;
   onFindMyCar: () => void;
   onSourceCar: () => void;
   onGoHome?: () => void;
 }
 
+const BROWSE_SCROLL_STORAGE_KEY = 'jite_browse_scroll_y';
+const PAGE_BATCH_SIZE = 18;
+
 export default function BrowseCarsPage({
   vehicles,
   onViewDetails,
   onBookInspection,
-  onAskAboutCar,
-  onConsultVehicle,
   onFindMyCar,
   onSourceCar,
   onGoHome,
 }: BrowseCarsPageProps) {
-  const handleConsult = onConsultVehicle || onAskAboutCar || (() => {});
-  const handleBook = onBookInspection || handleConsult;
   const handleGoHome = onGoHome || (() => {});
 
   // Primary Search & Filters
@@ -57,15 +51,33 @@ export default function BrowseCarsPage({
   const [minYear, setMinYear] = useState<number | ''>('');
   const [maxYear, setMaxYear] = useState<number | ''>('');
 
-  // Sorting
+  // Sorting & Progressive Batching
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc'>('newest');
+  const [visibleLimit, setVisibleLimit] = useState<number>(PAGE_BATCH_SIZE);
 
   // Mobile Drawer State
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
-  // Scroll to top on mount
+  // Track and restore scroll position inside Browse Showroom
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const saved = sessionStorage.getItem(BROWSE_SCROLL_STORAGE_KEY);
+      if (saved) {
+        const y = parseInt(saved, 10);
+        if (!Number.isNaN(y) && y > 0) {
+          requestAnimationFrame(() => window.scrollTo(0, y));
+        }
+      }
+    } catch {}
+
+    const handleScroll = () => {
+      try {
+        sessionStorage.setItem(BROWSE_SCROLL_STORAGE_KEY, String(window.scrollY));
+      } catch {}
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // When brand changes, reset model filter
@@ -258,6 +270,25 @@ export default function BrowseCarsPage({
 
   const hasActiveFilters = activeFiltersCount > 0;
 
+  useEffect(() => {
+    setVisibleLimit(PAGE_BATCH_SIZE);
+  }, [
+    searchTerm,
+    selectedBrand,
+    selectedModel,
+    selectedBodyType,
+    selectedCondition,
+    selectedLocation,
+    selectedTransmission,
+    selectedFuel,
+    selectedStatus,
+    minPrice,
+    maxPrice,
+    minYear,
+    maxYear,
+    sortBy,
+  ]);
+
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedBrand('All');
@@ -274,6 +305,7 @@ export default function BrowseCarsPage({
     setMinYear('');
     setMaxYear('');
     setSortBy('newest');
+    setVisibleLimit(PAGE_BATCH_SIZE);
   };
 
   return (
@@ -294,10 +326,9 @@ export default function BrowseCarsPage({
 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                <span>Verified Sourcing Showroom</span>
-              </div>
+              <p className="text-xs font-mono font-semibold uppercase tracking-[0.18em] text-amber-400">
+                Verified Sourcing Showroom
+              </p>
               <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-2">
                 Browse Available Cars
               </h1>
@@ -594,46 +625,74 @@ export default function BrowseCarsPage({
             <div className="flex flex-wrap items-center gap-1.5 pt-2 text-xs">
               <span className="text-slate-600 font-mono text-[11px] mr-1">Active:</span>
               {searchTerm && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-medium">
-                  Search: "{searchTerm}"
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSearchTerm('')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Search: &ldquo;{searchTerm}&rdquo;</span>
+                  <X size={12} className="text-slate-500" />
+                </button>
               )}
               {selectedBrand !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-medium">
-                  Brand: {selectedBrand}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedBrand('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBrand('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Brand: {selectedBrand}</span>
+                  <X size={12} className="text-amber-700" />
+                </button>
               )}
               {selectedModel !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-medium">
-                  Model: {selectedModel}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedModel('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedModel('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Model: {selectedModel}</span>
+                  <X size={12} className="text-amber-700" />
+                </button>
               )}
               {selectedBodyType !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-medium">
-                  Body: {selectedBodyType}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedBodyType('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBodyType('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Body: {selectedBodyType}</span>
+                  <X size={12} className="text-slate-500" />
+                </button>
               )}
               {selectedCondition !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-medium">
-                  Condition: {selectedCondition}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedCondition('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCondition('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Condition: {selectedCondition}</span>
+                  <X size={12} className="text-slate-500" />
+                </button>
               )}
               {selectedLocation !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-medium">
-                  Location: {selectedLocation}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedLocation('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLocation('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Location: {selectedLocation}</span>
+                  <X size={12} className="text-slate-500" />
+                </button>
               )}
               {selectedStatus !== 'All' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-medium">
-                  Status: {selectedStatus}
-                  <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setSelectedStatus('All')} />
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatus('All')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <span>Status: {selectedStatus}</span>
+                  <X size={12} className="text-slate-500" />
+                </button>
               )}
             </div>
           )}
@@ -641,7 +700,7 @@ export default function BrowseCarsPage({
 
         {/* Counter Bar */}
         <div className="mt-6 flex items-center justify-between px-1">
-          <p className="text-xs font-mono text-slate-500 font-medium">
+          <p className="text-xs font-mono text-slate-500 font-medium tabular-nums">
             Showing <strong className="text-slate-900 font-bold">{filteredVehicles.length}</strong> of{' '}
             {vehicles.length} showroom vehicles
           </p>
@@ -654,17 +713,30 @@ export default function BrowseCarsPage({
 
         {/* Results Grid */}
         {filteredVehicles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-6">
-            {filteredVehicles.map((vehicle) => (
-              <VehicleCard
-                key={vehicle.id}
-                vehicle={vehicle}
-                onViewDetails={onViewDetails}
-                onBookInspection={handleBook}
-                onAskAboutCar={handleConsult}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-6">
+              {filteredVehicles.slice(0, visibleLimit).map((vehicle) => (
+                <VehicleCard
+                  key={vehicle.id}
+                  vehicle={vehicle}
+                  onViewDetails={onViewDetails}
+                  onBookInspection={onBookInspection}
+                />
+              ))}
+            </div>
+
+            {filteredVehicles.length > visibleLimit && (
+              <div className="mt-10 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleLimit((prev) => prev + PAGE_BATCH_SIZE)}
+                  className="inline-flex items-center justify-center gap-2 px-7 min-h-[44px] py-3 rounded-xl bg-slate-900 hover:bg-amber-500 text-white hover:text-slate-950 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                >
+                  <span>Load More Vehicles ({filteredVehicles.length - visibleLimit} remaining)</span>
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           /* Empty State */
           <div className="mt-12 p-10 sm:p-14 bg-white rounded-3xl border border-slate-200 text-center max-w-2xl mx-auto shadow-sm space-y-6">

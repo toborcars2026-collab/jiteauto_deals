@@ -1,28 +1,18 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import {
-  MessageSquare,
-  Phone,
-  Car,
-  Search,
-  Share2,
-  HelpCircle,
-  UserCheck,
-  Shield,
-  ArrowUp,
-  X,
-} from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import TrustStrip from './components/TrustStrip';
 import ProblemSolution from './components/ProblemSolution';
+import FeaturedShowcase from './components/FeaturedShowcase';
 import ThreePaths from './components/ThreePaths';
 import FeaturedVehicles from './components/FeaturedVehicles';
 import WhyChooseUs from './components/WhyChooseUs';
 import HowItWorks from './components/HowItWorks';
+import EditorialContentSection from './components/EditorialContentSection';
 import AboutFounder from './components/AboutFounder';
 import VehicleDetailsModal from './components/VehicleDetailsModal';
 import Footer from './components/Footer';
-import { Vehicle, NavigationTab, BusinessSettings } from './types';
+import { Vehicle, NavigationTab, BusinessSettings, EditorialPost } from './types';
 import {
   getVehicles,
   fetchVehicles,
@@ -31,13 +21,13 @@ import {
   getBusinessSettings,
   fetchBusinessSettings,
   subscribeToBusinessSettings,
-  formatCurrency,
+  getEditorialPosts,
+  fetchEditorialPosts,
+  subscribeToEditorialPosts,
   getWhatsAppLink,
   getGeneralConsultationMessage,
-  isVehicleActive,
   findVehicleBySlugOrId,
   getVehicleSlug,
-  getBusinessPhoneDisplay,
   getBusinessPhoneCallUrl,
   preloadPrimaryImage,
   getInitialVehicleRoute,
@@ -89,6 +79,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('home');
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => initialVehiclesList);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => getBusinessSettings());
+  const [editorialPosts, setEditorialPosts] = useState<EditorialPost[]>(() => getEditorialPosts());
 
   // Modal states - instantly initialized from URL if a vehicle link was tapped
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(() => {
@@ -152,6 +143,10 @@ export default function App() {
     setIsConsultantOpen(false);
     setIsInspectionOpen(false);
     setInspectionVehicle(null);
+
+    try {
+      sessionStorage.removeItem('jite_browse_scroll_y');
+    } catch {}
 
     // Dynamic metadata update
     const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
@@ -410,9 +405,22 @@ export default function App() {
       }
     });
 
+    fetchEditorialPosts().then((loadedPosts) => {
+      if (loadedPosts && loadedPosts.length > 0) {
+        setEditorialPosts(loadedPosts);
+      }
+    });
+
+    const unsubscribeEditorial = subscribeToEditorialPosts((updatedPosts) => {
+      if (updatedPosts && updatedPosts.length > 0) {
+        setEditorialPosts(updatedPosts);
+      }
+    });
+
     return () => {
       unsubscribeVehicles();
       unsubscribeSettings();
+      unsubscribeEditorial();
     };
   }, []);
 
@@ -480,6 +488,7 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={handleTabChange}
         onOpenConsultation={() => handleOpenConsultant(null)}
+        businessSettings={businessSettings}
       />
 
       {/* Main Content Router */}
@@ -490,8 +499,16 @@ export default function App() {
             <Hero
               vehicles={vehicles}
               onBrowseCars={() => handleTabChange('browse')}
+              onTalkToConsultant={() => handleOpenConsultant(null)}
               onFindMyCar={() => handleTabChange('find-car')}
               onViewVehicleDetails={handleViewDetails}
+            />
+
+            <FeaturedShowcase
+              vehicles={vehicles}
+              onViewDetails={handleViewDetails}
+              onBookInspection={handleOpenInspection}
+              onBrowseAll={() => handleTabChange('browse')}
             />
 
             <ProblemSolution
@@ -510,7 +527,6 @@ export default function App() {
               onViewDetails={handleViewDetails}
               onBrowseAll={() => handleTabChange('browse')}
               onBookInspection={handleOpenInspection}
-              onConsultVehicle={(car) => handleOpenConsultant(car)}
             />
 
             <WhyChooseUs
@@ -521,6 +537,11 @@ export default function App() {
             <HowItWorks
               onLearnMore={() => handleTabChange('how-it-works')}
               onOpenConsultant={() => handleOpenConsultant(null)}
+            />
+
+            <EditorialContentSection
+              posts={editorialPosts}
+              onTalkToConsultant={() => handleOpenConsultant(null)}
             />
 
             <AboutFounder
@@ -537,9 +558,9 @@ export default function App() {
               vehicles={vehicles}
               onViewDetails={handleViewDetails}
               onBookInspection={handleOpenInspection}
-              onConsultVehicle={(car) => handleOpenConsultant(car)}
               onFindMyCar={() => handleTabChange('find-car')}
               onSourceCar={() => handleTabChange('source-car')}
+              onGoHome={() => handleTabChange('home')}
             />
           </Suspense>
         )}
@@ -606,6 +627,7 @@ export default function App() {
       <Footer
         onNavigate={handleTabChange}
         onOpenConsultation={() => handleOpenConsultant(null)}
+        businessSettings={businessSettings}
       />
 
       {/* Vehicle Details Modal - Primary priority, rendered instantly */}
@@ -675,20 +697,20 @@ export default function App() {
         </Suspense>
       )}
 
-      {/* Floating Consultation Action (Subtle, non-intrusive, only on explore/browse tabs, never covers forms or modals) */}
+      {/* Floating Consultation Action (Desktop & spacious tablets only so mobile sticky height stays strictly <= 15%) */}
       {!isDetailsOpen && !isConsultantOpen && !isInspectionOpen && (currentTab === 'home' || currentTab === 'browse') && (
-        <div className="fixed bottom-5 right-5 z-30 select-none">
+        <div className="hidden sm:block fixed bottom-5 right-5 z-30 select-none">
           <a
             href={getWhatsAppLink(getGeneralConsultationMessage(), businessSettings?.whatsAppNumber)}
             target="_blank"
             rel="noopener noreferrer"
             id="floating_whatsapp_btn"
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-emerald-600/95 hover:bg-emerald-500 text-white font-semibold text-xs rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 border border-emerald-400/30 backdrop-blur-sm opacity-90 hover:opacity-100"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600/95 hover:bg-emerald-500 text-white font-semibold text-xs rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 border border-emerald-400/30 backdrop-blur-sm"
             title="Chat with Tobor Jite on WhatsApp"
             aria-label="Chat on WhatsApp"
           >
             <MessageSquare size={15} />
-            <span className="hidden sm:inline">WhatsApp</span>
+            <span>WhatsApp</span>
           </a>
         </div>
       )}
