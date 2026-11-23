@@ -13,6 +13,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { EditorialCategory, EditorialPost } from '../../types';
+import { recordAdminAuditLog } from '../../services/adminAudit';
 import {
   getEditorialPosts,
   fetchEditorialPosts,
@@ -90,6 +91,11 @@ export default function AdminEditorialSection() {
     setSaveSuccess(false);
     try {
       const saved = await saveEditorialPostsToFirestore(posts);
+      await recordAdminAuditLog({
+        action: 'EDITORIAL_CONTENT_UPDATED',
+        status: 'success',
+        details: `Published ${saved.filter((p) => p.isPublished).length} editorial insights to Firestore.`,
+      });
       setPosts(saved);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);

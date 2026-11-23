@@ -16,6 +16,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { BusinessSettings } from '../../types';
+import { recordAdminAuditLog } from '../../services/adminAudit';
 import {
   getBusinessSettings,
   fetchBusinessSettings,
@@ -29,12 +30,14 @@ interface AdminSettingsTabProps {
   currentUser?: { email: string | null } | null;
   onSignOut?: () => void;
   onSettingsSaved?: (settings: BusinessSettings) => void;
+  profileOnly?: boolean;
 }
 
 export default function AdminSettingsTab({
   currentUser,
   onSignOut,
   onSettingsSaved,
+  profileOnly = false,
 }: AdminSettingsTabProps) {
   const [subTab, setSubTab] = useState<'profile' | 'editorial' | 'security'>('profile');
   const [settings, setSettings] = useState<BusinessSettings>(() => getBusinessSettings());
@@ -65,6 +68,11 @@ export default function AdminSettingsTab({
 
     try {
       const saved = await saveBusinessSettingsToFirestore(settings);
+      await recordAdminAuditLog({
+        action: 'BUSINESS_SETTINGS_UPDATED',
+        status: 'success',
+        details: `Updated business profile (${saved.businessName}).`,
+      });
       setSettings(saved);
       setSaveSuccess(true);
       if (onSettingsSaved) onSettingsSaved(saved);
@@ -87,7 +95,8 @@ export default function AdminSettingsTab({
   return (
     <div className="space-y-6">
       {/* Sub-tab Switcher: Profile vs Editorial vs Security */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl w-fit border border-slate-200">
+      {!profileOnly && (
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100/90 rounded-2xl w-fit border border-slate-200">
         <button
           type="button"
           onClick={() => setSubTab('profile')}
@@ -127,6 +136,7 @@ export default function AdminSettingsTab({
           <span>Security & Authentication</span>
         </button>
       </div>
+      )}
 
       {subTab === 'security' ? (
         <AdminSecuritySection currentUser={currentUser || null} onSignOut={onSignOut} />

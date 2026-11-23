@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { verifyRequestAdmin } from './admin-auth.js';
 
 export const config = {
   api: {
@@ -10,9 +10,13 @@ export const config = {
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers?.origin;
+  if (origin && typeof origin === 'string') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
@@ -26,24 +30,37 @@ export default async function handler(req, res) {
     return;
   }
 
+  const adminCheck = await verifyRequestAdmin(req);
+  if (!adminCheck.authorized) {
+    res.statusCode = 401;
+    res.end(JSON.stringify({ error: adminCheck.error || 'Unauthorized upload request.' }));
+    return;
+  }
+
   try {
     let body = req.body;
     if (typeof body === 'string') {
       try {
         body = JSON.parse(body);
-      } catch {}
+      } catch {
+        body = {};
+      }
     }
 
-    const { vehicleId, base64Data, filename } = body || {};
+    const { base64Data } = body || {};
     if (!base64Data || typeof base64Data !== 'string') {
       res.statusCode = 400;
       res.end(JSON.stringify({ error: 'Missing base64Data payload' }));
       return;
     }
 
-    // Parse base64 header
     const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
     const mimeType = matches ? matches[1] : 'image/jpeg';
+    if (!mimeType.startsWith('image/')) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'Invalid image MIME type' }));
+      return;
+    }
     const rawData = matches ? matches[2] : base64Data;
     const buffer = Buffer.from(rawData, 'base64');
 
@@ -53,9 +70,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // On serverless environments (Vercel) without persistent disk,
-    // if client cannot upload to Firebase Storage, return the optimized data URL or media link
-    // When size is compact (< 300KB), data URL is instant and 100% durable across all platforms
     res.statusCode = 200;
     res.end(
       JSON.stringify({
@@ -67,6 +81,6 @@ export default async function handler(req, res) {
     );
   } catch (err) {
     res.statusCode = 500;
-    res.end(JSON.stringify({ error: 'Upload failed: ' + (err.message || String(err)) }));
+    res.end(JSON.stringify({ error: 'Upload failed: ' + (err?.message || String(err)) }));
   }
 }

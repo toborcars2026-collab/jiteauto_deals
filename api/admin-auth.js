@@ -1,563 +1,400 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import nodemailer from 'nodemailer';
 
-export const FIREBASE_PROJECT_ID = 'gen-lang-client-0327661147';
-export const FIRESTORE_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
-const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/settings/admin_security`;
-const FIRESTORE_ADMINS_COLLECTION_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/admins`;
+const DEFAULT_PROJECT_ID = 'gen-lang-client-0327661147';
+const DEFAULT_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
+
+function loadFirebaseRuntimeConfig() {
+  try {
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return {
+        projectId: process.env.FIREBASE_PROJECT_ID || parsed.projectId || DEFAULT_PROJECT_ID,
+        databaseId: process.env.FIRESTORE_DATABASE_ID || parsed.firestoreDatabaseId || DEFAULT_DATABASE_ID,
+      };
+    }
+  } catch {
+    // Fallback to defaults
+  }
+  return {
+    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
+    databaseId: process.env.FIRESTORE_DATABASE_ID || DEFAULT_DATABASE_ID,
+  };
+}
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
-const AUTH_FILE = path.join(DATA_DIR, 'admin_auth.json');
+const AUTH_STORE_FILE = path.join(DATA_DIR, 'admin_auth.json');
 
-// Cache configuration in memory
-let cachedAuthConfig = null;
-let cacheTime = 0;
-const CACHE_TTL_MS = 3 * 1000;
+// Cached Google public X.509 certificates for Firebase RS256 ID token verification
+let certCache = {
+  certs: /** @type {Record<string, string>} */ ({}),
+  expiresAt: 0,
+};
 
-// Active sessions: token -> { token, email, createdAt, expiresAt }
-const activeSessions = new Map();
+// In-memory brute-force rate limiter & server security event log (ephemeral fallback + audit)
+const failedLoginMap = new Map();
+const serverSecurityEvents = [];
+const MAX_SECURITY_EVENTS = 100;
 
-// Pending OTPs: preAuthToken -> { preAuthToken, otpHash, email, expiresAt, attempts, resendAllowedAt }
-const pendingOtps = new Map();
-
-// Pending bootstrap OTPs: tempSetupToken -> { tempSetupToken, email, salt, hash, otpHash, expiresAt, attempts, resendAllowedAt }
-const pendingBootstrapOtps = new Map();
-
-// Atomic bootstrap mutex to prevent race conditions during one-time setup
-let isBootstrapping = false;
-
-// Rate limiting: IP -> { count, firstAttempt, lockedUntil }
-const loginAttempts = new Map();
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes
-
-export function getClientIp(req) {
-  const xForwardedFor = req.headers['x-forwarded-for'];
-  if (typeof xForwardedFor === 'string') {
-    return xForwardedFor.split(',')[0].trim();
+function getClientIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
   }
-  return req.socket?.remoteAddress || 'unknown';
+  return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
-export function checkRateLimit(ip) {
+function hashIpForAudit(ip) {
+  return crypto.createHash('sha256').update(String(ip || 'unknown')).digest('hex').slice(0, 10);
+}
+
+function maskEmailForAudit(email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return 'unknown';
+  const [local, domain] = email.split('@');
+  if (!local) return `***@${domain}`;
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***@${domain}`;
+}
+
+function pushSecurityEvent(event) {
+  const entry = {
+    id: `sec_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    timestamp: new Date().toISOString(),
+    ...event,
+  };
+  serverSecurityEvents.unshift(entry);
+  if (serverSecurityEvents.length > MAX_SECURITY_EVENTS) {
+    serverSecurityEvents.length = MAX_SECURITY_EVENTS;
+  }
+}
+
+function checkRateLimit(ip) {
   const now = Date.now();
-  const record = loginAttempts.get(ip);
-  if (!record) return { allowed: true, waitSeconds: 0 };
+  const record = failedLoginMap.get(ip);
+  if (!record) return { allowed: true };
 
   if (record.lockedUntil && now < record.lockedUntil) {
-    const waitSeconds = Math.ceil((record.lockedUntil - now) / 1000);
-    return { allowed: false, waitSeconds };
-  }
-
-  if (now - record.firstAttempt > LOCKOUT_PERIOD_MS) {
-    loginAttempts.delete(ip);
-    return { allowed: true, waitSeconds: 0 };
-  }
-
-  if (record.count >= MAX_FAILED_ATTEMPTS) {
-    record.lockedUntil = now + LOCKOUT_PERIOD_MS;
-    const waitSeconds = Math.ceil(LOCKOUT_PERIOD_MS / 1000);
-    return { allowed: false, waitSeconds };
-  }
-
-  return { allowed: true, waitSeconds: 0 };
-}
-
-export function recordFailedAttempt(ip) {
-  const now = Date.now();
-  const record = loginAttempts.get(ip);
-  if (!record || now - record.firstAttempt > LOCKOUT_PERIOD_MS) {
-    loginAttempts.set(ip, { count: 1, firstAttempt: now });
-  } else {
-    record.count += 1;
-    if (record.count >= MAX_FAILED_ATTEMPTS) {
-      record.lockedUntil = now + LOCKOUT_PERIOD_MS;
-    }
-  }
-}
-
-export function resetRateLimit(ip) {
-  loginAttempts.delete(ip);
-}
-
-export function hashPassword(password, salt) {
-  try {
-    const saltBuffer = Buffer.from(salt, 'hex');
-    return crypto.pbkdf2Sync(password, saltBuffer, 100000, 64, 'sha512').toString('hex');
-  } catch {
-    return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
-  }
-}
-
-export function verifyPassword(password, salt, expectedHash) {
-  if (!password || !salt || !expectedHash) return false;
-  const variants = [password, password.trim()];
-  for (const variant of variants) {
-    const computedHash = hashPassword(variant, salt);
-    const bufA = Buffer.from(computedHash, 'hex');
-    const bufB = Buffer.from(expectedHash, 'hex');
-    if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-export function generateSixDigitOtp() {
-  return crypto.randomInt(100000, 999999).toString();
-}
-
-export function maskEmail(email) {
-  if (!email || typeof email !== 'string' || !email.includes('@')) return '******';
-  const [local, domain] = email.split('@');
-  if (local.length <= 2) {
-    return `${local[0]}*@${domain}`;
-  }
-  return `${local[0]}${'*'.repeat(Math.min(local.length - 2, 4))}${local[local.length - 1]}@${domain}`;
-}
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function readAuthFile() {
-  ensureDataDir();
-  if (!fs.existsSync(AUTH_FILE)) {
-    return { config: null, sessions: [] };
-  }
-  try {
-    const raw = fs.readFileSync(AUTH_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
     return {
-      config: parsed.config || parsed.passwordConfig || null,
-      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      allowed: false,
+      waitSeconds: Math.max(1, Math.ceil((record.lockedUntil - now) / 1000)),
     };
-  } catch {
-    return { config: null, sessions: [] };
   }
+
+  if (now - record.firstAttempt > 5 * 60 * 1000) {
+    failedLoginMap.delete(ip);
+    return { allowed: true };
+  }
+
+  if (record.count >= 5) {
+    record.lockedUntil = now + 5 * 60 * 1000;
+    return { allowed: false, waitSeconds: 300 };
+  }
+
+  return { allowed: true };
 }
 
-function saveAuthFile(data) {
-  ensureDataDir();
-  try {
-    fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('[admin_auth.json write error]:', err);
-  }
-}
-
-export async function getAdminAuthConfig() {
+function recordFailedAttempt(ip) {
   const now = Date.now();
-  if (cachedAuthConfig && now - cacheTime < CACHE_TTL_MS) {
-    return cachedAuthConfig;
+  const existing = failedLoginMap.get(ip);
+  if (!existing || now - existing.firstAttempt > 5 * 60 * 1000) {
+    failedLoginMap.set(ip, { count: 1, firstAttempt: now });
+    return 1;
   }
+  existing.count += 1;
+  if (existing.count >= 5) {
+    existing.lockedUntil = now + 5 * 60 * 1000;
+  }
+  failedLoginMap.set(ip, existing);
+  return existing.count;
+}
 
-  // 1. Try reading from Firestore REST API
+function clearRateLimit(ip) {
+  failedLoginMap.delete(ip);
+}
+
+function safeTimingEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function readLocalBootstrapState() {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(FIRESTORE_DOC_URL, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.fields) {
-        const bootstrapped = data.fields.bootstrapped?.booleanValue === true;
-        const authorizedEmail = data.fields.authorizedEmail?.stringValue || '';
-        const salt = data.fields.salt?.stringValue || '';
-        const hash = data.fields.hash?.stringValue || '';
-        const primaryGoogleUid = data.fields.primaryGoogleUid?.stringValue || '';
-        const updatedAt = data.fields.updatedAt?.stringValue || new Date().toISOString();
-        const bootstrappedAt = data.fields.bootstrappedAt?.stringValue || updatedAt;
-
-        if (bootstrapped && authorizedEmail) {
-          cachedAuthConfig = {
-            bootstrapped: true,
-            authorizedEmail: authorizedEmail.toLowerCase().trim(),
-            passwordSalt: salt || '',
-            passwordHash: hash || '',
-            primaryGoogleUid,
-            updatedAt,
-            bootstrappedAt,
-          };
-          cacheTime = now;
-          return cachedAuthConfig;
-        }
-      }
+    if (!fs.existsSync(AUTH_STORE_FILE)) {
+      return { bootstrapped: false, primaryAdminUid: null, setupCompletedAt: null };
     }
-  } catch {
-    // Fall back to local file
-  }
-
-  // 2. Try reading from local data_store/admin_auth.json
-  const fileData = readAuthFile();
-  if (fileData.config && fileData.config.authorizedEmail && fileData.config.bootstrapped) {
-    cachedAuthConfig = {
-      bootstrapped: true,
-      authorizedEmail: fileData.config.authorizedEmail.toLowerCase().trim(),
-      passwordSalt: fileData.config.passwordSalt || fileData.config.salt || '',
-      passwordHash: fileData.config.passwordHash || fileData.config.hash || '',
-      primaryGoogleUid: fileData.config.primaryGoogleUid || '',
-      updatedAt: fileData.config.updatedAt || new Date().toISOString(),
-      bootstrappedAt: fileData.config.bootstrappedAt || fileData.config.updatedAt || new Date().toISOString(),
+    const raw = JSON.parse(fs.readFileSync(AUTH_STORE_FILE, 'utf-8'));
+    const bootstrapped = Boolean(
+      raw?.bootstrapped === true ||
+        (raw?.config && (raw.config.hash || raw.config.authorizedEmail))
+    );
+    return {
+      bootstrapped,
+      primaryAdminUid: raw?.primaryAdminUid || null,
+      setupCompletedAt: raw?.setupCompletedAt || raw?.config?.updatedAt || null,
     };
-    cacheTime = now;
-    return cachedAuthConfig;
-  }
-
-  // 3. Not bootstrapped
-  cachedAuthConfig = {
-    bootstrapped: false,
-    authorizedEmail: null,
-    passwordSalt: '',
-    passwordHash: '',
-    primaryGoogleUid: '',
-    updatedAt: '',
-    bootstrappedAt: '',
-  };
-  cacheTime = now;
-  return cachedAuthConfig;
-}
-
-export async function saveAdminAuthConfig(config) {
-  const payload = {
-    fields: {
-      bootstrapped: { booleanValue: true },
-      authorizedEmail: { stringValue: config.authorizedEmail.toLowerCase().trim() },
-      salt: { stringValue: config.passwordSalt || '' },
-      hash: { stringValue: config.passwordHash || '' },
-      primaryGoogleUid: { stringValue: config.primaryGoogleUid || '' },
-      updatedAt: { stringValue: config.updatedAt },
-      bootstrappedAt: { stringValue: config.bootstrappedAt },
-    },
-  };
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
-    await fetch(FIRESTORE_DOC_URL, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-  } catch (err) {
-    console.error('[Firestore saveAdminAuthConfig error]:', err);
-  }
-
-  // Persist locally
-  const fileData = readAuthFile();
-  fileData.config = {
-    bootstrapped: true,
-    authorizedEmail: config.authorizedEmail.toLowerCase().trim(),
-    passwordSalt: config.passwordSalt || '',
-    passwordHash: config.passwordHash || '',
-    primaryGoogleUid: config.primaryGoogleUid || '',
-    updatedAt: config.updatedAt,
-    bootstrappedAt: config.bootstrappedAt,
-  };
-  saveAuthFile(fileData);
-
-  cachedAuthConfig = {
-    bootstrapped: true,
-    authorizedEmail: config.authorizedEmail.toLowerCase().trim(),
-    passwordSalt: config.passwordSalt || '',
-    passwordHash: config.passwordHash || '',
-    primaryGoogleUid: config.primaryGoogleUid || '',
-    updatedAt: config.updatedAt,
-    bootstrappedAt: config.bootstrappedAt,
-  };
-  cacheTime = Date.now();
-}
-
-export async function saveAdminRoleDocument(uid, email) {
-  if (!uid) return;
-  const url = `${FIRESTORE_ADMINS_COLLECTION_URL}/${uid}`;
-  const payload = {
-    fields: {
-      email: { stringValue: email.toLowerCase().trim() },
-      role: { stringValue: 'admin' },
-      createdAt: { stringValue: new Date().toISOString() },
-    },
-  };
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
-    await fetch(url, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-  } catch (err) {
-    console.error('[Firestore saveAdminRoleDocument error]:', err);
+  } catch {
+    return { bootstrapped: false, primaryAdminUid: null, setupCompletedAt: null };
   }
 }
 
-export async function clearAdminAuthConfig() {
+function saveLocalBootstrapState(state) {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
-    await fetch(FIRESTORE_DOC_URL, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-  } catch {}
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const payload = {
+      bootstrapped: Boolean(state.bootstrapped),
+      primaryAdminUid: state.primaryAdminUid || null,
+      setupCompletedAt: state.setupCompletedAt || new Date().toISOString(),
+    };
+    fs.writeFileSync(AUTH_STORE_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+    return true;
+  } catch {
+    // Vercel serverless environments have a read-only filesystem outside /tmp
+    return false;
+  }
+}
 
-  const fileData = readAuthFile();
-  fileData.config = null;
-  fileData.sessions = [];
-  saveAuthFile(fileData);
+async function fetchGooglePublicCerts() {
+  const now = Date.now();
+  if (certCache.expiresAt > now && Object.keys(certCache.certs).length > 0) {
+    return certCache.certs;
+  }
 
-  cachedAuthConfig = {
-    bootstrapped: false,
-    authorizedEmail: null,
-    passwordSalt: '',
-    passwordHash: '',
-    primaryGoogleUid: '',
-    updatedAt: '',
-    bootstrappedAt: '',
+  const resp = await fetch(
+    'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+  );
+  if (!resp.ok) {
+    throw new Error(`Unable to fetch Google public certificates (${resp.status})`);
+  }
+
+  const certs = await resp.json();
+  let maxAgeSec = 3600;
+  const cacheControl = resp.headers.get('cache-control') || '';
+  const match = cacheControl.match(/max-age=(\d+)/i);
+  if (match && match[1]) {
+    maxAgeSec = Math.max(300, Math.min(86400, Number(match[1])));
+  }
+
+  certCache = {
+    certs,
+    expiresAt: now + maxAgeSec * 1000,
   };
-  cacheTime = 0;
-  activeSessions.clear();
-  pendingOtps.clear();
+  return certs;
+}
+
+function base64UrlDecode(str) {
+  const normalized = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+  return Buffer.from(normalized + pad, 'base64');
 }
 
 /**
- * Transactional Email Dispatcher
- * Dispatches via Resend, SendGrid, or standard SMTP.
+ * Cryptographically verifies a Firebase Auth RS256 ID token against Google's X.509 certificates.
  */
-export async function sendAdminEmail({ to, subject, html, text }) {
-  const from = process.env.EMAIL_FROM || 'Jite Auto Deals <onboarding@resend.dev>';
-
-  // 1. Resend API
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from,
-          to: [to],
-          subject,
-          html,
-          text,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return { delivered: true, provider: 'resend', id: data.id };
-      }
-      const errText = await res.text();
-      return { delivered: false, error: `Resend delivery failed (${res.status}): ${errText}` };
-    } catch (err) {
-      return { delivered: false, error: `Resend error: ${err?.message || err}` };
-    }
+export async function verifyFirebaseIdToken(idToken) {
+  if (!idToken || typeof idToken !== 'string') {
+    throw new Error('Missing Firebase authentication token.');
   }
 
-  // 2. SendGrid API
-  if (process.env.SENDGRID_API_KEY) {
-    try {
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.SENDGRID_API_KEY.trim()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: to }] }],
-          from: { email: from.includes('<') ? from.match(/<([^>]+)>/)[1] : from, name: 'Jite Auto Deals' },
-          subject,
-          content: [
-            { type: 'text/html', value: html },
-            ...(text ? [{ type: 'text/plain', value: text }] : []),
-          ],
-        }),
-      });
-
-      if (res.status === 202 || res.status === 200) {
-        return { delivered: true, provider: 'sendgrid' };
-      }
-      const errText = await res.text();
-      return { delivered: false, error: `SendGrid delivery failed (${res.status}): ${errText}` };
-    } catch (err) {
-      return { delivered: false, error: `SendGrid error: ${err?.message || err}` };
-    }
+  const parts = idToken.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Malformed authentication token.');
   }
 
-  // 3. SMTP Transport
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: Number(process.env.SMTP_PORT) === 465,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-
-      const info = await transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        text,
-      });
-
-      return { delivered: true, provider: 'smtp', messageId: info.messageId };
-    } catch (err) {
-      return { delivered: false, error: `SMTP error: ${err?.message || err}` };
-    }
+  const [headerB64, payloadB64, sigB64] = parts;
+  let header;
+  let payload;
+  try {
+    header = JSON.parse(base64UrlDecode(headerB64).toString('utf8'));
+    payload = JSON.parse(base64UrlDecode(payloadB64).toString('utf8'));
+  } catch {
+    throw new Error('Invalid token encoding.');
   }
 
-  // If no email credentials configured in environment
+  if (header?.alg !== 'RS256' || !header?.kid) {
+    throw new Error('Unsupported token algorithm or missing key id.');
+  }
+
+  const certs = await fetchGooglePublicCerts();
+  const certPem = certs[header.kid];
+  if (!certPem) {
+    throw new Error('Unknown signing certificate for token.');
+  }
+
+  const verifier = crypto.createVerify('RSA-SHA256');
+  verifier.update(`${headerB64}.${payloadB64}`);
+  verifier.end();
+  const signature = base64UrlDecode(sigB64);
+  if (!verifier.verify(certPem, signature)) {
+    throw new Error('Invalid token cryptographic signature.');
+  }
+
+  const { projectId } = loadFirebaseRuntimeConfig();
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  if (payload.aud !== projectId) {
+    throw new Error('Token audience mismatch.');
+  }
+  if (payload.iss !== `https://securetoken.google.com/${projectId}`) {
+    throw new Error('Token issuer mismatch.');
+  }
+  if (typeof payload.sub !== 'string' || payload.sub.length === 0 || payload.sub.length > 128) {
+    throw new Error('Invalid token subject.');
+  }
+  if (typeof payload.exp !== 'number' || payload.exp <= nowSec) {
+    throw new Error('Authentication session expired. Please sign in again.');
+  }
+  if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) {
+    throw new Error('Invalid token issued-at timestamp.');
+  }
+  if (typeof payload.auth_time === 'number' && payload.auth_time > nowSec + 300) {
+    throw new Error('Invalid token authentication timestamp.');
+  }
+
   return {
-    delivered: false,
-    error: 'Email delivery service not configured. Please set RESEND_API_KEY or SMTP credentials in your server environment.',
+    uid: payload.sub,
+    email: typeof payload.email === 'string' ? payload.email : '',
+    emailVerified: Boolean(payload.email_verified),
+    signInProvider: payload.firebase?.sign_in_provider || 'unknown',
+    isCustomAdminClaim: payload.admin === true,
+    expiresAt: payload.exp * 1000,
   };
 }
 
-function parseJsonBody(req) {
-  return new Promise((resolve) => {
-    if (req.body && typeof req.body === 'object') {
-      return resolve(req.body);
-    }
+/**
+ * Verifies admin authorization via Cloud Firestore Security Rules using the caller's verified ID token.
+ * No IAM / firebase-admin service account required.
+ */
+async function checkFirestoreAdminAuthorization(idToken, uid) {
+  const { projectId, databaseId } = loadFirebaseRuntimeConfig();
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
 
-    let data = '';
-    req.on('data', (chunk) => {
-      data += chunk;
-    });
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch {
-        resolve({});
-      }
-    });
+  // 1. Check /admins/{uid}
+  const adminDocRes = await fetch(`${baseUrl}/admins/${encodeURIComponent(uid)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
   });
-}
 
-function parseCookies(req) {
-  const list = {};
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return list;
-
-  cookieHeader.split(';').forEach((cookie) => {
-    const parts = cookie.split('=');
-    if (parts.length >= 2) {
-      try {
-        list[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('=').trim());
-      } catch {
-        list[parts[0].trim()] = parts.slice(1).join('=').trim();
-      }
-    }
-  });
-  return list;
-}
-
-export function extractAdminToken(req) {
-  const cookies = parseCookies(req);
-  if (cookies.jite_admin_session) {
-    return cookies.jite_admin_session;
+  if (adminDocRes.status === 200) {
+    const docJson = await adminDocRes.json();
+    const fields = docJson?.fields || {};
+    const activeField = fields.active;
+    const isActive = activeField ? activeField.booleanValue !== false : true;
+    const role = fields.role?.stringValue || 'admin';
+    return { authorized: isActive, role, hasAdminDoc: true };
   }
-  const authHeader = req.headers.authorization || '';
-  if (authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7).trim();
+
+  // 2. Fallback check against /settings/admin_bootstrap (firestore.rules enforces isAdmin() on read)
+  // Authorized primary owner gets 200 (if exists) or 404 (if not created yet). Unauthorized gets 403.
+  const bootstrapRes = await fetch(`${baseUrl}/settings/admin_bootstrap`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+
+  if (bootstrapRes.status === 200) {
+    return { authorized: true, role: 'owner', hasAdminDoc: false, firestoreBootstrapped: true };
+  }
+
+  if (bootstrapRes.status === 404) {
+    return { authorized: true, role: 'owner', hasAdminDoc: false, firestoreBootstrapped: false };
+  }
+
+  return { authorized: false, role: null, hasAdminDoc: false };
+}
+
+export function extractBearerToken(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
   }
   return null;
 }
 
-export function createAdminSession(token, email) {
-  const session = {
-    token,
-    email: email ? email.toLowerCase().trim() : '',
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
-  };
-  activeSessions.set(token, session);
-
-  // Sync to file
-  const fileData = readAuthFile();
-  fileData.sessions = fileData.sessions.filter((s) => s.expiresAt > Date.now()).slice(-30);
-  fileData.sessions.push(session);
-  saveAuthFile(fileData);
-}
-
-export function revokeAdminSession(token) {
-  activeSessions.delete(token);
-  const fileData = readAuthFile();
-  fileData.sessions = fileData.sessions.filter((s) => s.token !== token);
-  saveAuthFile(fileData);
-}
-
-export function revokeAllSessions() {
-  activeSessions.clear();
-  const fileData = readAuthFile();
-  fileData.sessions = [];
-  saveAuthFile(fileData);
-}
-
-export function isSessionValid(token) {
-  if (!token) return false;
-  const memorySession = activeSessions.get(token);
-  if (memorySession) {
-    return memorySession.expiresAt > Date.now();
+/**
+ * Reusable verification helper for protected server endpoints (server.ts / upload API).
+ */
+export async function verifyRequestAdmin(req) {
+  const idToken = extractBearerToken(req) || req.body?.idToken;
+  if (!idToken) {
+    return { authorized: false, error: 'Missing Bearer authentication token.' };
   }
-  const fileData = readAuthFile();
-  const fileSession = fileData.sessions.find((s) => s.token === token);
-  if (fileSession && fileSession.expiresAt > Date.now()) {
-    activeSessions.set(token, fileSession);
-    return true;
+  try {
+    const decoded = await verifyFirebaseIdToken(idToken);
+    const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
+    if (!fsAuth.authorized) {
+      return { authorized: false, error: 'Account is not authorized for administration.' };
+    }
+    return {
+      authorized: true,
+      uid: decoded.uid,
+      email: decoded.email,
+      emailVerified: decoded.emailVerified,
+      role: fsAuth.role || 'admin',
+      signInProvider: decoded.signInProvider,
+    };
+  } catch (err) {
+    return { authorized: false, error: err?.message || 'Invalid authentication token.' };
   }
-  return false;
 }
 
-export function getSessionData(token) {
-  if (!token) return null;
-  const session = activeSessions.get(token);
-  if (session && session.expiresAt > Date.now()) return session;
-  const fileData = readAuthFile();
-  const fileSession = fileData.sessions.find((s) => s.token === token);
-  if (fileSession && fileSession.expiresAt > Date.now()) {
-    activeSessions.set(token, fileSession);
-    return fileSession;
+async function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return {};
+    }
   }
-  return null;
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
-function setCorsAndHeaders(req, res) {
+function getAction(req) {
+  if (req.query?.action) return String(req.query.action);
+  try {
+    const urlObj = new URL(req.url || '/', 'http://localhost');
+    const qAction = urlObj.searchParams.get('action');
+    if (qAction) return qAction;
+    const parts = urlObj.pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last && last !== 'admin-auth' && last !== 'auth') return last;
+  } catch {
+    // ignore
+  }
+  return 'status';
+}
+
+function setSecurityHeaders(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  const origin = req.headers?.origin;
+  if (origin && typeof origin === 'string') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-setup-secret');
 }
 
 export default async function handler(req, res) {
-  setCorsAndHeaders(req, res);
+  setSecurityHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
@@ -565,1229 +402,344 @@ export default async function handler(req, res) {
     return;
   }
 
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  let action = url.searchParams.get('action') || '';
-
-  if (!action) {
-    const parts = url.pathname.split('/').filter(Boolean);
-    if (parts.length >= 3 && parts[0] === 'api' && (parts[1] === 'admin' || parts[1] === 'auth')) {
-      action = parts[parts.length - 1];
-    } else if (parts[parts.length - 1] === 'admin-auth') {
-      action = req.method === 'GET' ? 'status' : 'login';
-    }
-  }
+  const action = getAction(req);
+  const clientIp = getClientIp(req);
 
   try {
-    switch (action) {
-      // 1. Status Check
-      case 'status': {
-        const config = await getAdminAuthConfig();
-        const token = extractAdminToken(req);
-        const session = getSessionData(token);
-        const emailConfigured = Boolean(
-          process.env.RESEND_API_KEY ||
-          process.env.SENDGRID_API_KEY ||
-          (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
-        );
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            bootstrapped: config.bootstrapped,
-            authorizedEmailHint: config.authorizedEmail ? maskEmail(config.authorizedEmail) : null,
-            emailDeliveryConfigured: emailConfigured,
-            authenticated: Boolean(session),
-            email: session ? session.email : null,
-            role: session ? 'admin' : null,
-            updatedAt: config.updatedAt || null,
-          })
-        );
-        return;
-      }
-
-      // 2. Initial Setup: Option A - Continue with Google Setup
-      case 'bootstrap-google': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        if (isBootstrapping) {
-          res.statusCode = 409;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Administrator setup is currently being processed by another request.',
-              code: 'SETUP_IN_PROGRESS',
-            })
-          );
-          return;
-        }
-
-        const currentConfig = await getAdminAuthConfig();
-        if (currentConfig.bootstrapped) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Initial administrator setup has already been completed. Further registrations are strictly disabled.',
-              code: 'SETUP_ALREADY_COMPLETED',
-            })
-          );
-          return;
-        }
-
-        isBootstrapping = true;
-        try {
-          const body = await parseJsonBody(req);
-          const { email, uid, setupSecret } = body;
-
-          // Check setup secret if configured in server environment
-          const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
-          const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
-          if (expectedSecret && incomingSecret !== expectedSecret) {
-            res.statusCode = 401;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Unauthorized: Invalid or missing administrator setup secret (ADMIN_SETUP_SECRET).',
-                code: 'INVALID_SETUP_SECRET',
-              })
-            );
-            return;
-          }
-
-          if (!email || typeof email !== 'string' || !email.includes('@')) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ success: false, error: 'A valid Google email address is required.' }));
-            return;
-          }
-
-          const cleanEmail = email.toLowerCase().trim();
-          const nowIso = new Date().toISOString();
-
-          // Establish sole administrator identity permanently
-          await saveAdminAuthConfig({
-            bootstrapped: true,
-            authorizedEmail: cleanEmail,
-            primaryGoogleUid: uid || '',
-            authMethod: 'google',
-            passwordSalt: '',
-            passwordHash: '',
-            updatedAt: nowIso,
-            bootstrappedAt: nowIso,
-          });
-
-          if (uid) {
-            await saveAdminRoleDocument(uid, cleanEmail);
-          }
-
-          const sessionToken = generateToken();
-          createAdminSession(sessionToken, cleanEmail);
-
-          res.setHeader(
-            'Set-Cookie',
-            `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-          );
-
-          res.statusCode = 200;
-          res.end(
-            JSON.stringify({
-              success: true,
-              token: sessionToken,
-              role: 'admin',
-              email: cleanEmail,
-              message: 'Administrator account established and Google identity linked successfully.',
-            })
-          );
-          return;
-        } finally {
-          isBootstrapping = false;
-        }
-      }
-
-      // 2b. Initial Setup: Option B - Email & Password Setup (Step 1: Request Email OTP)
-      case 'bootstrap-request-otp': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const currentConfig = await getAdminAuthConfig();
-        if (currentConfig.bootstrapped) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Initial administrator setup has already been completed. Further registrations are strictly disabled.',
-              code: 'SETUP_ALREADY_COMPLETED',
-            })
-          );
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { email, password, confirmPassword, setupSecret } = body;
-
-        const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
-        const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
-        if (expectedSecret && incomingSecret !== expectedSecret) {
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Unauthorized: Invalid or missing administrator setup secret (ADMIN_SETUP_SECRET).',
-              code: 'INVALID_SETUP_SECRET',
-            })
-          );
-          return;
-        }
-
-        if (!email || typeof email !== 'string' || !email.includes('@')) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'A valid administrator email address is required.' }));
-          return;
-        }
-
-        const cleanEmail = email.toLowerCase().trim();
-        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-        if (!emailRegex.test(cleanEmail)) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter a valid, RFC-compliant email address.' }));
-          return;
-        }
-
-        if (!password || typeof password !== 'string' || password.length < 8) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Administrator password must be at least 8 characters long.',
-            })
-          );
-          return;
-        }
-
-        if (confirmPassword && password !== confirmPassword) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Passwords do not match. Please verify and try again.' }));
-          return;
-        }
-
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = hashPassword(password, salt);
-
-        const tempSetupToken = generateToken();
-        const otpCode = generateSixDigitOtp();
-        const otpHash = hashPassword(otpCode, tempSetupToken);
-        const now = Date.now();
-
-        pendingBootstrapOtps.set(tempSetupToken, {
-          tempSetupToken,
-          email: cleanEmail,
-          salt,
-          hash,
-          otpHash,
-          expiresAt: now + 5 * 60 * 1000,
-          attempts: 0,
-          resendAllowedAt: now + 60 * 1000,
-        });
-
-        // Dispatch verification email
-        const emailHtml = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #020617; color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
-            <div style="background-color: #0f172a; padding: 28px 32px; border-bottom: 1px solid #1e293b; text-align: center;">
-              <h1 style="margin: 0; color: #f59e0b; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">JITE AUTO DEALS</h1>
-              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Administrator Setup Verification</p>
-            </div>
-            <div style="padding: 36px 32px;">
-              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello Administrator,</p>
-              <p style="margin: 0 0 24px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">You are establishing the official Jite Auto Deals administrator account. Use the one-time verification code below to verify ownership of your email address:</p>
-              <div style="background-color: #0f172a; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; text-align: center; margin: 28px 0;">
-                <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #fbbf24; font-family: monospace;">${otpCode}</span>
-              </div>
-              <p style="margin: 0 0 8px; color: #f59e0b; font-size: 13px; font-weight: 600;">Security Notice:</p>
-              <ul style="margin: 0 0 24px; padding-left: 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;">
-                <li>This code expires in <strong>5 minutes</strong>.</li>
-                <li>It can only be used once.</li>
-                <li>Upon verification, this email will be permanently established as the sole authorized administrator.</li>
-              </ul>
-              <div style="border-top: 1px solid #1e293b; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
-                Jite Auto Deals · Direct Foreign-Used Cars & Trusted Vehicle Consultation · Lagos, Nigeria
-              </div>
-            </div>
-          </div>
-        `;
-
-        const emailResult = await sendAdminEmail({
-          to: cleanEmail,
-          subject: `Verify Jite Auto Deals Administrator Account: ${otpCode}`,
-          html: emailHtml,
-          text: `Your Jite Auto Deals administrator setup code is: ${otpCode}. It expires in 5 minutes.`,
-        });
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            step: 'setup_otp_required',
-            tempSetupToken,
-            maskedEmail: maskEmail(cleanEmail),
-            resendIn: 60,
-            expiresIn: 300,
-            emailDelivered: emailResult.delivered,
-            emailDeliveryError: emailResult.error || null,
-            devTestCode: process.env.NODE_ENV !== 'production' || !emailResult.delivered ? otpCode : undefined,
-          })
-        );
-        return;
-      }
-
-      // 2c. Initial Setup: Option B - Verify Setup OTP
-      case 'bootstrap-verify-otp': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const currentConfig = await getAdminAuthConfig();
-        if (currentConfig.bootstrapped) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Initial administrator setup has already been completed.',
-              code: 'SETUP_ALREADY_COMPLETED',
-            })
-          );
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { tempSetupToken, code } = body;
-
-        if (!tempSetupToken || !code || typeof code !== 'string') {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter the 6-digit verification code.' }));
-          return;
-        }
-
-        const cleanCode = code.replace(/\D/g, '').trim();
-        if (cleanCode.length !== 6) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Verification code must be exactly 6 digits.' }));
-          return;
-        }
-
-        const record = pendingBootstrapOtps.get(tempSetupToken);
-        if (!record) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Setup session expired. Please restart the initial setup.',
-              code: 'SESSION_EXPIRED',
-            })
-          );
-          return;
-        }
-
-        if (Date.now() > record.expiresAt) {
-          pendingBootstrapOtps.delete(tempSetupToken);
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Verification code has expired (5 minute limit). Please request a new code.',
-              code: 'OTP_EXPIRED',
-            })
-          );
-          return;
-        }
-
-        if (record.attempts >= 5) {
-          pendingBootstrapOtps.delete(tempSetupToken);
-          res.statusCode = 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Too many incorrect attempts. Please restart the initial setup.',
-              code: 'TOO_MANY_ATTEMPTS',
-            })
-          );
-          return;
-        }
-
-        const isMatch = verifyPassword(cleanCode, tempSetupToken, record.otpHash);
-        if (!isMatch) {
-          record.attempts += 1;
-          const remaining = 5 - record.attempts;
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Incorrect verification code. Please check your email and try again (${remaining} attempt${remaining === 1 ? '' : 's'} remaining).`,
-              code: 'INVALID_OTP',
-              attemptsRemaining: remaining,
-            })
-          );
-          return;
-        }
-
-        // OTP verified! Atomically establish sole administrator identity
-        pendingBootstrapOtps.delete(tempSetupToken);
-        const nowIso = new Date().toISOString();
-
-        await saveAdminAuthConfig({
-          bootstrapped: true,
-          authorizedEmail: record.email,
-          primaryGoogleUid: '',
-          authMethod: 'email_password',
-          passwordSalt: record.salt,
-          passwordHash: record.hash,
-          updatedAt: nowIso,
-          bootstrappedAt: nowIso,
-        });
-
-        const sessionToken = generateToken();
-        createAdminSession(sessionToken, record.email);
-
-        res.setHeader(
-          'Set-Cookie',
-          `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-        );
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: sessionToken,
-            role: 'admin',
-            email: record.email,
-            message: 'Administrator account established and verified successfully.',
-          })
-        );
-        return;
-      }
-
-      // 2d. Initial Setup: Option B - Resend Setup OTP
-      case 'bootstrap-resend-otp': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { tempSetupToken } = body;
-
-        if (!tempSetupToken) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Missing setup session reference.' }));
-          return;
-        }
-
-        const record = pendingBootstrapOtps.get(tempSetupToken);
-        if (!record) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Setup session expired. Please restart the initial setup.',
-              code: 'SESSION_EXPIRED',
-            })
-          );
-          return;
-        }
-
-        const now = Date.now();
-        if (now < record.resendAllowedAt) {
-          const waitSec = Math.ceil((record.resendAllowedAt - now) / 1000);
-          res.statusCode = 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Please wait ${waitSec} seconds before requesting a new code.`,
-              code: 'RESEND_COOLDOWN',
-              waitSeconds: waitSec,
-            })
-          );
-          return;
-        }
-
-        const freshOtpCode = generateSixDigitOtp();
-        record.otpHash = hashPassword(freshOtpCode, tempSetupToken);
-        record.expiresAt = now + 5 * 60 * 1000;
-        record.resendAllowedAt = now + 60 * 1000;
-        record.attempts = 0;
-
-        const emailResult = await sendAdminEmail({
-          to: record.email,
-          subject: `Your New Administrator Setup Code: ${freshOtpCode}`,
-          html: `<p>Your verification code is: <strong>${freshOtpCode}</strong>. Expires in 5 minutes.</p>`,
-          text: `Your verification code is: ${freshOtpCode}. Expires in 5 minutes.`,
-        });
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            message: 'A new verification code has been dispatched to your email.',
-            resendIn: 60,
-            emailDelivered: emailResult.delivered,
-            devTestCode: process.env.NODE_ENV !== 'production' || !emailResult.delivered ? freshOtpCode : undefined,
-          })
-        );
-        return;
-      }
-
-      // 2e. One-Time Administrator Bootstrap (Direct Fallback)
-      case 'bootstrap': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        if (isBootstrapping) {
-          res.statusCode = 409;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Administrator setup is currently being processed by another request.',
-              code: 'SETUP_IN_PROGRESS',
-            })
-          );
-          return;
-        }
-
-        const currentConfig = await getAdminAuthConfig();
-        if (currentConfig.bootstrapped) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Initial administrator setup has already been completed. Further registrations are strictly disabled.',
-              code: 'SETUP_ALREADY_COMPLETED',
-            })
-          );
-          return;
-        }
-
-        isBootstrapping = true;
-        try {
-          const body = await parseJsonBody(req);
-          const { email, password, confirmPassword, googleUid, setupSecret } = body;
-
-          const expectedSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
-          const incomingSecret = (setupSecret || req.headers['x-admin-setup-secret'] || '').toString().trim();
-
-          if (expectedSecret && incomingSecret !== expectedSecret) {
-            res.statusCode = 401;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Unauthorized: Invalid or missing administrator bootstrap setup secret (ADMIN_SETUP_SECRET).',
-                code: 'INVALID_SETUP_SECRET',
-              })
-            );
-            return;
-          }
-
-          if (!email || typeof email !== 'string' || !email.includes('@')) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ success: false, error: 'A valid administrator email address is required.' }));
-            return;
-          }
-
-          const cleanEmail = email.toLowerCase().trim();
-          const nowIso = new Date().toISOString();
-
-          let salt = '';
-          let hash = '';
-          if (password) {
-            if (password.length < 8) {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, error: 'Administrator password must be at least 8 characters long.' }));
-              return;
-            }
-            if (confirmPassword && password !== confirmPassword) {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, error: 'Passwords do not match.' }));
-              return;
-            }
-            salt = crypto.randomBytes(16).toString('hex');
-            hash = hashPassword(password, salt);
-          }
-
-          await saveAdminAuthConfig({
-            bootstrapped: true,
-            authorizedEmail: cleanEmail,
-            passwordSalt: salt,
-            passwordHash: hash,
-            primaryGoogleUid: googleUid || '',
-            authMethod: googleUid ? 'google' : 'email_password',
-            updatedAt: nowIso,
-            bootstrappedAt: nowIso,
-          });
-
-          if (googleUid) {
-            await saveAdminRoleDocument(googleUid, cleanEmail);
-          }
-
-          const sessionToken = generateToken();
-          createAdminSession(sessionToken, cleanEmail);
-
-          res.setHeader(
-            'Set-Cookie',
-            `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-          );
-
-          res.statusCode = 200;
-          res.end(
-            JSON.stringify({
-              success: true,
-              token: sessionToken,
-              role: 'admin',
-              email: cleanEmail,
-              message: 'Administrator account established and verified successfully.',
-            })
-          );
-          return;
-        } finally {
-          isBootstrapping = false;
-        }
-      }
-
-      // 2f. Secure Server-Side Account Recovery Procedure
-      case 'recover-setup': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { recoverySecret } = body;
-
-        const serverRecoverySecret = (process.env.ADMIN_RECOVERY_SECRET || '').trim();
-        const serverSetupSecret = (process.env.ADMIN_SETUP_SECRET || process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
-        const serverAdminPass = (process.env.ADMIN_PASSWORD || '').trim();
-
-        const inputSecret = (recoverySecret || req.headers['x-admin-recovery-secret'] || '').toString().trim();
-
-        // Recovery secret verification
-        const isValid =
-          (serverRecoverySecret && inputSecret === serverRecoverySecret) ||
-          (serverSetupSecret && inputSecret === serverSetupSecret) ||
-          (serverAdminPass && inputSecret === serverAdminPass) ||
-          inputSecret === 'JITE_RECOVER_ADMIN_2025';
-
-        if (!inputSecret || !isValid) {
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Invalid recovery secret. Access denied.',
-              code: 'INVALID_RECOVERY_SECRET',
-            })
-          );
-          return;
-        }
-
-        await clearAdminAuthConfig();
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            message: 'Administrator provisioning reset successfully. Initial setup has been safely reopened.',
-          })
-        );
-        return;
-      }
-
-      // 3. Continue with Google Authentication
-      case 'google-signin': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { email, uid } = body;
-
-        if (!email || typeof email !== 'string') {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Missing authenticated Google account email.' }));
-          return;
-        }
-
-        const config = await getAdminAuthConfig();
-
-        if (!config.bootstrapped) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              needsSetup: true,
-              error: 'Initial administrator setup has not been completed yet.',
-            })
-          );
-          return;
-        }
-
-        const incomingEmail = email.toLowerCase().trim();
-        const expectedEmail = config.authorizedEmail ? config.authorizedEmail.toLowerCase().trim() : '';
-
-        // STRICT AUTHORISATION CHECK
-        if (incomingEmail !== expectedEmail) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'ACCESS DENIED. This Google account is not authorised to access the Jite Auto Deals Administration System.',
-              code: 'UNAUTHORIZED_GOOGLE_ACCOUNT',
-            })
-          );
-          return;
-        }
-
-        // Link primary Google UID if not yet stored
-        if (uid) {
-          if (!config.primaryGoogleUid) {
-            config.primaryGoogleUid = uid;
-            await saveAdminAuthConfig(config);
-          }
-          await saveAdminRoleDocument(uid, expectedEmail);
-        }
-
-        // Issue verified admin session
-        const sessionToken = generateToken();
-        createAdminSession(sessionToken, expectedEmail);
-
-        res.setHeader(
-          'Set-Cookie',
-          `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-        );
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: sessionToken,
-            role: 'admin',
-            email: expectedEmail,
-          })
-        );
-        return;
-      }
-
-      // 4. Step 1: Email and Password Login -> Triggers OTP Email
-      case 'email-login': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const clientIp = getClientIp(req);
-        const rateCheck = checkRateLimit(clientIp);
-        if (!rateCheck.allowed) {
-          res.statusCode = 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Too many failed attempts. Please wait ${rateCheck.waitSeconds} seconds before trying again.`,
-              code: 'RATE_LIMITED',
-            })
-          );
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { email, password } = body;
-
-        if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
-          recordFailedAttempt(clientIp);
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter both your email address and password.' }));
-          return;
-        }
-
-        const config = await getAdminAuthConfig();
-
-        if (!config.bootstrapped) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              needsSetup: true,
-              error: 'Administrator setup has not been completed. Please establish the administrator account first.',
-            })
-          );
-          return;
-        }
-
-        const incomingEmail = email.toLowerCase().trim();
-        const expectedEmail = config.authorizedEmail.toLowerCase().trim();
-
-        // Verify authorized email address
-        if (incomingEmail !== expectedEmail) {
-          recordFailedAttempt(clientIp);
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Incorrect email address or password. Please verify and try again.',
-            })
-          );
-          return;
-        }
-
-        // Verify password
-        const isPasswordCorrect = verifyPassword(password, config.passwordSalt, config.passwordHash);
-        if (!isPasswordCorrect) {
-          recordFailedAttempt(clientIp);
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Incorrect administrator password. Please try again.',
-            })
-          );
-          return;
-        }
-
-        resetRateLimit(clientIp);
-
-        // Generate 6-digit OTP code and temporary pre-auth token
-        const preAuthToken = generateToken();
-        const otpCode = generateSixDigitOtp();
-        const otpHash = hashPassword(otpCode, preAuthToken);
-
-        const now = Date.now();
-        pendingOtps.set(preAuthToken, {
-          preAuthToken,
-          otpHash,
-          email: expectedEmail,
-          expiresAt: now + 5 * 60 * 1000, // 5 minutes
-          attempts: 0,
-          resendAllowedAt: now + 60 * 1000, // 60 seconds
-        });
-
-        // Send Email OTP
-        const emailHtml = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #020617; color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
-            <div style="background-color: #0f172a; padding: 28px 32px; border-bottom: 1px solid #1e293b; text-align: center;">
-              <h1 style="margin: 0; color: #f59e0b; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">JITE AUTO DEALS</h1>
-              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Administrator Security Verification</p>
-            </div>
-            <div style="padding: 36px 32px;">
-              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello Administrator,</p>
-              <p style="margin: 0 0 24px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">A sign-in attempt was initiated for the Jite Auto Deals Administrator Command Center. Use the one-time verification code below to complete your authentication:</p>
-              <div style="background-color: #0f172a; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; text-align: center; margin: 28px 0;">
-                <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #fbbf24; font-family: monospace;">${otpCode}</span>
-              </div>
-              <p style="margin: 0 0 8px; color: #f59e0b; font-size: 13px; font-weight: 600;">Security Notice:</p>
-              <ul style="margin: 0 0 24px; padding-left: 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;">
-                <li>This code expires in <strong>5 minutes</strong>.</li>
-                <li>It can only be used once.</li>
-                <li>If you did not initiate this request, your password may be compromised. Please sign in and update your credentials immediately.</li>
-              </ul>
-              <div style="border-top: 1px solid #1e293b; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
-                Jite Auto Deals · Direct Foreign-Used Cars & Trusted Vehicle Consultation · Lagos, Nigeria
-              </div>
-            </div>
-          </div>
-        `;
-
-        const emailResult = await sendAdminEmail({
-          to: expectedEmail,
-          subject: `Your Jite Auto Deals Verification Code: ${otpCode}`,
-          html: emailHtml,
-          text: `Your Jite Auto Deals verification code is: ${otpCode}. It expires in 5 minutes. Do not share this code.`,
-        });
-
-        if (!emailResult.delivered) {
-          pendingOtps.delete(preAuthToken);
-          res.statusCode = 502;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Email delivery failed: ${emailResult.error || 'Transactional email credentials not configured in server environment.'}`,
-              code: 'EMAIL_DELIVERY_FAILED',
-              emailDelivered: false,
-            })
-          );
-          return;
-        }
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            step: 'otp_required',
-            preAuthToken,
-            emailMasked: maskEmail(expectedEmail),
-            resendIn: 60,
-            expiresIn: 300,
-            emailDelivered: true,
-          })
-        );
-        return;
-      }
-
-      // 5. Step 2: Verify 6-digit OTP Code
-      case 'verify-otp': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { preAuthToken, code } = body;
-
-        if (!preAuthToken || !code || typeof code !== 'string') {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter the 6-digit verification code.' }));
-          return;
-        }
-
-        const cleanCode = code.replace(/\D/g, '').trim();
-        if (cleanCode.length !== 6) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Verification code must be exactly 6 digits.' }));
-          return;
-        }
-
-        const record = pendingOtps.get(preAuthToken);
-        if (!record) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Session expired or invalid. Please sign in again to receive a fresh verification code.',
-              code: 'INVALID_PREAUTH_TOKEN',
-            })
-          );
-          return;
-        }
-
-        // Check expiration (5 minutes)
-        if (Date.now() > record.expiresAt) {
-          pendingOtps.delete(preAuthToken);
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Verification code has expired (5 minute limit). Please request a new code.',
-              code: 'OTP_EXPIRED',
-            })
-          );
-          return;
-        }
-
-        // Check attempt count (max 5)
-        if (record.attempts >= 5) {
-          pendingOtps.delete(preAuthToken);
-          res.statusCode = 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Too many incorrect verification attempts. For security, please sign in again.',
-              code: 'TOO_MANY_OTP_ATTEMPTS',
-            })
-          );
-          return;
-        }
-
-        // Verify timing-safe hash
-        const computedHash = hashPassword(cleanCode, preAuthToken);
-        const isMatch = verifyPassword(cleanCode, preAuthToken, record.otpHash);
-
-        if (!isMatch) {
-          record.attempts += 1;
-          const remaining = 5 - record.attempts;
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Incorrect verification code. Please check your email and try again (${remaining} attempt${remaining === 1 ? '' : 's'} remaining).`,
-              code: 'INVALID_OTP',
-              attemptsRemaining: remaining,
-            })
-          );
-          return;
-        }
-
-        // Single-use: delete immediately upon successful verification
-        pendingOtps.delete(preAuthToken);
-
-        // Issue verified admin session
-        const sessionToken = generateToken();
-        createAdminSession(sessionToken, record.email);
-
-        res.setHeader(
-          'Set-Cookie',
-          `jite_admin_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-        );
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: sessionToken,
-            role: 'admin',
-            email: record.email,
-          })
-        );
-        return;
-      }
-
-      // 6. Resend 6-Digit OTP Code
-      case 'resend-otp': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { preAuthToken } = body;
-
-        if (!preAuthToken) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Missing session reference. Please sign in again.' }));
-          return;
-        }
-
-        const record = pendingOtps.get(preAuthToken);
-        if (!record) {
-          res.statusCode = 400;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Verification session expired. Please sign in again.',
-              code: 'SESSION_EXPIRED',
-            })
-          );
-          return;
-        }
-
-        const now = Date.now();
-        if (now < record.resendAllowedAt) {
-          const waitSec = Math.ceil((record.resendAllowedAt - now) / 1000);
-          res.statusCode = 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Please wait ${waitSec} seconds before requesting a new code.`,
-              code: 'RESEND_COOLDOWN',
-              waitSeconds: waitSec,
-            })
-          );
-          return;
-        }
-
-        // Generate fresh OTP code and reset timer
-        const freshOtpCode = generateSixDigitOtp();
-        record.otpHash = hashPassword(freshOtpCode, preAuthToken);
-        record.expiresAt = now + 5 * 60 * 1000;
-        record.resendAllowedAt = now + 60 * 1000;
-        record.attempts = 0;
-
-        const emailHtml = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #020617; color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
-            <div style="background-color: #0f172a; padding: 28px 32px; border-bottom: 1px solid #1e293b; text-align: center;">
-              <h1 style="margin: 0; color: #f59e0b; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">JITE AUTO DEALS</h1>
-              <p style="margin: 6px 0 0; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">New Verification Code</p>
-            </div>
-            <div style="padding: 36px 32px;">
-              <p style="margin: 0 0 16px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello Administrator,</p>
-              <p style="margin: 0 0 24px; color: #cbd5e1; font-size: 15px; line-height: 1.6;">Your requested new one-time verification code is below:</p>
-              <div style="background-color: #0f172a; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; text-align: center; margin: 28px 0;">
-                <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #fbbf24; font-family: monospace;">${freshOtpCode}</span>
-              </div>
-              <p style="margin: 0 0 8px; color: #f59e0b; font-size: 13px; font-weight: 600;">Security Notice:</p>
-              <ul style="margin: 0 0 24px; padding-left: 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;">
-                <li>This code expires in <strong>5 minutes</strong>.</li>
-                <li>Your previous code has been invalidated.</li>
-              </ul>
-              <div style="border-top: 1px solid #1e293b; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
-                Jite Auto Deals · Direct Foreign-Used Cars & Trusted Vehicle Consultation · Lagos, Nigeria
-              </div>
-            </div>
-          </div>
-        `;
-
-        const emailResult = await sendAdminEmail({
-          to: record.email,
-          subject: `Your New Jite Auto Deals Verification Code: ${freshOtpCode}`,
-          html: emailHtml,
-          text: `Your new Jite Auto Deals verification code is: ${freshOtpCode}. It expires in 5 minutes.`,
-        });
-
-        if (!emailResult.delivered) {
-          res.statusCode = 502;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: `Email delivery failed: ${emailResult.error || 'Failed to dispatch verification email.'}`,
-              code: 'EMAIL_DELIVERY_FAILED',
-              emailDelivered: false,
-            })
-          );
-          return;
-        }
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            message: 'A new verification code has been sent to your email.',
-            emailDelivered: true,
-            resendIn: 60,
-          })
-        );
-        return;
-      }
-
-      // 7. Verify Active Session
-      case 'verify': {
-        const token = extractAdminToken(req);
-        const session = getSessionData(token);
-
-        if (!session) {
-          res.statusCode = 401;
-          res.end(JSON.stringify({ authenticated: false, error: 'Session expired or unauthenticated.' }));
-          return;
-        }
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            authenticated: true,
-            role: 'admin',
-            email: session.email,
-          })
-        );
-        return;
-      }
-
-      // 8. Change Password (Authenticated)
-      case 'change-password': {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
-          return;
-        }
-
-        const token = extractAdminToken(req);
-        if (!isSessionValid(token)) {
-          res.statusCode = 401;
-          res.end(JSON.stringify({ success: false, error: 'Unauthorized: Active administrator session required.' }));
-          return;
-        }
-
-        const body = await parseJsonBody(req);
-        const { currentPassword, oldPassword, newPassword, confirmPassword } = body;
-        const passwordToCheck = currentPassword || oldPassword;
-
-        if (!passwordToCheck || !newPassword) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Both current password and new password are required.' }));
-          return;
-        }
-
-        if (typeof newPassword !== 'string' || newPassword.length < 8) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'New password must be at least 8 characters long.' }));
-          return;
-        }
-
-        if (confirmPassword && newPassword !== confirmPassword) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'New passwords do not match.' }));
-          return;
-        }
-
-        const config = await getAdminAuthConfig();
-        const isCurrentValid = verifyPassword(passwordToCheck, config.passwordSalt, config.passwordHash);
-        if (!isCurrentValid) {
-          res.statusCode = 401;
-          res.end(JSON.stringify({ success: false, error: 'Incorrect current administrator password.' }));
-          return;
-        }
-
-        const newSalt = crypto.randomBytes(16).toString('hex');
-        const newHash = hashPassword(newPassword, newSalt);
-        const nowIso = new Date().toISOString();
-
-        await saveAdminAuthConfig({
-          ...config,
-          passwordSalt: newSalt,
-          passwordHash: newHash,
-          updatedAt: nowIso,
-        });
-
-        revokeAllSessions();
-        const newToken = generateToken();
-        createAdminSession(newToken, config.authorizedEmail);
-
-        res.setHeader(
-          'Set-Cookie',
-          `jite_admin_session=${newToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-        );
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: newToken,
-            message: 'Administrator password changed successfully.',
-          })
-        );
-        return;
-      }
-
-      // 9. Sign Out
-      case 'logout': {
-        const token = extractAdminToken(req);
-        if (token) {
-          revokeAdminSession(token);
-        }
-        res.setHeader('Set-Cookie', 'jite_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
-        res.statusCode = 200;
-        res.end(JSON.stringify({ success: true, message: 'Logged out successfully.' }));
-        return;
-      }
-
-      // Legacy fallback
-      case 'login': {
-        // Redirect legacy login calls to email-login
-        const body = await parseJsonBody(req);
-        const config = await getAdminAuthConfig();
-        if (config.bootstrapped && !body.email) {
-          body.email = config.authorizedEmail;
-        }
-        req.body = body;
-        return handler({ ...req, url: `${url.pathname}?action=email-login` }, res);
-      }
-
-      default: {
-        res.statusCode = 404;
-        res.end(JSON.stringify({ error: `Unknown admin action: ${action}` }));
-        return;
-      }
+    // ------------------------------------------------------------------------
+    // 1. GET /api/admin-auth?action=status
+    //    Returns ONLY non-sensitive setup state. NEVER returns admin emails!
+    // ------------------------------------------------------------------------
+    if (action === 'status' && req.method === 'GET') {
+      const localState = readLocalBootstrapState();
+      const envBootstrapped = process.env.ADMIN_BOOTSTRAPPED === 'true';
+      const setupSecretRequired = Boolean(
+        process.env.ADMIN_SETUP_SECRET && process.env.ADMIN_SETUP_SECRET.trim().length > 0
+      );
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          bootstrapped: Boolean(localState.bootstrapped || envBootstrapped),
+          setupSecretRequired,
+          firebaseAuthConfigured: true,
+        })
+      );
+      return;
     }
+
+    // ------------------------------------------------------------------------
+    // 2. POST /api/admin-auth?action=verify-session
+    //    Cryptographically verifies Firebase ID token & Firestore admin access
+    // ------------------------------------------------------------------------
+    if (action === 'verify-session' && req.method === 'POST') {
+      const rateCheck = checkRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.statusCode = 429;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'RATE_LIMITED',
+            error: `Too many authentication attempts. Please wait ${rateCheck.waitSeconds} seconds.`,
+          })
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const idToken = extractBearerToken(req) || body.idToken;
+      if (!idToken) {
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'UNAUTHENTICATED',
+            error: 'Sign-in credentials could not be verified.',
+          })
+        );
+        return;
+      }
+
+      let decoded;
+      try {
+        decoded = await verifyFirebaseIdToken(idToken);
+      } catch (tokenErr) {
+        recordFailedAttempt(clientIp);
+        pushSecurityEvent({
+          action: 'SESSION_VERIFY_FAILED',
+          status: 'failure',
+          actorEmailMasked: 'invalid-token',
+          ipTag: hashIpForAudit(clientIp),
+          details: tokenErr?.message || 'Token signature or expiry check failed.',
+        });
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'INVALID_TOKEN',
+            error: 'Authentication could not be verified. Please sign in again.',
+          })
+        );
+        return;
+      }
+
+      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
+      if (!fsAuth.authorized) {
+        recordFailedAttempt(clientIp);
+        pushSecurityEvent({
+          action: 'UNAUTHORIZED_ADMIN_ATTEMPT',
+          status: 'warning',
+          actorEmailMasked: maskEmailForAudit(decoded.email),
+          ipTag: hashIpForAudit(clientIp),
+          details: `Unauthorized account attempted admin login via ${decoded.signInProvider}.`,
+        });
+        res.statusCode = 403;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'ACCESS_DENIED',
+            error: 'Unable to authorize administrator access for this account.',
+          })
+        );
+        return;
+      }
+
+      clearRateLimit(clientIp);
+
+      // Keep local bootstrap lock synchronized once a verified admin authenticates
+      const localState = readLocalBootstrapState();
+      if (fsAuth.firestoreBootstrapped || fsAuth.hasAdminDoc) {
+        if (!localState.bootstrapped) {
+          saveLocalBootstrapState({
+            bootstrapped: true,
+            primaryAdminUid: decoded.uid,
+            setupCompletedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          uid: decoded.uid,
+          email: decoded.email,
+          emailVerified: decoded.emailVerified,
+          role: fsAuth.role || 'admin',
+          signInProvider: decoded.signInProvider,
+          bootstrapped: Boolean(localState.bootstrapped || fsAuth.firestoreBootstrapped || fsAuth.hasAdminDoc),
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 3. POST /api/admin-auth?action=bootstrap-complete
+    //    Controlled one-time setup verification & lock
+    // ------------------------------------------------------------------------
+    if (action === 'bootstrap-complete' && req.method === 'POST') {
+      const localState = readLocalBootstrapState();
+      if (localState.bootstrapped || process.env.ADMIN_BOOTSTRAPPED === 'true') {
+        res.statusCode = 403;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'ALREADY_BOOTSTRAPPED',
+            error: 'Initial administrator setup has already been completed.',
+          })
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const idToken = extractBearerToken(req) || body.idToken;
+      const providedSecret = req.headers?.['x-admin-setup-secret'] || body.setupSecret || '';
+      const configuredSecret = (process.env.ADMIN_SETUP_SECRET || '').trim();
+
+      if (configuredSecret) {
+        if (!providedSecret || !safeTimingEqual(String(providedSecret), configuredSecret)) {
+          recordFailedAttempt(clientIp);
+          pushSecurityEvent({
+            action: 'BOOTSTRAP_SECRET_REJECTED',
+            status: 'warning',
+            actorEmailMasked: 'anonymous',
+            ipTag: hashIpForAudit(clientIp),
+            details: 'Invalid setup authorization secret supplied during bootstrap attempt.',
+          });
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              code: 'INVALID_SETUP_SECRET',
+              error: 'Setup authorization secret is invalid or missing.',
+            })
+          );
+          return;
+        }
+      }
+
+      if (!idToken) {
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'MISSING_TOKEN',
+            error: 'Authenticated administrator verification token is required.',
+          })
+        );
+        return;
+      }
+
+      const decoded = await verifyFirebaseIdToken(idToken);
+      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
+
+      if (!fsAuth.authorized) {
+        pushSecurityEvent({
+          action: 'BOOTSTRAP_UNAUTHORIZED',
+          status: 'warning',
+          actorEmailMasked: maskEmailForAudit(decoded.email),
+          ipTag: hashIpForAudit(clientIp),
+          details: 'Bootstrap attempted by account without verified owner permissions.',
+        });
+        res.statusCode = 403;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'BOOTSTRAP_UNAUTHORIZED',
+            error:
+              'Verification incomplete. Verify your administrator email address or authenticate with your verified primary Google account to finalize setup.',
+          })
+        );
+        return;
+      }
+
+      if (fsAuth.firestoreBootstrapped) {
+        saveLocalBootstrapState({
+          bootstrapped: true,
+          primaryAdminUid: decoded.uid,
+          setupCompletedAt: new Date().toISOString(),
+        });
+        res.statusCode = 403;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'ALREADY_BOOTSTRAPPED',
+            error: 'Initial administrator setup has already been completed.',
+          })
+        );
+        return;
+      }
+
+      saveLocalBootstrapState({
+        bootstrapped: true,
+        primaryAdminUid: decoded.uid,
+        setupCompletedAt: new Date().toISOString(),
+      });
+
+      pushSecurityEvent({
+        action: 'BOOTSTRAP_COMPLETED',
+        status: 'success',
+        actorEmailMasked: maskEmailForAudit(decoded.email),
+        ipTag: hashIpForAudit(clientIp),
+        details: `Primary administrator setup finalized (${decoded.signInProvider}).`,
+      });
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          bootstrapped: true,
+          uid: decoded.uid,
+          email: decoded.email,
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 4. POST /api/admin-auth?action=record-security-event
+    //    Logs non-sensitive failed sign-in attempts for audit visibility & throttling
+    // ------------------------------------------------------------------------
+    if (action === 'record-security-event' && req.method === 'POST') {
+      const rateCheck = checkRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.statusCode = 429;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'RATE_LIMITED',
+            waitSeconds: rateCheck.waitSeconds,
+            error: `Too many failed sign-in attempts. Please wait ${rateCheck.waitSeconds} seconds.`,
+          })
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const attemptCount = recordFailedAttempt(clientIp);
+      pushSecurityEvent({
+        action: 'LOGIN_FAILED',
+        status: attemptCount >= 5 ? 'warning' : 'failure',
+        actorEmailMasked: maskEmailForAudit(body?.emailHint),
+        ipTag: hashIpForAudit(clientIp),
+        details:
+          attemptCount >= 5
+            ? 'Repeated failed login attempts triggered temporary 5-minute rate lock.'
+            : 'Unsuccessful administrator sign-in attempt.',
+      });
+
+      const updatedRate = checkRateLimit(clientIp);
+      res.statusCode = updatedRate.allowed ? 200 : 429;
+      res.end(
+        JSON.stringify({
+          success: true,
+          rateLimited: !updatedRate.allowed,
+          waitSeconds: updatedRate.waitSeconds || 0,
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 5. GET /api/admin-auth?action=security-events
+    //    Admin-only read of recent server security events
+    // ------------------------------------------------------------------------
+    if (action === 'security-events' && req.method === 'GET') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          events: serverSecurityEvents,
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 6. POST /api/admin-auth?action=logout
+    // ------------------------------------------------------------------------
+    if (action === 'logout' && req.method === 'POST') {
+      res.setHeader('Set-Cookie', 'jite_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    res.statusCode = 404;
+    res.end(JSON.stringify({ success: false, error: 'Endpoint not found.' }));
   } catch (err) {
-    console.error(`[Admin Auth Error on action=${action}]:`, err);
     res.statusCode = 500;
-    res.end(JSON.stringify({ success: false, error: 'Internal server authentication error.' }));
+    res.end(JSON.stringify({ success: false, error: 'Internal authentication verification error.' }));
   }
+}
+
+export async function getAdminAuthConfig() {
+  return readLocalBootstrapState();
 }

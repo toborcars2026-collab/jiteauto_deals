@@ -1,4 +1,5 @@
 {
-  "config": null,
-  "sessions": []
+  "bootstrapped": false,
+  "primaryAdminUid": null,
+  "setupCompletedAt": null
 }

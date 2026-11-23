@@ -25,6 +25,8 @@
         "inSlideshow": { "type": "boolean" },
         "slideshowOrder": { "type": "number" },
         "status": { "type": "string", "enum": ["Available", "Reserved", "Sold", "Hidden", "Active", "Inactive"] },
+        "model3dUrl": { "type": "string" },
+        "frames360": { "type": "array" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
@@ -56,7 +58,7 @@
     },
     "Inquiry": {
       "title": "Inquiry",
-      "description": "Direct vehicle acquisition inquiry",
+      "description": "Direct vehicle acquisition or inspection inquiry",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -100,6 +102,17 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["businessName", "phoneDisplay", "whatsAppNumber"]
+    },
+    "EditorialSettings": {
+      "title": "EditorialSettings",
+      "description": "Automotive guides, inspection briefs, and walkaround media",
+      "type": "object",
+      "properties": {
+        "posts": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["posts"]
+    },
     "Admin": {
       "title": "Admin",
       "description": "Administrator registry and access control record",
@@ -107,11 +120,43 @@
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string" },
-        "role": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin"] },
+        "authMethods": { "type": "array" },
+        "active": { "type": "boolean" },
+        "inactivityTimeoutMinutes": { "type": "number" },
+        "lastLoginAt": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["email", "role"]
+      "required": ["uid", "email", "role", "active"]
+    },
+    "AdminBootstrap": {
+      "title": "AdminBootstrap",
+      "description": "One-time administrator bootstrap completion lock record",
+      "type": "object",
+      "properties": {
+        "setupCompleted": { "type": "boolean" },
+        "setupCompletedAt": { "type": "string" },
+        "primaryAdminUid": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["setupCompleted", "primaryAdminUid"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable administrator security and operational audit event",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "actorUid": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["success", "failure", "warning"] },
+        "details": { "type": "string" },
+        "authMethod": { "type": "string" },
+        "timestamp": { "type": "object", "format": "timestamp" }
+      },
+      "required": ["action", "actorUid", "status", "details", "timestamp"]
     }
   },
   "firestore": {
@@ -131,10 +176,21 @@
       "schema": { "$ref": "#/entities/BusinessSettings" },
       "description": "Centralized business contact information and public settings"
     },
+    "/settings/editorial": {
+      "schema": { "$ref": "#/entities/EditorialSettings" },
+      "description": "Published editorial guides and automotive walkarounds"
+    },
+    "/settings/admin_bootstrap": {
+      "schema": { "$ref": "#/entities/AdminBootstrap" },
+      "description": "Locked one-time administrator setup status"
+    },
     "/admins/{adminId}": {
       "schema": { "$ref": "#/entities/Admin" },
       "description": "Verified administrator role registry"
+    },
+    "/admin_audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Immutable administrator security and inventory audit trail"
     }
   }
 }
-

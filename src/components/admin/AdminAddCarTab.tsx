@@ -19,6 +19,7 @@ import {
   Camera,
 } from 'lucide-react';
 import { Vehicle } from '../../types';
+import { recordAdminAuditLog } from '../../services/adminAudit';
 import {
   saveVehicleToFirestore,
   uploadVehicleImageFile,
@@ -541,6 +542,12 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       // Single authoritative Cloud Firestore write
       const confirmed = await saveVehicleToFirestore(payload);
 
+      await recordAdminAuditLog({
+        action: carData.id ? 'VEHICLE_UPDATED' : 'VEHICLE_PUBLISHED',
+        status: 'success',
+        details: `${carData.id ? 'Updated' : 'Published'} ${confirmed.year} ${confirmed.make} ${confirmed.model} (${confirmed.images?.length || 0} photos).`,
+      });
+
       // Confirm successful publication
       setPublishStatusText('VEHICLE SUCCESSFULLY PUBLISHED!');
       await new Promise((resolve) => setTimeout(resolve, 350));
@@ -551,7 +558,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       console.error('[Publish Error]:', err);
       setErrorMsg(
         err?.message?.includes('permission') || err?.message?.includes('PERMISSION_DENIED')
-          ? 'Cloud Firestore write error: Missing or insufficient permissions. Please ensure you are signed in with the authorized Google Account (blwuniabuja@gmail.com) in the Admin Command Center.'
+          ? 'Cloud Firestore write error: Missing or insufficient permissions. Please ensure you are signed in with an authorized administrator account.'
           : err?.message || 'Failed to complete publishing. Uploaded images have been preserved; please retry.'
       );
     } finally {

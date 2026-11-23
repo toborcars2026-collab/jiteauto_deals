@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage, OperationType, handleFirestoreError } from './firebase';
+import { auth, db, storage, OperationType, handleFirestoreError } from './firebase';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
 import { INITIAL_VEHICLES } from './data';
 import {
@@ -1620,11 +1620,15 @@ export async function uploadVehicleImageFile(
 
   // Step 3: Resilient high-speed upload fallback using robust arrayBuffer data URL conversion
   const base64Data = await readBlobAsDataUrl(uploadBlob);
+  const bearerToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
 
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/upload-vehicle-image', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
+    if (bearerToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${bearerToken}`);
+    }
 
     if (xhr.upload && onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -1704,9 +1708,13 @@ export async function uploadVehicleImageDataUrl(
   }
 
   // Fallback to server route
+  const bearerToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
   const response = await fetch('/api/upload-vehicle-image', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+    },
     body: JSON.stringify({
       vehicleId: cleanId,
       base64Data: dataUrl,

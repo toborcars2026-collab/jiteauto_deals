@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Vehicle, VehicleStatus } from '../../types';
+import { recordAdminAuditLog } from '../../services/adminAudit';
 import { FALLBACK_VEHICLE_IMAGE } from '../../assets/visuals';
 import {
   formatCurrency,
@@ -99,6 +100,11 @@ export default function AdminInventoryTab({
     setUpdatingStatusId(car.id);
     try {
       await saveVehicleStatus(car.id, newStatus);
+      await recordAdminAuditLog({
+        action: 'VEHICLE_STATUS_UPDATED',
+        status: 'success',
+        details: `Set ${car.year} ${car.make} ${car.model} status to ${newStatus}.`,
+      });
       setVehicles((prev) =>
         prev.map((v) => (v.id === car.id ? { ...v, status: newStatus, updatedAt: new Date().toISOString() } : v))
       );
@@ -123,6 +129,11 @@ export default function AdminInventoryTab({
     setUpdatingPriceId(car.id);
     try {
       await saveVehiclePrice(car.id, numPrice);
+      await recordAdminAuditLog({
+        action: 'VEHICLE_PRICE_UPDATED',
+        status: 'success',
+        details: `Updated price of ${car.year} ${car.make} ${car.model} to ${formatCurrency(numPrice)}.`,
+      });
       setVehicles((prev) =>
         prev.map((v) => (v.id === car.id ? { ...v, price: numPrice, updatedAt: new Date().toISOString() } : v))
       );
@@ -181,6 +192,11 @@ export default function AdminInventoryTab({
     setDeletingId(car.id);
     try {
       await deleteVehicleFromFirestore(car.id);
+      await recordAdminAuditLog({
+        action: 'VEHICLE_DELETED',
+        status: 'warning',
+        details: `Deleted listing "${car.year} ${car.make} ${car.model}" (${car.id}).`,
+      });
       setVehicles((prev) => prev.filter((v) => v.id !== car.id));
       deleteVehicle(car.id);
       showFeedback(`Listing "${car.make} ${car.model}" deleted successfully from Cloud Firestore.`);

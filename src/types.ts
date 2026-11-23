@@ -152,4 +152,27 @@ export interface AIConsultantMessage {
   quickReplies?: string[];
 }
 
+export interface AdminProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  role: 'owner' | 'admin';
+  authMethods?: string[];
+  active: boolean;
+  inactivityTimeoutMinutes?: number;
+  lastLoginAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
+export interface AdminAuditLogEntry {
+  id: string;
+  action: string;
+  actorUid: string;
+  actorEmail?: string;
+  status: 'success' | 'failure' | 'warning';
+  details: string;
+  authMethod?: string;
+  timestamp: string;
+  source?: 'firestore' | 'security-server';
+}

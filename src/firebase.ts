@@ -1,40 +1,35 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, setLogLevel, type Firestore } from 'firebase/firestore';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getFirestore, setLogLevel, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Silence non-critical internal SDK connection retry warnings in sandbox iframes
 try {
   setLogLevel('silent');
 } catch {
   // Ignore if already set
 }
 
-// Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Cloud Firestore with dedicated Database ID
 export const db: Firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Initialize Firebase Authentication with permanent local persistence
+// Session-only persistence: sessions expire automatically when browser/tab closes
 export const auth = getAuth(app);
 try {
-  setPersistence(auth, browserLocalPersistence).catch(() => {
-    // Graceful fallback in constrained environments
+  setPersistence(auth, browserSessionPersistence).catch(() => {
+    // Graceful fallback in constrained browser contexts
   });
 } catch {
   // Ignore
 }
 
-// Initialize Firebase Storage with fast, responsive timeout thresholds
 export const storage = getStorage(app);
 try {
-  // Prevent SDK from stalling for 120 seconds in exponential backoff when a network glitch occurs
   storage.maxUploadRetryTime = 4000;
   storage.maxOperationRetryTime = 4000;
 } catch {
-  // Ignore in environments where properties are read-only
+  // Ignore
 }
 
 export enum OperationType {
@@ -72,19 +67,28 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
     },
     operationType,
-    path
+    path,
   };
   console.warn('Firestore Notice: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore on boot (graceful fallback)
 export async function testFirestoreConnection(): Promise<boolean> {
-  return true;
+  try {
+    await getDocFromServer(doc(db, 'settings', 'business'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firestore appears offline or unreachable.');
+      return false;
+    }
+    return true;
+  }
 }

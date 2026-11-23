@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Film, CheckCircle2, ArrowUp, ArrowDown, Star, ExternalLink, Loader2 } from 'lucide-react';
 import { Vehicle } from '../../types';
+import { recordAdminAuditLog } from '../../services/adminAudit';
 import {
   saveVehicleSlideshow,
   getImageUrl,
@@ -34,6 +35,11 @@ export default function AdminSlideshowTab({ vehicles, setVehicles }: AdminSlides
       const nextOrder = nextVal ? highestOrder + 1 : undefined;
 
       await saveVehicleSlideshow(car.id, nextVal, nextOrder);
+      await recordAdminAuditLog({
+        action: 'SLIDESHOW_UPDATED',
+        status: 'success',
+        details: `${nextVal ? 'Added' : 'Removed'} ${car.year} ${car.make} ${car.model} ${nextVal ? 'to' : 'from'} Hero Slideshow.`,
+      });
       setVehicles((prev) =>
         prev.map((v) =>
           v.id === car.id

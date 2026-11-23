@@ -6,16 +6,108 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Permanently authorized administrator verification:
-    // 1. Runtime verified email blwuniabuja@gmail.com
-    // 2. Or entry in admins collection
-    // 3. Or server-issued admin custom claim
+    function isPrimaryBootstrapOwner() {
+      return isSignedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'blwuniabuja@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isRegisteredActiveAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('active', true) == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email == 'blwuniabuja@gmail.com' && request.auth.token.email_verified == true) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.admin == true
-      );
+      return isPrimaryBootstrapOwner() ||
+        isRegisteredActiveAdmin() ||
+        (isSignedIn() && request.auth.token.admin == true);
+    }
+
+    function isValidDocId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 160;
+    }
+
+    function isValidVehicleWrite(data) {
+      return data.make is string &&
+        data.make.size() >= 1 &&
+        data.make.size() <= 120 &&
+        data.model is string &&
+        data.model.size() >= 1 &&
+        data.model.size() <= 160 &&
+        data.year is number &&
+        data.year >= 1980 &&
+        data.year <= 2035 &&
+        data.price is number &&
+        data.price >= 0 &&
+        (!('images' in data) || data.images is list);
+    }
+
+    function isValidLeadCreate(data) {
+      return data.name is string &&
+        data.name.size() >= 1 &&
+        data.name.size() <= 160 &&
+        data.phone is string &&
+        data.phone.size() >= 4 &&
+        data.phone.size() <= 40;
+    }
+
+    function isValidInquiryCreate(data) {
+      return data.name is string &&
+        data.name.size() >= 1 &&
+        data.name.size() <= 160 &&
+        data.phone is string &&
+        data.phone.size() >= 4 &&
+        data.phone.size() <= 40 &&
+        data.vehicleName is string &&
+        data.vehicleName.size() >= 1 &&
+        data.vehicleName.size() <= 200;
+    }
+
+    function isValidAdminRecord(data, adminId) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+        data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'role',
+          'authMethods',
+          'active',
+          'inactivityTimeoutMinutes',
+          'lastLoginAt',
+          'authorizedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.uid == adminId &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 200 &&
+        data.role in ['owner', 'admin'] &&
+        (!('active' in data) || data.active is bool) &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120));
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['action', 'actorUid', 'status', 'details', 'timestamp']) &&
+        data.keys().hasOnly([
+          'action',
+          'actorUid',
+          'actorEmail',
+          'status',
+          'details',
+          'authMethod',
+          'timestamp'
+        ]) &&
+        data.actorUid == request.auth.uid &&
+        data.action is string &&
+        data.action.size() >= 1 &&
+        data.action.size() <= 100 &&
+        data.status in ['success', 'failure', 'warning'] &&
+        data.details is string &&
+        data.details.size() <= 500 &&
+        data.timestamp == request.time;
     }
 
     // Default deny catch-all for Zero-Trust Firestore Security
@@ -24,49 +116,65 @@ service cloud.firestore {
     }
 
     // Vehicles Catalog:
-    // - Public read for website visitors, Android app, and customer inventory browsing.
-    // - Writes, updates, and deletes strictly restricted to the authorized administrator.
+    // - Public read for storefront visitors and inventory browsing.
+    // - Writes restricted to verified active administrators.
     match /vehicles/{vehicleId} {
       allow read: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow create, update: if isAdmin() && isValidDocId(vehicleId) && isValidVehicleWrite(request.resource.data);
+      allow delete: if isAdmin();
     }
 
-    // Central Business & Security Settings:
-    // - Public read for business contact info, phone display, WhatsApp numbers, etc.
-    // - Writes strictly restricted to the authorized administrator.
-    match /settings/{docId} {
+    // Public Website Content Settings (Business Profile & Editorial Insights)
+    match /settings/business {
       allow read: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
-    // Customer Leads (Find My Car & Source A Car requests):
-    // - Public create so prospective clients can submit vehicle requests.
-    // - Reads, updates, and deletes restricted to authorized administrator.
+    match /settings/editorial {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Private Administrative & Analytics Settings
+    match /settings/analytics {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/admin_bootstrap {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/admin_security {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Customer Leads (Find My Car & Source A Car requests)
     match /leads/{leadId} {
-      allow create: if true;
+      allow create: if isValidDocId(leadId) && isValidLeadCreate(request.resource.data);
       allow read, update, delete: if isAdmin();
     }
 
-    // Direct Vehicle Inquiries:
-    // - Public create so prospective buyers can submit vehicle inspection & inquiry requests.
-    // - Reads, updates, and deletes restricted to authorized administrator.
+    // Direct Vehicle Inquiries & Inspection Bookings
     match /inquiries/{inquiryId} {
-      allow create: if true;
+      allow create: if isValidDocId(inquiryId) && isValidInquiryCreate(request.resource.data);
       allow read, update, delete: if isAdmin();
     }
 
     // Administrator Registry:
-    // - Authenticated administrator can read their own record or all admin records.
-    // - Writes strictly restricted to the authorized administrator.
+    // - Admins can read their own record or all admin records.
+    // - Admins can create/update records and revoke other accounts, without deleting themselves.
     match /admins/{adminId} {
       allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && isValidDocId(adminId) && isValidAdminRecord(request.resource.data, adminId);
+      allow delete: if isAdmin() && request.auth.uid != adminId;
     }
 
-    // Diagnostics & connectivity collection
-    match /test/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    // Immutable Administrator Audit Trail
+    match /admin_audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidAuditLog(request.resource.data);
+      allow update, delete: if false;
     }
   }
 }
