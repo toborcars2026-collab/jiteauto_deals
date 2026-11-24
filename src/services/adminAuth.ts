@@ -264,17 +264,17 @@ export function evaluatePasswordStrength(password: string): PasswordStrengthResu
     symbol: /[^A-Za-z0-9]/.test(password),
   };
 
-  const passed = Object.values(checks).filter(Boolean).length;
+  const classCount = [checks.upper, checks.lower, checks.number, checks.symbol].filter(Boolean).length;
   let score: 0 | 1 | 2 | 3 | 4 = 0;
   let label: PasswordStrengthResult['label'] = 'Too weak';
 
-  if (password.length >= 14 && passed === 5) {
+  if (password.length >= 14 && classCount >= 3) {
     score = 4;
     label = 'Very strong';
-  } else if (checks.length && passed >= 4) {
+  } else if (checks.length && classCount >= 3) {
     score = 3;
     label = 'Strong';
-  } else if (password.length >= 8 && passed >= 3) {
+  } else if (password.length >= 8 && classCount >= 2) {
     score = 2;
     label = 'Fair';
   } else if (password.length > 0) {
@@ -282,7 +282,7 @@ export function evaluatePasswordStrength(password: string): PasswordStrengthResu
     label = 'Weak';
   }
 
-  const isValid = checks.length && checks.upper && checks.lower && checks.number && checks.symbol;
+  const isValid = checks.length && classCount >= 3;
   return { score, label, isValid, checks };
 }
 
@@ -744,7 +744,7 @@ export async function completeFirstTimeSetup(params: {
     return {
       success: false,
       error:
-        'Password must be at least 10 characters and include uppercase, lowercase, a number, and a special character.',
+        'Password must be at least 10 characters and combine at least 3 of: uppercase, lowercase, numbers, or symbols.',
     };
   }
 
@@ -948,7 +948,7 @@ export async function linkEmailPasswordToCurrentAdmin(
     return {
       success: false,
       error:
-        'Password must be at least 10 characters and include uppercase, lowercase, a number, and a special character.',
+        'Password must be at least 10 characters and combine at least 3 of: uppercase, lowercase, numbers, or symbols.',
     };
   }
 
@@ -1081,7 +1081,7 @@ export async function changeAdminPassword(params: {
     return {
       success: false,
       error:
-        'Password must be at least 10 characters and include uppercase, lowercase, a number, and a special character.',
+        'Password must be at least 10 characters and combine at least 3 of: uppercase, lowercase, numbers, or symbols.',
     };
   }
 

@@ -235,7 +235,7 @@ export default function AdminSecuritySection({
     }
     if (!passwordStrength.isValid) {
       showError(
-        'Password must be at least 10 characters and include uppercase, lowercase, a number, and a special character.'
+        'Password must be at least 10 characters and combine at least 3 of: uppercase, lowercase, numbers, or symbols.'
       );
       return;
     }
@@ -704,18 +704,21 @@ export default function AdminSecuritySection({
                     ✓ 10+ chars
                   </span>
                   <span className={passwordStrength.checks.upper ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
-                    ✓ Uppercase
+                    Uppercase
                   </span>
                   <span className={passwordStrength.checks.lower ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
-                    ✓ Lowercase
+                    Lowercase
                   </span>
                   <span className={passwordStrength.checks.number ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
-                    ✓ Number
+                    Number
                   </span>
                   <span className={passwordStrength.checks.symbol ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
-                    ✓ Symbol
+                    Symbol
                   </span>
                 </div>
+                <p className="text-[11px] text-slate-500">
+                  Requires 10+ characters combining at least 3 character types (uppercase, lowercase, number, or symbol).
+                </p>
               </div>
 
               <div className="flex justify-end">

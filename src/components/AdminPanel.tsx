@@ -849,7 +849,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                       type={showSetupPassword ? 'text' : 'password'}
                       required
                       autoComplete="new-password"
-                      placeholder="Min 10 chars, upper, lower, number, symbol"
+                      placeholder="Min 10 chars (letters, numbers & symbol)"
                       value={setupPassword}
                       onChange={(e) => setSetupPassword(e.target.value)}
                       className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
@@ -902,15 +902,18 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                       {setupStrength.label}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 font-mono text-[10px]">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 font-mono text-[10px]">
                     <span className={setupStrength.checks.length ? 'text-emerald-400' : 'text-slate-500'}>
                       ✓ 10+ chars
                     </span>
-                    <span className={setupStrength.checks.upper && setupStrength.checks.lower ? 'text-emerald-400' : 'text-slate-500'}>
-                      ✓ Upper/Lower
+                    <span className={setupStrength.checks.upper || setupStrength.checks.lower ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ Letters
                     </span>
-                    <span className={setupStrength.checks.number && setupStrength.checks.symbol ? 'text-emerald-400' : 'text-slate-500'}>
-                      ✓ Num & Symbol
+                    <span className={setupStrength.checks.number ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ Number
+                    </span>
+                    <span className={setupStrength.checks.symbol ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ Symbol
                     </span>
                   </div>
                 </div>
