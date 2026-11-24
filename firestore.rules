@@ -6,13 +6,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isPrimaryBootstrapOwner() {
-      return isSignedIn() &&
-        request.auth.token.email != null &&
-        request.auth.token.email.lower() == 'blwuniabuja@gmail.com' &&
-        request.auth.token.email_verified == true;
-    }
-
     function isRegisteredActiveAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
@@ -20,13 +13,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isPrimaryBootstrapOwner() ||
-        isRegisteredActiveAdmin() ||
+      return isRegisteredActiveAdmin() ||
         (isSignedIn() && request.auth.token.admin == true);
     }
 
     function isValidDocId(id) {
-      return id is string && id.size() >= 1 && id.size() <= 160;
+      return id is string && id.size() >= 1 && id.size() <= 160 && id.matches('^[a-zA-Z0-9_\\-.@]+$');
+    }
+
+    function isValidEmailDocId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 200 && id.matches('^[^/\\s]+@[^/\\s]+\\.[^/\\s]+$');
     }
 
     function isValidVehicleWrite(data) {
@@ -41,7 +37,7 @@ service cloud.firestore {
         data.year <= 2035 &&
         data.price is number &&
         data.price >= 0 &&
-        (!('images' in data) || data.images is list);
+        (!('images' in data) || (data.images is list && data.images.size() <= 40));
     }
 
     function isValidLeadCreate(data) {
@@ -65,6 +61,15 @@ service cloud.firestore {
         data.vehicleName.size() <= 200;
     }
 
+    function isValidBootstrapDoc(data) {
+      return data.keys().hasAll(['setupCompleted']) &&
+        data.keys().hasOnly(['setupCompleted', 'setupCompletedAt', 'updatedAt', 'primaryAdminUid']) &&
+        data.setupCompleted == true &&
+        (!('setupCompletedAt' in data) || (data.setupCompletedAt is string && data.setupCompletedAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+        (!('primaryAdminUid' in data) || (data.primaryAdminUid is string && data.primaryAdminUid.size() <= 128));
+    }
+
     function isValidAdminRecord(data, adminId) {
       return data.keys().hasAll(['uid', 'email', 'role']) &&
         data.keys().hasOnly([
@@ -86,7 +91,36 @@ service cloud.firestore {
         data.email.size() <= 200 &&
         data.role in ['owner', 'admin'] &&
         (!('active' in data) || data.active is bool) &&
+        (!('inactivityTimeoutMinutes' in data) || (data.inactivityTimeoutMinutes is number && data.inactivityTimeoutMinutes >= 5 && data.inactivityTimeoutMinutes <= 180)) &&
+        (!('authMethods' in data) || (data.authMethods is list && data.authMethods.size() <= 10)) &&
+        (!('lastLoginAt' in data) || (data.lastLoginAt is string && data.lastLoginAt.size() <= 64)) &&
+        (!('authorizedAt' in data) || (data.authorizedAt is string && data.authorizedAt.size() <= 64)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
         (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120));
+    }
+
+    function isValidAdminInvite(data, inviteEmail) {
+      return data.keys().hasAll(['email', 'role', 'active']) &&
+        data.keys().hasOnly([
+          'email',
+          'displayName',
+          'role',
+          'active',
+          'invitedByUid',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 200 &&
+        data.email.lower() == inviteEmail &&
+        data.role == 'admin' &&
+        data.active is bool &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120)) &&
+        (!('invitedByUid' in data) || (data.invitedByUid is string && data.invitedByUid.size() <= 128)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
     }
 
     function isValidAuditLog(data) {
@@ -107,7 +141,29 @@ service cloud.firestore {
         data.status in ['success', 'failure', 'warning'] &&
         data.details is string &&
         data.details.size() <= 500 &&
+        (!('actorEmail' in data) || (data.actorEmail is string && data.actorEmail.size() <= 200)) &&
+        (!('authMethod' in data) || (data.authMethod is string && data.authMethod.size() <= 64)) &&
         data.timestamp == request.time;
+    }
+
+    function isBootstrappingInitialOwner(adminId) {
+      return isSignedIn() &&
+        adminId == request.auth.uid &&
+        !exists(/databases/$(database)/documents/settings/admin_bootstrap) &&
+        existsAfter(/databases/$(database)/documents/settings/admin_bootstrap) &&
+        request.resource.data.role == 'owner' &&
+        request.resource.data.get('active', true) == true;
+    }
+
+    function isRedeemingVerifiedInvite(adminId) {
+      return isSignedIn() &&
+        adminId == request.auth.uid &&
+        request.auth.token.email != null &&
+        request.auth.token.email_verified == true &&
+        exists(/databases/$(database)/documents/admin_invites/$(request.auth.token.email.lower())) &&
+        get(/databases/$(database)/documents/admin_invites/$(request.auth.token.email.lower())).data.active == true &&
+        request.resource.data.role == 'admin' &&
+        request.resource.data.get('active', true) == true;
     }
 
     // Default deny catch-all for Zero-Trust Firestore Security
@@ -140,8 +196,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // One-Time Bootstrap Lock Flag (contains NO PII/UIDs; locks permanently after first owner claim)
     match /settings/admin_bootstrap {
-      allow read, write: if isAdmin();
+      allow get: if true;
+      allow list, delete: if false;
+      allow create: if isSignedIn() &&
+        !exists(/databases/$(database)/documents/settings/admin_bootstrap) &&
+        existsAfter(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        isValidBootstrapDoc(request.resource.data);
+      allow update: if isAdmin() && isValidBootstrapDoc(request.resource.data);
     }
 
     match /settings/admin_security {
@@ -163,11 +226,41 @@ service cloud.firestore {
 
     // Administrator Registry:
     // - Admins can read their own record or all admin records.
-    // - Admins can create/update records and revoke other accounts, without deleting themselves.
+    // - Atomic one-time initial owner claim when /settings/admin_bootstrap is unclaimed.
+    // - Verified invite redemption for invited admins.
+    // - Existing admins can manage accounts, but Primary Owner cannot be revoked, demoted, or deleted.
     match /admins/{adminId} {
-      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
-      allow create, update: if isAdmin() && isValidDocId(adminId) && isValidAdminRecord(request.resource.data, adminId);
-      allow delete: if isAdmin() && request.auth.uid != adminId;
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidDocId(adminId) &&
+        isValidAdminRecord(request.resource.data, adminId) && (
+          isAdmin() ||
+          isBootstrappingInitialOwner(adminId) ||
+          isRedeemingVerifiedInvite(adminId)
+        );
+      allow update: if isAdmin() &&
+        isValidDocId(adminId) &&
+        isValidAdminRecord(request.resource.data, adminId) &&
+        request.resource.data.uid == resource.data.uid &&
+        (resource.data.role != 'owner' || (request.resource.data.role == 'owner' && request.resource.data.get('active', true) == true));
+      allow delete: if isAdmin() &&
+        request.auth.uid != adminId &&
+        resource.data.role != 'owner';
+    }
+
+    // Authorized Administrator Email Invitations
+    match /admin_invites/{inviteEmail} {
+      allow get: if isAdmin() || (
+        isSignedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email_verified == true &&
+        request.auth.token.email.lower() == inviteEmail
+      );
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() &&
+        isValidEmailDocId(inviteEmail) &&
+        isValidAdminInvite(request.resource.data, inviteEmail);
+      allow delete: if isAdmin();
     }
 
     // Immutable Administrator Audit Trail

@@ -27,7 +27,7 @@ import {
   ArrowLeft,
   UserCheck,
 } from 'lucide-react';
-import { onAuthStateChanged, sendEmailVerification, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
   getAdminAuthStatus,
@@ -35,11 +35,14 @@ import {
   syncAdminProfileInFirestore,
   signInAdminWithEmailPassword,
   signInAdminWithGoogle,
+  checkPendingGoogleRedirect,
   sendAdminPasswordReset,
   completeFirstTimeSetup,
-  finalizeVerificationAndBootstrap,
   completeGoogleBootstrap,
   evaluatePasswordStrength,
+  touchAdminActivity,
+  isAdminSessionTimedOut,
+  AUTH_MESSAGES,
   logoutAdminSession,
   AdminBootstrapStatus,
 } from '../services/adminAuth';
@@ -109,14 +112,14 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // First-Time Setup Form
+  // First-Time Setup Form (always blank by default)
   const [setupFullName, setSetupFullName] = useState('');
   const [setupEmail, setSetupEmail] = useState('');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
   const [setupSecret, setSetupSecret] = useState('');
   const [showSetupPassword, setShowSetupPassword] = useState(false);
-  const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false);
+  const [showSetupConfirmPassword, setShowSetupConfirmPassword] = useState(false);
 
   // Forgot Password Form
   const [resetEmail, setResetEmail] = useState('');
@@ -126,6 +129,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [dashboardBanner, setDashboardBanner] = useState<string | null>(null);
 
   // Command Centre Workspace State
   const [activeTab, setActiveTab] = useState<AdminSectionTab>('overview');
@@ -151,19 +155,42 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
   const setupStrength = evaluatePasswordStrength(setupPassword);
 
-  // 1. Check bootstrap status + listen to Firebase Auth session-only state
+  // 1. Check bootstrap status, process any mobile Google redirect result, and verify persisted session
   useEffect(() => {
     let mounted = true;
 
-    getAdminAuthStatus().then((status) => {
-      if (!mounted) return;
+    const bootstrapPromise = getAdminAuthStatus().then((status) => {
+      if (!mounted) return status;
       setBootstrapStatus(status);
+      if (!status.bootstrapped) {
+        setAuthView('setup');
+      }
+      return status;
+    });
+
+    checkPendingGoogleRedirect().then((redirectRes) => {
+      if (!mounted || !redirectRes.handled) return;
+      if (redirectRes.success && redirectRes.user) {
+        setCurrentAdminUser(redirectRes.user);
+        setAdminProfile(redirectRes.profile || null);
+        if (redirectRes.profile?.inactivityTimeoutMinutes) {
+          setTimeoutMinutes(redirectRes.profile.inactivityTimeoutMinutes);
+        }
+        setDashboardBanner(AUTH_MESSAGES.LOGIN_WELCOME);
+        setIsAuthenticated(true);
+        setIsVerifyingSession(false);
+      } else if (redirectRes.error) {
+        setAuthError(redirectRes.error);
+        setIsVerifyingSession(false);
+      }
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!mounted) return;
 
       if (!user) {
+        await bootstrapPromise;
+        if (!mounted) return;
         setCurrentAdminUser(null);
         setAdminProfile(null);
         setIsAuthenticated(false);
@@ -175,21 +202,36 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         return;
       }
 
+      // Enforce inactivity timeout even across browser closes/reopenings
+      if (isAdminSessionTimedOut(30)) {
+        await Promise.all([bootstrapPromise, logoutAdminSession('timeout')]);
+        if (!mounted) return;
+        setCurrentAdminUser(null);
+        setAdminProfile(null);
+        setIsAuthenticated(false);
+        setIsVerifyingSession(false);
+        setAuthError('Your administrator session timed out due to inactivity. Please sign in again.');
+        return;
+      }
+
       const verification = await verifyCurrentAdminSession(user);
       if (!mounted) return;
 
       if (verification.authorized) {
         const profile = await syncAdminProfileInFirestore(user);
         if (!mounted) return;
+        const activeTimeout = profile?.inactivityTimeoutMinutes || 30;
         setCurrentAdminUser(user);
         setAdminProfile(profile);
-        if (profile?.inactivityTimeoutMinutes) {
-          setTimeoutMinutes(profile.inactivityTimeoutMinutes);
-        }
+        setTimeoutMinutes(activeTimeout);
+        touchAdminActivity(activeTimeout);
+        lastActivityRef.current = Date.now();
         setIsAuthenticated(true);
         setIsVerifyingSession(false);
       } else {
+        await bootstrapPromise;
         await signOut(auth).catch(() => {});
+        if (!mounted) return;
         setCurrentAdminUser(null);
         setAdminProfile(null);
         setIsAuthenticated(false);
@@ -229,6 +271,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   const handleSignOut = useCallback(
     async (reason: 'manual' | 'timeout' = 'manual') => {
       setShowTimeoutWarning(false);
+      setDashboardBanner(null);
       await logoutAdminSession(reason);
       setCurrentAdminUser(null);
       setAdminProfile(null);
@@ -252,6 +295,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
     const resetTimer = () => {
       lastActivityRef.current = Date.now();
+      touchAdminActivity(timeoutMinutes);
       setShowTimeoutWarning(false);
     };
 
@@ -289,15 +333,16 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     try {
       const res = await signInAdminWithEmailPassword(emailInput, passwordInput);
       if (!res.success || !res.user) {
-        setAuthError(res.error || 'Sign-in failed. Please verify your credentials and try again.');
+        setAuthError(res.error || AUTH_MESSAGES.INVALID_PASSWORD);
         return;
       }
       setCurrentAdminUser(res.user);
       setAdminProfile(res.profile || null);
-      if (res.profile?.inactivityTimeoutMinutes) {
-        setTimeoutMinutes(res.profile.inactivityTimeoutMinutes);
-      }
+      const mins = res.profile?.inactivityTimeoutMinutes || 30;
+      setTimeoutMinutes(mins);
+      touchAdminActivity(mins);
       setPasswordInput('');
+      setDashboardBanner(AUTH_MESSAGES.LOGIN_WELCOME);
       setIsAuthenticated(true);
       lastActivityRef.current = Date.now();
     } finally {
@@ -315,15 +360,17 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
     try {
       const res = await signInAdminWithGoogle();
+      if (res.redirecting) return;
       if (!res.success || !res.user) {
-        setAuthError(res.error || 'Unable to authorize this account for administration.');
+        setAuthError(res.error || AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT);
         return;
       }
       setCurrentAdminUser(res.user);
       setAdminProfile(res.profile || null);
-      if (res.profile?.inactivityTimeoutMinutes) {
-        setTimeoutMinutes(res.profile.inactivityTimeoutMinutes);
-      }
+      const mins = res.profile?.inactivityTimeoutMinutes || 30;
+      setTimeoutMinutes(mins);
+      touchAdminActivity(mins);
+      setDashboardBanner(AUTH_MESSAGES.LOGIN_WELCOME);
       setIsAuthenticated(true);
       lastActivityRef.current = Date.now();
     } finally {
@@ -354,12 +401,6 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         setupSecret,
       });
 
-      if (res.needsEmailVerification) {
-        setAwaitingEmailVerification(true);
-        setAuthNotice(res.error || 'Verification email dispatched.');
-        return;
-      }
-
       if (!res.success || !res.user) {
         setAuthError(res.error || 'Setup could not be completed.');
         return;
@@ -368,45 +409,14 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       setBootstrapStatus((prev) => ({ ...prev, bootstrapped: true }));
       setCurrentAdminUser(res.user);
       setAdminProfile(res.profile || null);
+      setSetupPassword('');
+      setSetupConfirmPassword('');
+      setDashboardBanner(AUTH_MESSAGES.SETUP_READY_BANNER);
       setIsAuthenticated(true);
       lastActivityRef.current = Date.now();
     } finally {
       activeSignInInProgress.current = false;
       setIsSubmitting(false);
-    }
-  };
-
-  const handleCompleteEmailVerification = async () => {
-    setIsSubmitting(true);
-    setAuthError(null);
-    activeSignInInProgress.current = true;
-    try {
-      const res = await finalizeVerificationAndBootstrap({
-        fullName: setupFullName,
-        setupSecret,
-      });
-      if (!res.success || !res.user) {
-        setAuthError(res.error || 'Email not yet verified.');
-        return;
-      }
-      setAwaitingEmailVerification(false);
-      setBootstrapStatus((prev) => ({ ...prev, bootstrapped: true }));
-      setCurrentAdminUser(res.user);
-      setAdminProfile(res.profile || null);
-      setIsAuthenticated(true);
-    } finally {
-      activeSignInInProgress.current = false;
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    if (!auth.currentUser) return;
-    try {
-      await sendEmailVerification(auth.currentUser);
-      setAuthNotice('A fresh verification link has been sent to your inbox.');
-    } catch (err: any) {
-      setAuthError(err?.message || 'Unable to resend verification link yet.');
     }
   };
 
@@ -429,7 +439,9 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       setBootstrapStatus((prev) => ({ ...prev, bootstrapped: true }));
       setCurrentAdminUser(res.user);
       setAdminProfile(res.profile || null);
+      setDashboardBanner(AUTH_MESSAGES.SETUP_READY_BANNER);
       setIsAuthenticated(true);
+      lastActivityRef.current = Date.now();
     } finally {
       activeSignInInProgress.current = false;
       setIsSubmitting(false);
@@ -497,7 +509,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
   }
 
   // ============================================================================
-  // PRE-AUTHENTICATION EXPERIENCE (ZERO EMAIL EXPOSURE, ZERO UNEXPECTED OTP)
+  // PRE-AUTHENTICATION EXPERIENCE (#admin-login-screen > #admin-login-card)
+  // Zero hardcoded emails · Blank initial inputs · Blue, Gold, White & Navy brand
   // ============================================================================
   if (!isAuthenticated) {
     return (
@@ -507,15 +520,16 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       >
         <div
           id="admin-login-card"
-          className="w-full max-w-md bg-[#0b1221] border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden"
+          className="w-full max-w-md bg-[#0b1221] border border-blue-900/50 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden"
         >
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-24 -right-24 w-52 h-52 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* View: Administrator Sign-In */}
           {authView === 'login' && (
             <>
               <div className="text-center space-y-2.5">
-                <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                <div className="mx-auto w-14 h-14 rounded-2xl bg-blue-950/80 border border-amber-500/35 flex items-center justify-center text-amber-400">
                   <Lock size={24} />
                 </div>
                 <div>
@@ -523,23 +537,23 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     JITE AUTO DEALS
                   </p>
                   <h1 className="text-2xl font-bold font-display tracking-tight text-white mt-1">
-                    Administrator Access
+                    Administrator Sign In
                   </h1>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Secure access to your business management environment.
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    Authorized access to the Jite Auto Deals Command Centre.
                   </p>
                 </div>
               </div>
 
               {authError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2.5">
                   <ShieldAlert size={16} className="shrink-0 text-rose-400 mt-0.5" />
                   <span className="leading-relaxed">{authError}</span>
                 </div>
               )}
 
               {authNotice && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 text-emerald-200 text-xs flex items-start gap-2.5">
                   <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
                   <span className="leading-relaxed">{authNotice}</span>
                 </div>
@@ -556,13 +570,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                       type="email"
                       required
                       autoComplete="email"
-                      placeholder="administrator@domain.com"
+                      placeholder="Enter administrator email"
                       value={emailInput}
                       onChange={(e) => {
                         setEmailInput(e.target.value);
                         if (authError) setAuthError(null);
                       }}
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-10 pr-4 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                      className="w-full bg-slate-900/95 border border-slate-800 rounded-xl pl-10 pr-4 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
                 </div>
@@ -597,13 +611,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                         setPasswordInput(e.target.value);
                         if (authError) setAuthError(null);
                       }}
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-10 pr-11 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                      className="w-full bg-slate-900/95 border border-slate-800 rounded-xl pl-10 pr-11 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-300 cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-white cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -622,7 +636,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     </>
                   ) : (
                     <>
-                      <span>SECURE SIGN IN</span>
+                      <span>SIGN IN</span>
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -649,7 +663,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                <span>Sign in with Google</span>
+                <span>Continue with Google</span>
               </button>
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
@@ -673,7 +687,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     }}
                     className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer py-1 ml-auto"
                   >
-                    First-time setup
+                    First-time administrator setup
                   </button>
                 )}
               </div>
@@ -684,26 +698,26 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
           {authView === 'forgot' && (
             <>
               <div className="text-center space-y-2">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-950/80 border border-amber-500/35 flex items-center justify-center text-amber-400">
                   <KeyRound size={22} />
                 </div>
                 <h2 className="text-xl font-bold font-display text-white">
                   Password Recovery
                 </h2>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Enter your administrator email address to receive recovery instructions.
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Enter your administrator email address to receive password reset instructions.
                 </p>
               </div>
 
               {authError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2">
                   <ShieldAlert size={16} className="shrink-0 text-rose-400 mt-0.5" />
                   <span>{authError}</span>
                 </div>
               )}
 
               {resetNotice && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 text-emerald-200 text-xs flex items-start gap-2">
                   <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
                   <span>{resetNotice}</span>
                 </div>
@@ -719,8 +733,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     required
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="administrator@domain.com"
-                    className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
+                    placeholder="Enter administrator email"
+                    className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-4 py-3 min-h-[46px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -743,203 +757,211 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 className="w-full flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-white cursor-pointer py-2"
               >
                 <ArrowLeft size={14} />
-                <span>Back to Administrator Access</span>
+                <span>Back to Administrator Sign In</span>
               </button>
             </>
           )}
 
-          {/* View: Controlled First-Time Administrator Setup */}
+          {/* View: Controlled First-Time Administrator Setup (All fields blank by default) */}
           {authView === 'setup' && !bootstrapStatus.bootstrapped && (
             <>
               <div className="text-center space-y-2">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-950/80 border border-amber-500/35 flex items-center justify-center text-amber-400">
                   <ShieldCheck size={24} />
                 </div>
                 <p className="text-[11px] uppercase tracking-[0.2em] text-amber-400 font-mono font-bold">
                   JITE AUTO DEALS
                 </p>
-                <h2 className="text-xl font-bold font-display text-white">
-                  Welcome to Jite Auto Deals Administration
-                </h2>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Let's securely configure your Administrator Command Centre.
+                <h1 className="text-xl font-bold font-display text-white">
+                  First-Time Administrator Setup
+                </h1>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Configure your permanent administrator email and password. Once completed, initial setup locks permanently.
                 </p>
               </div>
 
               {authError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2">
                   <ShieldAlert size={16} className="shrink-0 text-rose-400 mt-0.5" />
-                  <span>{authError}</span>
+                  <span className="leading-relaxed">{authError}</span>
                 </div>
               )}
 
               {authNotice && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 text-emerald-200 text-xs flex items-start gap-2">
                   <CheckCircle2 size={16} className="shrink-0 text-emerald-400 mt-0.5" />
-                  <span>{authNotice}</span>
+                  <span className="leading-relaxed">{authNotice}</span>
                 </div>
               )}
 
-              {awaitingEmailVerification ? (
-                <div className="space-y-4 bg-slate-900/70 p-4 rounded-2xl border border-slate-800">
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Open the verification email sent to your inbox and confirm your address, then finalize setup below.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleCompleteEmailVerification}
-                    disabled={isSubmitting}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 min-h-[46px] rounded-xl text-xs uppercase tracking-wider cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Checking Verification...' : 'Complete Verification'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResendVerification}
-                    className="w-full text-xs text-amber-400 hover:text-amber-300 cursor-pointer py-1"
-                  >
-                    Resend verification email
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleFirstTimeSetup} className="space-y-3.5">
-                  {bootstrapStatus.setupSecretRequired && (
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-mono uppercase tracking-wider text-amber-400 block font-bold">
-                        Setup Authorization Secret *
-                      </label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Enter server ADMIN_SETUP_SECRET"
-                        value={setupSecret}
-                        onChange={(e) => setSetupSecret(e.target.value)}
-                        className="w-full bg-slate-900/90 border border-amber-500/40 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  )}
-
+              <form onSubmit={handleFirstTimeSetup} className="space-y-3.5">
+                {bootstrapStatus.setupSecretRequired && (
                   <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                      Administrator Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Tobor Jite"
-                      value={setupFullName}
-                      onChange={(e) => setSetupFullName(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                      Administrator Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="you@domain.com"
-                      value={setupEmail}
-                      onChange={(e) => setSetupEmail(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                      Create Strong Password *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showSetupPassword ? 'text' : 'password'}
-                        required
-                        placeholder="Min 10 chars, mixed case, number, symbol"
-                        value={setupPassword}
-                        onChange={(e) => setSetupPassword(e.target.value)}
-                        className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 min-h-[44px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSetupPassword(!showSetupPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
-                      >
-                        {showSetupPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
-                      Confirm Password *
+                    <label className="text-[11px] font-mono uppercase tracking-wider text-amber-400 block font-bold">
+                      Setup Authorization Secret *
                     </label>
                     <input
                       type="password"
                       required
-                      placeholder="Re-enter password"
-                      value={setupConfirmPassword}
-                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
+                      placeholder="Enter server ADMIN_SETUP_SECRET"
+                      value={setupSecret}
+                      onChange={(e) => setSetupSecret(e.target.value)}
+                      className="w-full bg-slate-900/95 border border-amber-500/40 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
                     />
                   </div>
+                )}
 
-                  {/* Strength Indicator */}
-                  <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5 text-[11px]">
-                    <div className="flex justify-between font-mono">
-                      <span className="text-slate-400">Strength:</span>
-                      <span
-                        className={
-                          setupStrength.score >= 3 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'
-                        }
-                      >
-                        {setupStrength.label}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1 font-mono text-[10px]">
-                      <span className={setupStrength.checks.length ? 'text-emerald-400' : 'text-slate-500'}>
-                        ✓ 10+ chars
-                      </span>
-                      <span className={setupStrength.checks.upper && setupStrength.checks.lower ? 'text-emerald-400' : 'text-slate-500'}>
-                        ✓ Upper/Lower
-                      </span>
-                      <span className={setupStrength.checks.number && setupStrength.checks.symbol ? 'text-emerald-400' : 'text-slate-500'}>
-                        ✓ Num & Symbol
-                      </span>
-                    </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter your full name"
+                    value={setupFullName}
+                    onChange={(e) => setSetupFullName(e.target.value)}
+                    className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="Choose your administrator email"
+                    value={setupEmail}
+                    onChange={(e) => setSetupEmail(e.target.value)}
+                    className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                    Create Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSetupPassword ? 'text' : 'password'}
+                      required
+                      autoComplete="new-password"
+                      placeholder="Min 10 chars, upper, lower, number, symbol"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupPassword(!showSetupPassword)}
+                      aria-label={showSetupPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      {showSetupPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
                   </div>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 min-h-[48px] rounded-xl text-xs uppercase tracking-wider cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Configuring...' : 'Complete Setup & Access Dashboard'}
-                  </button>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-300 block font-bold">
+                    Confirm Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSetupConfirmPassword ? 'text' : 'password'}
+                      required
+                      autoComplete="new-password"
+                      placeholder="Re-enter your password"
+                      value={setupConfirmPassword}
+                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                      className="w-full bg-slate-900/95 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 min-h-[44px] text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupConfirmPassword(!showSetupConfirmPassword)}
+                      aria-label={showSetupConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      {showSetupConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
 
+                {/* Strength Indicator */}
+                <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 space-y-1.5 text-[11px]">
+                  <div className="flex justify-between font-mono">
+                    <span className="text-slate-400">Password Strength:</span>
+                    <span
+                      className={
+                        setupStrength.score >= 3 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'
+                      }
+                    >
+                      {setupStrength.label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 font-mono text-[10px]">
+                    <span className={setupStrength.checks.length ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ 10+ chars
+                    </span>
+                    <span className={setupStrength.checks.upper && setupStrength.checks.lower ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ Upper/Lower
+                    </span>
+                    <span className={setupStrength.checks.number && setupStrength.checks.symbol ? 'text-emerald-400' : 'text-slate-500'}>
+                      ✓ Num & Symbol
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 min-h-[48px] rounded-xl text-xs uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creating Administrator Account...' : 'Create Administrator & Enter Dashboard'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleBootstrap}
+                  disabled={isSubmitting}
+                  className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 min-h-[44px] rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Or Configure with Google Account</span>
+                </button>
+              </form>
+
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
+                {onCancel && (
                   <button
                     type="button"
-                    onClick={handleGoogleBootstrap}
-                    disabled={isSubmitting}
-                    className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 min-h-[44px] rounded-xl text-xs cursor-pointer disabled:opacity-50"
+                    onClick={onCancel}
+                    className="text-slate-400 hover:text-white font-medium cursor-pointer py-1"
                   >
-                    Verify & Bootstrap with Google Account
+                    Return to Website
                   </button>
-                </form>
-              )}
+                )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthError(null);
-                  setAuthNotice(null);
-                  setAwaitingEmailVerification(false);
-                  setAuthView('login');
-                }}
-                className="w-full text-xs text-slate-400 hover:text-white text-center cursor-pointer pt-1"
-              >
-                Existing administrator? Sign in
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthNotice(null);
+                    setAuthView('login');
+                  }}
+                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer py-1 ml-auto"
+                >
+                  Existing administrator? Sign in
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -1180,6 +1202,23 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 Sign Out
               </button>
             </div>
+          </div>
+        )}
+
+        {dashboardBanner && (
+          <div className="mx-4 sm:mx-8 mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 text-xs font-semibold flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 size={18} className="text-blue-700 shrink-0" />
+              <span>{dashboardBanner}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDashboardBanner(null)}
+              aria-label="Dismiss welcome message"
+              className="text-blue-700 hover:text-blue-950 p-1 cursor-pointer shrink-0"
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 

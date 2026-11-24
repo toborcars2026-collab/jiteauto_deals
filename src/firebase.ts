@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, setLogLevel, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -14,15 +14,12 @@ export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db: Firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Session-only persistence: sessions expire automatically when browser/tab closes
+// IndexedDB local persistence so verified sessions survive page reloads & browser reopenings,
+// paired with mandatory server RS256 verification and inactivity timeout expiry checks.
 export const auth = getAuth(app);
-try {
-  setPersistence(auth, browserSessionPersistence).catch(() => {
-    // Graceful fallback in constrained browser contexts
-  });
-} catch {
-  // Ignore
-}
+export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {
+  // Graceful fallback in constrained/private browser contexts
+});
 
 export const storage = getStorage(app);
 try {

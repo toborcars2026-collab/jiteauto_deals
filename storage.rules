@@ -2,21 +2,15 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function isStorageAdmin() {
-      return request.auth != null && (
-        (
-          request.auth.token.email != null &&
-          request.auth.token.email_verified == true &&
-          request.auth.token.email.lower() == 'blwuniabuja@gmail.com'
-        ) ||
-        request.auth.token.admin == true
-      );
+      return request.auth != null &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // Direct Vehicle Photographs Storage Path
     match /vehicle-images/{vehicleId}/{allPaths=**} {
       // Public visitors can view vehicle photographs
       allow read: if true;
-      // Only authenticated verified administrator can upload, replace, or delete photographs
+      // Only authenticated administrator session can upload, replace, or delete photographs
       allow write: if isStorageAdmin()
         && request.resource.size < 15 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');

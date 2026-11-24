@@ -279,10 +279,14 @@ export default function App() {
     const route = getInitialVehicleRoute();
     const searchParams = new URLSearchParams(window.location.search);
     const tabParam = searchParams.get('tab') as NavigationTab | null;
+    const pathnameClean = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+    const hashClean = window.location.hash.toLowerCase();
 
     const validTabs: NavigationTab[] = ['home', 'browse', 'find-car', 'source-car', 'how-it-works', 'about', 'admin'];
     let initialTab: NavigationTab = 'home';
-    if (tabParam && validTabs.includes(tabParam)) {
+    if (pathnameClean === '/admin' || hashClean === '#admin' || hashClean === '#/admin') {
+      initialTab = 'admin';
+    } else if (tabParam && validTabs.includes(tabParam)) {
       initialTab = tabParam;
     }
     setCurrentTab(initialTab);

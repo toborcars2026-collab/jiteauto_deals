@@ -176,3 +176,24 @@ export interface AdminAuditLogEntry {
   timestamp: string;
   source?: 'firestore' | 'security-server';
 }
+
+export interface AdminInvite {
+  email: string;
+  displayName?: string;
+  role: 'admin';
+  active: boolean;
+  invitedByUid?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SecurityDiagnosticStatus {
+  checkedAt: string;
+  firebaseAuthOk: boolean;
+  firebaseAuthSummary: string;
+  databaseConnected: boolean;
+  databaseSummary: string;
+  authorizationOk: boolean;
+  authorizationSummary: string;
+  warnings: string[];
+}

@@ -33,7 +33,7 @@ let certCache = {
   expiresAt: 0,
 };
 
-// In-memory brute-force rate limiter & server security event log (ephemeral fallback + audit)
+// In-memory brute-force rate limiter & server security event log
 const failedLoginMap = new Map();
 const serverSecurityEvents = [];
 const MAX_SECURITY_EVENTS = 100;
@@ -160,6 +160,28 @@ function saveLocalBootstrapState(state) {
   }
 }
 
+/**
+ * Checks Firestore's non-PII lock document /settings/admin_bootstrap so serverless deployments
+ * (including Vercel cold starts) reliably know whether first-time setup has already locked.
+ */
+async function readRemoteBootstrapFlag() {
+  try {
+    const { projectId, databaseId } = loadFirebaseRuntimeConfig();
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/settings/admin_bootstrap`;
+    const resp = await fetch(url, { method: 'GET' });
+    if (resp.status === 200) {
+      const json = await resp.json();
+      return Boolean(json?.fields?.setupCompleted?.booleanValue === true);
+    }
+    if (resp.status === 404) {
+      return false;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchGooglePublicCerts() {
   const now = Date.now();
   if (certCache.expiresAt > now && Object.keys(certCache.certs).length > 0) {
@@ -269,14 +291,14 @@ export async function verifyFirebaseIdToken(idToken) {
 
 /**
  * Verifies admin authorization via Cloud Firestore Security Rules using the caller's verified ID token.
- * No IAM / firebase-admin service account required.
+ * Zero hardcoded emails — trusts ONLY /admins/{uid} or verified active /admin_invites/{emailLower}.
  */
-async function checkFirestoreAdminAuthorization(idToken, uid) {
+async function checkFirestoreAdminAuthorization(idToken, decoded) {
   const { projectId, databaseId } = loadFirebaseRuntimeConfig();
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
 
   // 1. Check /admins/{uid}
-  const adminDocRes = await fetch(`${baseUrl}/admins/${encodeURIComponent(uid)}`, {
+  const adminDocRes = await fetch(`${baseUrl}/admins/${encodeURIComponent(decoded.uid)}`, {
     headers: { Authorization: `Bearer ${idToken}` },
   });
 
@@ -285,25 +307,60 @@ async function checkFirestoreAdminAuthorization(idToken, uid) {
     const fields = docJson?.fields || {};
     const activeField = fields.active;
     const isActive = activeField ? activeField.booleanValue !== false : true;
-    const role = fields.role?.stringValue || 'admin';
-    return { authorized: isActive, role, hasAdminDoc: true };
+    const role = fields.role?.stringValue === 'owner' ? 'owner' : 'admin';
+    return {
+      authorized: isActive,
+      revoked: !isActive,
+      role,
+      hasAdminDoc: true,
+      invited: false,
+      firestoreBootstrapped: true,
+    };
   }
 
-  // 2. Fallback check against /settings/admin_bootstrap (firestore.rules enforces isAdmin() on read)
-  // Authorized primary owner gets 200 (if exists) or 404 (if not created yet). Unauthorized gets 403.
-  const bootstrapRes = await fetch(`${baseUrl}/settings/admin_bootstrap`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
-
-  if (bootstrapRes.status === 200) {
-    return { authorized: true, role: 'owner', hasAdminDoc: false, firestoreBootstrapped: true };
+  // 2. Check /admin_invites/{emailLower} if caller email is verified
+  if (decoded.email && decoded.emailVerified) {
+    const emailLower = decoded.email.trim().toLowerCase();
+    const inviteRes = await fetch(`${baseUrl}/admin_invites/${encodeURIComponent(emailLower)}`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (inviteRes.status === 200) {
+      const inviteJson = await inviteRes.json();
+      const fields = inviteJson?.fields || {};
+      const activeField = fields.active;
+      const isActive = activeField ? activeField.booleanValue !== false : true;
+      if (isActive) {
+        return {
+          authorized: true,
+          revoked: false,
+          role: 'admin',
+          hasAdminDoc: false,
+          invited: true,
+          firestoreBootstrapped: true,
+        };
+      }
+    }
   }
 
-  if (bootstrapRes.status === 404) {
-    return { authorized: true, role: 'owner', hasAdminDoc: false, firestoreBootstrapped: false };
+  // 3. Check custom claim fallback if provisioned externally
+  if (decoded.isCustomAdminClaim) {
+    return {
+      authorized: true,
+      revoked: false,
+      role: 'admin',
+      hasAdminDoc: false,
+      invited: false,
+      firestoreBootstrapped: true,
+    };
   }
 
-  return { authorized: false, role: null, hasAdminDoc: false };
+  return {
+    authorized: false,
+    revoked: false,
+    role: null,
+    hasAdminDoc: false,
+    invited: false,
+  };
 }
 
 export function extractBearerToken(req) {
@@ -324,9 +381,9 @@ export async function verifyRequestAdmin(req) {
   }
   try {
     const decoded = await verifyFirebaseIdToken(idToken);
-    const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
+    const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded);
     if (!fsAuth.authorized) {
-      return { authorized: false, error: 'Account is not authorized for administration.' };
+      return { authorized: false, error: 'This account does not have administrator access.' };
     }
     return {
       authorized: true,
@@ -408,11 +465,25 @@ export default async function handler(req, res) {
   try {
     // ------------------------------------------------------------------------
     // 1. GET /api/admin-auth?action=status
-    //    Returns ONLY non-sensitive setup state. NEVER returns admin emails!
+    //    Returns ONLY non-sensitive setup state. NEVER returns admin emails or UIDs!
     // ------------------------------------------------------------------------
     if (action === 'status' && req.method === 'GET') {
       const localState = readLocalBootstrapState();
       const envBootstrapped = process.env.ADMIN_BOOTSTRAPPED === 'true';
+      const remoteBootstrapped = await readRemoteBootstrapFlag();
+      const bootstrapped =
+        remoteBootstrapped !== null
+          ? Boolean(remoteBootstrapped || envBootstrapped)
+          : Boolean(localState.bootstrapped || envBootstrapped);
+
+      if (remoteBootstrapped === false && localState.bootstrapped) {
+        saveLocalBootstrapState({
+          bootstrapped: false,
+          primaryAdminUid: null,
+          setupCompletedAt: null,
+        });
+      }
+
       const setupSecretRequired = Boolean(
         process.env.ADMIN_SETUP_SECRET && process.env.ADMIN_SETUP_SECRET.trim().length > 0
       );
@@ -420,7 +491,7 @@ export default async function handler(req, res) {
       res.statusCode = 200;
       res.end(
         JSON.stringify({
-          bootstrapped: Boolean(localState.bootstrapped || envBootstrapped),
+          bootstrapped,
           setupSecretRequired,
           firebaseAuthConfigured: true,
         })
@@ -483,22 +554,26 @@ export default async function handler(req, res) {
         return;
       }
 
-      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
+      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded);
       if (!fsAuth.authorized) {
         recordFailedAttempt(clientIp);
         pushSecurityEvent({
-          action: 'UNAUTHORIZED_ADMIN_ATTEMPT',
+          action: fsAuth.revoked ? 'REVOKED_ADMIN_ATTEMPT' : 'UNAUTHORIZED_ADMIN_ATTEMPT',
           status: 'warning',
           actorEmailMasked: maskEmailForAudit(decoded.email),
           ipTag: hashIpForAudit(clientIp),
-          details: `Unauthorized account attempted admin login via ${decoded.signInProvider}.`,
+          details: fsAuth.revoked
+            ? 'Revoked administrator account attempted sign-in.'
+            : `Unauthorized account attempted admin login via ${decoded.signInProvider}.`,
         });
         res.statusCode = 403;
         res.end(
           JSON.stringify({
             success: false,
-            code: 'ACCESS_DENIED',
-            error: 'Unable to authorize administrator access for this account.',
+            code: fsAuth.revoked ? 'ACCOUNT_REVOKED' : 'ACCESS_DENIED',
+            error: fsAuth.revoked
+              ? 'Administrator access for this account has been revoked.'
+              : 'This account does not have administrator access.',
           })
         );
         return;
@@ -506,16 +581,13 @@ export default async function handler(req, res) {
 
       clearRateLimit(clientIp);
 
-      // Keep local bootstrap lock synchronized once a verified admin authenticates
       const localState = readLocalBootstrapState();
-      if (fsAuth.firestoreBootstrapped || fsAuth.hasAdminDoc) {
-        if (!localState.bootstrapped) {
-          saveLocalBootstrapState({
-            bootstrapped: true,
-            primaryAdminUid: decoded.uid,
-            setupCompletedAt: new Date().toISOString(),
-          });
-        }
+      if ((fsAuth.firestoreBootstrapped || fsAuth.hasAdminDoc) && !localState.bootstrapped) {
+        saveLocalBootstrapState({
+          bootstrapped: true,
+          primaryAdminUid: decoded.uid,
+          setupCompletedAt: new Date().toISOString(),
+        });
       }
 
       res.statusCode = 200;
@@ -526,6 +598,7 @@ export default async function handler(req, res) {
           email: decoded.email,
           emailVerified: decoded.emailVerified,
           role: fsAuth.role || 'admin',
+          invited: Boolean(fsAuth.invited),
           signInProvider: decoded.signInProvider,
           bootstrapped: Boolean(localState.bootstrapped || fsAuth.firestoreBootstrapped || fsAuth.hasAdminDoc),
         })
@@ -535,17 +608,22 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 3. POST /api/admin-auth?action=bootstrap-complete
-    //    Controlled one-time setup verification & lock
+    //    Pre-flight validation & setup secret check before atomic Firestore batch claim
     // ------------------------------------------------------------------------
     if (action === 'bootstrap-complete' && req.method === 'POST') {
       const localState = readLocalBootstrapState();
-      if (localState.bootstrapped || process.env.ADMIN_BOOTSTRAPPED === 'true') {
+      const remoteBootstrapped = await readRemoteBootstrapFlag();
+      const alreadyBootstrapped =
+        remoteBootstrapped !== null
+          ? Boolean(remoteBootstrapped || process.env.ADMIN_BOOTSTRAPPED === 'true')
+          : Boolean(localState.bootstrapped || process.env.ADMIN_BOOTSTRAPPED === 'true');
+      if (alreadyBootstrapped) {
         res.statusCode = 403;
         res.end(
           JSON.stringify({
             success: false,
             code: 'ALREADY_BOOTSTRAPPED',
-            error: 'Initial administrator setup has already been completed.',
+            error: 'An administrator account has already been configured. Please sign in instead.',
           })
         );
         return;
@@ -591,40 +669,41 @@ export default async function handler(req, res) {
       }
 
       const decoded = await verifyFirebaseIdToken(idToken);
-      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded.uid);
 
-      if (!fsAuth.authorized) {
-        pushSecurityEvent({
-          action: 'BOOTSTRAP_UNAUTHORIZED',
-          status: 'warning',
-          actorEmailMasked: maskEmailForAudit(decoded.email),
-          ipTag: hashIpForAudit(clientIp),
-          details: 'Bootstrap attempted by account without verified owner permissions.',
-        });
-        res.statusCode = 403;
-        res.end(
-          JSON.stringify({
-            success: false,
-            code: 'BOOTSTRAP_UNAUTHORIZED',
-            error:
-              'Verification incomplete. Verify your administrator email address or authenticate with your verified primary Google account to finalize setup.',
-          })
-        );
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          readyForClaim: true,
+          uid: decoded.uid,
+          email: decoded.email,
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 4. POST /api/admin-auth?action=bootstrap-finalize
+    //    Locks local bootstrap file ONLY after verifying the atomic Firestore batch succeeded
+    // ------------------------------------------------------------------------
+    if (action === 'bootstrap-finalize' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const idToken = extractBearerToken(req) || body.idToken;
+      if (!idToken) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Missing token.' }));
         return;
       }
 
-      if (fsAuth.firestoreBootstrapped) {
-        saveLocalBootstrapState({
-          bootstrapped: true,
-          primaryAdminUid: decoded.uid,
-          setupCompletedAt: new Date().toISOString(),
-        });
+      const decoded = await verifyFirebaseIdToken(idToken);
+      const fsAuth = await checkFirestoreAdminAuthorization(idToken, decoded);
+      if (!fsAuth.authorized || !fsAuth.hasAdminDoc) {
         res.statusCode = 403;
         res.end(
           JSON.stringify({
             success: false,
-            code: 'ALREADY_BOOTSTRAPPED',
-            error: 'Initial administrator setup has already been completed.',
+            code: 'BOOTSTRAP_NOT_COMMITTED',
+            error: 'Administrator profile record was not yet committed in Firestore.',
           })
         );
         return;
@@ -657,7 +736,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 4. POST /api/admin-auth?action=record-security-event
+    // 5. POST /api/admin-auth?action=record-security-event
     //    Logs non-sensitive failed sign-in attempts for audit visibility & throttling
     // ------------------------------------------------------------------------
     if (action === 'record-security-event' && req.method === 'POST') {
@@ -701,8 +780,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 5. GET /api/admin-auth?action=security-events
-    //    Admin-only read of recent server security events
+    // 6. GET /api/admin-auth?action=security-events (Admin-only)
     // ------------------------------------------------------------------------
     if (action === 'security-events' && req.method === 'GET') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -723,7 +801,37 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 6. POST /api/admin-auth?action=logout
+    // 7. GET /api/admin-auth?action=diagnostics (Admin-only live health check)
+    // ------------------------------------------------------------------------
+    if (action === 'diagnostics' && req.method === 'GET') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+
+      const remoteBootstrapped = await readRemoteBootstrapFlag();
+      const setupSecretConfigured = Boolean(
+        process.env.ADMIN_SETUP_SECRET && process.env.ADMIN_SETUP_SECRET.trim().length > 0
+      );
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          role: adminCheck.role,
+          emailVerified: adminCheck.emailVerified,
+          remoteBootstrapped,
+          setupSecretConfigured,
+          rs256VerificationActive: true,
+        })
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 8. POST /api/admin-auth?action=logout
     // ------------------------------------------------------------------------
     if (action === 'logout' && req.method === 'POST') {
       res.setHeader('Set-Cookie', 'jite_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
@@ -734,12 +842,17 @@ export default async function handler(req, res) {
 
     res.statusCode = 404;
     res.end(JSON.stringify({ success: false, error: 'Endpoint not found.' }));
-  } catch (err) {
+  } catch {
     res.statusCode = 500;
     res.end(JSON.stringify({ success: false, error: 'Internal authentication verification error.' }));
   }
 }
 
 export async function getAdminAuthConfig() {
-  return readLocalBootstrapState();
+  const local = readLocalBootstrapState();
+  const remote = await readRemoteBootstrapFlag();
+  return {
+    ...local,
+    bootstrapped: Boolean(local.bootstrapped || remote || process.env.ADMIN_BOOTSTRAPPED === 'true'),
+  };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck,
   KeyRound,
@@ -17,20 +17,26 @@ import {
   Link2,
   Check,
   ShieldAlert,
+  Activity,
+  Trash2,
 } from 'lucide-react';
+import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { AdminProfile } from '../../types';
+import { AdminInvite, AdminProfile, SecurityDiagnosticStatus } from '../../types';
 import {
   evaluatePasswordStrength,
   changeAdminPassword,
   changeAdminEmail,
   sendAdminPasswordReset,
-  linkEmailPasswordToCurrentAdmin,
   linkGoogleToCurrentAdmin,
+  unlinkGoogleFromCurrentAdmin,
   updateAdminProfileSettings,
   listAuthorizedAdmins,
+  listAdminInvites,
   registerAuthorizedAdmin,
+  removeAdminInvite,
   setAuthorizedAdminActive,
+  runSecurityDiagnostics,
   logoutAdminSession,
 } from '../../services/adminAuth';
 
@@ -64,20 +70,19 @@ export default function AdminSecuritySection({
   const hasPasswordLinked = providerIds.includes('password');
   const hasGoogleLinked = providerIds.includes('google.com');
 
-  // Profile & Session Timeout State
+  // Section A: Administrator Profile
   const [displayNameInput, setDisplayNameInput] = useState(
-    adminProfile?.displayName || currentUser?.displayName || 'Primary Administrator'
+    adminProfile?.displayName || currentUser?.displayName || ''
   );
-  const [timeoutInput, setTimeoutInput] = useState<number>(inactivityTimeoutMinutes || 30);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Email Change State
+  // Email Editing
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
   const [emailVerifyPassword, setEmailVerifyPassword] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
 
-  // Password Change / Link State
+  // Section B: Login & Authentication
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -87,11 +92,14 @@ export default function AdminSecuritySection({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  // Provider Linking
+  // Google Link / Unlink State
+  const [showGoogleLinkPanel, setShowGoogleLinkPanel] = useState(false);
+  const [googleLinkPassword, setGoogleLinkPassword] = useState('');
   const [linkingProvider, setLinkingProvider] = useState(false);
 
-  // Authorized Admin Registry
+  // Section C: Administrator Access
   const [authorizedAdmins, setAuthorizedAdmins] = useState<AdminProfile[]>([]);
+  const [adminInvites, setAdminInvites] = useState<AdminInvite[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(true);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdminUid, setNewAdminUid] = useState('');
@@ -100,27 +108,49 @@ export default function AdminSecuritySection({
   const [newAdminRole, setNewAdminRole] = useState<'admin' | 'owner'>('admin');
   const [savingAdmin, setSavingAdmin] = useState(false);
 
+  // Section D: Session & Privacy
+  const [timeoutInput, setTimeoutInput] = useState<number>(inactivityTimeoutMinutes || 30);
+
+  // Section E: Security Status (Live Diagnostics)
+  const [diagnostics, setDiagnostics] = useState<SecurityDiagnosticStatus | null>(null);
+  const [runningDiagnostics, setRunningDiagnostics] = useState(true);
+
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const passwordStrength = evaluatePasswordStrength(newPassword);
 
-  const loadAdmins = async () => {
+  const loadAccessRegistry = useCallback(async () => {
     setLoadingAdmins(true);
     try {
-      const list = await listAuthorizedAdmins();
-      setAuthorizedAdmins(list);
+      const [adminsList, invitesList] = await Promise.all([
+        listAuthorizedAdmins(),
+        listAdminInvites(),
+      ]);
+      setAuthorizedAdmins(adminsList);
+      setAdminInvites(invitesList);
     } catch {
-      // Fallback gracefully
+      // Non-blocking fallback
     } finally {
       setLoadingAdmins(false);
     }
-  };
+  }, []);
+
+  const refreshDiagnostics = useCallback(async () => {
+    setRunningDiagnostics(true);
+    try {
+      const report = await runSecurityDiagnostics();
+      setDiagnostics(report);
+    } finally {
+      setRunningDiagnostics(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadAdmins();
-  }, []);
+    loadAccessRegistry();
+    refreshDiagnostics();
+  }, [loadAccessRegistry, refreshDiagnostics]);
 
   useEffect(() => {
     if (adminProfile?.displayName) {
@@ -128,10 +158,16 @@ export default function AdminSecuritySection({
     }
   }, [adminProfile?.displayName]);
 
+  useEffect(() => {
+    if (inactivityTimeoutMinutes) {
+      setTimeoutInput(inactivityTimeoutMinutes);
+    }
+  }, [inactivityTimeoutMinutes]);
+
   const showSuccess = (msg: string) => {
     setErrorMessage(null);
     setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(null), 6500);
+    setTimeout(() => setSuccessMessage(null), 7000);
   };
 
   const showError = (msg: string) => {
@@ -139,7 +175,7 @@ export default function AdminSecuritySection({
     setErrorMessage(msg);
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfileAndTimeout = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
     try {
@@ -148,14 +184,46 @@ export default function AdminSecuritySection({
         inactivityTimeoutMinutes: timeoutInput,
       });
       if (!res.success) {
-        showError(res.error || 'Could not save profile preferences.');
+        showError(res.error || 'Could not save administrator preferences.');
         return;
       }
       if (onTimeoutChange) onTimeoutChange(timeoutInput);
       if (res.profile && onProfileUpdated) onProfileUpdated(res.profile);
-      showSuccess('Administrator profile and session timeout preferences saved.');
+      await loadAccessRegistry();
+      showSuccess('Administrator profile and session privacy settings saved.');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleEmailChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEmail(true);
+    try {
+      const res = await changeAdminEmail({
+        currentPassword: emailVerifyPassword || undefined,
+        newEmail: newEmailInput,
+      });
+      if (!res.success) {
+        showError(res.error || 'Unable to initiate email update.');
+        return;
+      }
+      setNewEmailInput('');
+      setEmailVerifyPassword('');
+      setIsEditingEmail(false);
+      showSuccess(res.message || 'Verification link sent to your new email address.');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const handleSendEmailVerification = async () => {
+    if (!user) return;
+    try {
+      await sendEmailVerification(user);
+      showSuccess('Verification email dispatched. Check your inbox and reload once confirmed.');
+    } catch (err: any) {
+      showError(err?.message || 'Unable to send verification email right now.');
     }
   };
 
@@ -190,7 +258,7 @@ export default function AdminSecuritySection({
       setNewPassword('');
       setConfirmPassword('');
       setIsEditingPassword(false);
-      await loadAdmins();
+      await Promise.all([loadAccessRegistry(), refreshDiagnostics()]);
       showSuccess(res.message || 'Administrator password updated successfully.');
     } finally {
       setSavingPassword(false);
@@ -200,7 +268,7 @@ export default function AdminSecuritySection({
   const handleSendPasswordReset = async () => {
     const email = user?.email || currentUser?.email;
     if (!email) {
-      showError('No primary email address associated with this session.');
+      showError('No email address is associated with this session.');
       return;
     }
     const res = await sendAdminPasswordReset(email);
@@ -211,36 +279,34 @@ export default function AdminSecuritySection({
     }
   };
 
-  const handleEmailChangeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingEmail(true);
+  const handleLinkGoogle = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLinkingProvider(true);
     try {
-      const res = await changeAdminEmail({
-        currentPassword: emailVerifyPassword || undefined,
-        newEmail: newEmailInput,
-      });
+      const res = await linkGoogleToCurrentAdmin(googleLinkPassword || undefined);
       if (!res.success) {
-        showError(res.error || 'Unable to initiate email update.');
+        showError(res.error || 'Unable to link Google account.');
         return;
       }
-      setNewEmailInput('');
-      setEmailVerifyPassword('');
-      setIsEditingEmail(false);
-      showSuccess(res.message || 'Verification link sent to your new email address.');
+      setGoogleLinkPassword('');
+      setShowGoogleLinkPanel(false);
+      await Promise.all([loadAccessRegistry(), refreshDiagnostics()]);
+      showSuccess('Google Sign-In linked safely to your administrator account.');
     } finally {
-      setSavingEmail(false);
+      setLinkingProvider(false);
     }
   };
 
-  const handleLinkGoogle = async () => {
+  const handleUnlinkGoogle = async () => {
     setLinkingProvider(true);
     try {
-      const res = await linkGoogleToCurrentAdmin();
+      const res = await unlinkGoogleFromCurrentAdmin(googleLinkPassword || undefined);
       if (!res.success) {
-        showError(res.error || 'Unable to link Google sign-in.');
+        showError(res.error || 'Unable to unlink Google account.');
         return;
       }
-      showSuccess('Google Sign-In linked to your administrator account.');
+      await Promise.all([loadAccessRegistry(), refreshDiagnostics()]);
+      showSuccess('Google Sign-In removed. Your Email & Password sign-in remains active.');
     } finally {
       setLinkingProvider(false);
     }
@@ -251,10 +317,10 @@ export default function AdminSecuritySection({
     setSavingAdmin(true);
     try {
       const res = await registerAuthorizedAdmin({
-        uid: newAdminUid,
+        uid: newAdminUid || undefined,
         email: newAdminEmail,
         displayName: newAdminName,
-        role: newAdminRole,
+        role: newAdminUid ? newAdminRole : 'admin',
       });
       if (!res.success) {
         showError(res.error || 'Failed to authorize administrator.');
@@ -264,21 +330,35 @@ export default function AdminSecuritySection({
       setNewAdminEmail('');
       setNewAdminName('');
       setShowAddAdmin(false);
-      await loadAdmins();
-      showSuccess('Authorized administrator added to access registry.');
+      await loadAccessRegistry();
+      showSuccess(
+        res.mode === 'invite'
+          ? 'Administrator email authorized. They can sign in with their verified Google account matching this email.'
+          : 'Authorized administrator added directly to access registry.'
+      );
     } finally {
       setSavingAdmin(false);
     }
   };
 
-  const handleToggleAdminStatus = async (target: AdminProfile) => {
-    const nextActive = !target.active;
-    const res = await setAuthorizedAdminActive(target.uid, nextActive);
+  const handleRemoveInvite = async (email: string) => {
+    const res = await removeAdminInvite(email);
     if (!res.success) {
-      showError(res.error || 'Unable to change administrator status.');
+      showError(res.error || 'Could not revoke invitation.');
       return;
     }
-    await loadAdmins();
+    await loadAccessRegistry();
+    showSuccess(`Invitation for ${email} revoked.`);
+  };
+
+  const handleToggleAdminStatus = async (target: AdminProfile) => {
+    const nextActive = !target.active;
+    const res = await setAuthorizedAdminActive(target.uid, nextActive, target.role);
+    if (!res.success) {
+      showError(res.error || 'Unable to modify administrator access.');
+      return;
+    }
+    await loadAccessRegistry();
     showSuccess(
       `${target.email} access ${nextActive ? 'restored' : 'revoked'} successfully.`
     );
@@ -295,11 +375,11 @@ export default function AdminSecuritySection({
       <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-display flex items-center gap-2">
-            <ShieldCheck className="text-amber-500" size={22} />
-            <span>Security & Account Settings</span>
+            <ShieldCheck className="text-blue-700" size={22} />
+            <span>Security &amp; Account Settings</span>
           </h2>
           <p className="text-slate-500 text-xs mt-1">
-            Manage authentication methods, password strength, session privacy timeout, and authorized administrator access.
+            Manage your administrator profile, authentication credentials, access permissions, session privacy, and live security verification.
           </p>
         </div>
 
@@ -309,7 +389,7 @@ export default function AdminSecuritySection({
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
         >
           <LogOut size={14} />
-          <span>Sign Out Session</span>
+          <span>Sign Out</span>
         </button>
       </div>
 
@@ -322,103 +402,94 @@ export default function AdminSecuritySection({
       )}
 
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2.5">
-          <AlertCircle size={18} className="text-rose-600 shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-start gap-2.5">
+          <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{errorMessage}</span>
         </div>
       )}
 
-      {/* 1. Profile & Session Privacy Timeout */}
-      <form
-        onSubmit={handleSaveProfile}
-        className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-5"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      {/* ===================================================================== */}
+      {/* A. ADMINISTRATOR PROFILE                                               */}
+      {/* ===================================================================== */}
+      <section className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
-            <UserCheck size={17} className="text-amber-600" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Administrator Profile & Session Privacy
-            </h3>
+            <UserCheck size={17} className="text-blue-700" />
+            <h3 className="text-sm font-bold text-slate-900">A. Administrator Profile</h3>
           </div>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold">
-            Session-Only Auth Active
+            {adminProfile?.role === 'owner' ? 'Active Primary Owner' : 'Active Administrator'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">
-              Administrator Display Name
-            </label>
-            <input
-              type="text"
-              required
-              value={displayNameInput}
-              onChange={(e) => setDisplayNameInput(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-slate-900 focus:outline-none focus:border-amber-500"
-            />
+        <form onSubmit={handleSaveProfileAndTimeout} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Full Name</label>
+              <input
+                type="text"
+                required
+                value={displayNameInput}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
+                placeholder="Administrator Full Name"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-slate-900 focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Account Status</label>
+              <div className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-800">
+                  {adminProfile?.active !== false ? 'Authorized & Active' : 'Suspended'}
+                </span>
+                <span className="font-mono text-[11px] text-slate-500">
+                  UID: {user?.uid?.slice(0, 10) || '—'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-              <Clock size={13} className="text-slate-500" />
-              <span>Inactivity Auto-Timeout</span>
-            </label>
-            <select
-              value={timeoutInput}
-              onChange={(e) => setTimeoutInput(Number(e.target.value))}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-slate-900 font-semibold focus:outline-none focus:border-amber-500"
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingProfile}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
             >
-              <option value={15}>15 minutes (High Security)</option>
-              <option value={30}>30 minutes (Recommended)</option>
-              <option value={60}>60 minutes (Extended Work)</option>
-            </select>
+              {savingProfile && <RefreshCw size={14} className="animate-spin text-amber-400" />}
+              <span>Save Full Name</span>
+            </button>
           </div>
-        </div>
+        </form>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-          <p className="text-xs text-slate-500">
-            Authentication tokens are kept strictly in active browser session memory and cleared automatically when you close this window.
-          </p>
-          <button
-            type="submit"
-            disabled={savingProfile}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-          >
-            {savingProfile && <RefreshCw size={14} className="animate-spin text-amber-400" />}
-            <span>Save Preferences</span>
-          </button>
-        </div>
-      </form>
-
-      {/* 2. Connected Sign-In Methods & Credentials */}
-      <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <KeyRound size={17} className="text-amber-600" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Sign-In Email, Password & Linked Methods
-            </h3>
-          </div>
-          <span className="text-[11px] font-mono text-slate-500">
-            UID: {user?.uid?.slice(0, 10) || '—'}...
-          </span>
-        </div>
-
-        {/* Connected Email Block */}
+        {/* Account Email Card */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                 <Mail size={18} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-mono uppercase tracking-wider text-slate-400 block">
-                  Signed-In Administrator Email
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 block">
+                  Account Email
                 </span>
-                <span className="text-sm font-bold text-slate-900 truncate block">
-                  {user?.email || currentUser?.email || 'Authenticated Session'}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900 truncate">
+                    {user?.email || currentUser?.email || 'Authenticated Session'}
+                  </span>
+                  {user?.emailVerified ? (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                      Verified
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendEmailVerification}
+                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold cursor-pointer"
+                    >
+                      Verify Email
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -444,7 +515,7 @@ export default function AdminSecuritySection({
                     required
                     value={newEmailInput}
                     onChange={(e) => setNewEmailInput(e.target.value)}
-                    placeholder="new-admin@jiteautodeals.com"
+                    placeholder="new-admin@domain.com"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-slate-900"
                   />
                 </div>
@@ -474,8 +545,32 @@ export default function AdminSecuritySection({
             </form>
           )}
         </div>
+      </section>
 
-        {/* Password Block */}
+      {/* ===================================================================== */}
+      {/* B. LOGIN & AUTHENTICATION                                              */}
+      {/* ===================================================================== */}
+      <section className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <KeyRound size={17} className="text-blue-700" />
+            <h3 className="text-sm font-bold text-slate-900">B. Login &amp; Authentication</h3>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+            {hasPasswordLinked && (
+              <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold">
+                Email/Password Active
+              </span>
+            )}
+            {hasGoogleLinked && (
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-bold">
+                Google Active
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Password Change & Recovery Block */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -483,11 +578,13 @@ export default function AdminSecuritySection({
                 <Lock size={18} />
               </div>
               <div>
-                <span className="text-xs font-mono uppercase tracking-wider text-slate-400 block">
-                  Email & Password Sign-In
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 block">
+                  Password Management &amp; Recovery
                 </span>
                 <span className="text-sm font-bold text-slate-900 block">
-                  {hasPasswordLinked ? 'Configured & Linked to Same UID' : 'Not Yet Linked (Google Only)'}
+                  {hasPasswordLinked
+                    ? 'Email & Password Sign-In Enabled'
+                    : 'Not Yet Linked (Google Sign-In Only)'}
                 </span>
               </div>
             </div>
@@ -499,7 +596,7 @@ export default function AdminSecuritySection({
                   onClick={handleSendPasswordReset}
                   className="px-3.5 py-2 min-h-[44px] rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer"
                 >
-                  Send Reset Link
+                  Send Recovery Email
                 </button>
               )}
               <button
@@ -514,7 +611,7 @@ export default function AdminSecuritySection({
                   ? 'Cancel'
                   : hasPasswordLinked
                   ? 'Change Password'
-                  : 'Set Password for Email Sign-In'}
+                  : 'Set Password'}
               </button>
             </div>
           </div>
@@ -587,7 +684,6 @@ export default function AdminSecuritySection({
                 </div>
               </div>
 
-              {/* Password Strength Meter */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-700">Password Strength:</span>
@@ -629,59 +725,109 @@ export default function AdminSecuritySection({
                   className="inline-flex items-center gap-2 px-5 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer disabled:opacity-50"
                 >
                   {savingPassword && <RefreshCw size={14} className="animate-spin" />}
-                  <span>{hasPasswordLinked ? 'Update Password' : 'Save & Link Password'}</span>
+                  <span>{hasPasswordLinked ? 'Update Password' : 'Save & Enable Password'}</span>
                 </button>
               </div>
             </form>
           )}
         </div>
 
-        {/* Google Sign-In Provider Link */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
-              <Link2 size={18} />
+        {/* Google Account Linking Card */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                <Link2 size={18} />
+              </div>
+              <div>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 block">
+                  Google Account Sign-In Link
+                </span>
+                <span className="text-sm font-bold text-slate-900 block">
+                  {hasGoogleLinked
+                    ? 'Google account safely linked to this administrator UID'
+                    : 'Not linked — optionally link Google Sign-In to this same account'}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-xs font-mono uppercase tracking-wider text-slate-400 block">
-                Google Authentication Link
-              </span>
-              <span className="text-sm font-bold text-slate-900 block">
-                {hasGoogleLinked ? 'Linked cleanly to this administrator UID' : 'Not linked yet'}
-              </span>
-            </div>
+
+            {hasGoogleLinked ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <Check size={14} />
+                  <span>Linked</span>
+                </span>
+                {hasPasswordLinked && (
+                  <button
+                    type="button"
+                    disabled={linkingProvider}
+                    onClick={handleUnlinkGoogle}
+                    className="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-xs font-bold text-slate-600 cursor-pointer disabled:opacity-50"
+                  >
+                    Unlink
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowGoogleLinkPanel(!showGoogleLinkPanel)}
+                className="px-4 py-2 min-h-[44px] rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-900 cursor-pointer shrink-0"
+              >
+                {showGoogleLinkPanel ? 'Cancel' : 'Link Google Account'}
+              </button>
+            )}
           </div>
 
-          {hasGoogleLinked ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shrink-0">
-              <Check size={14} />
-              <span>Linked</span>
-            </span>
-          ) : (
-            <button
-              type="button"
-              disabled={linkingProvider}
-              onClick={handleLinkGoogle}
-              className="px-4 py-2 min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer shrink-0 disabled:opacity-50"
+          {!hasGoogleLinked && showGoogleLinkPanel && (
+            <form
+              onSubmit={handleLinkGoogle}
+              className="pt-3 border-t border-slate-100 space-y-3 bg-slate-50/70 p-3.5 rounded-xl"
             >
-              {linkingProvider ? 'Linking...' : 'Link Google Sign-In'}
-            </button>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Linking adds Google Sign-In directly onto your existing administrator account without overwriting credentials or creating duplicates. Choose the matching Google account when prompted.
+              </p>
+              {hasPasswordLinked && (
+                <div className="max-w-sm space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Confirm Current Password (Recommended)
+                  </label>
+                  <input
+                    type="password"
+                    value={googleLinkPassword}
+                    onChange={(e) => setGoogleLinkPassword(e.target.value)}
+                    placeholder="Enter your password to verify identity"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-xs font-mono text-slate-900"
+                  />
+                </div>
+              )}
+              <div>
+                <button
+                  type="submit"
+                  disabled={linkingProvider}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {linkingProvider && <RefreshCw size={14} className="animate-spin text-amber-400" />}
+                  <span>{linkingProvider ? 'Linking Google...' : 'Continue to Link Google Account'}</span>
+                </button>
+              </div>
+            </form>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* 3. Authorized Administrators Registry */}
-      <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-4">
+      {/* ===================================================================== */}
+      {/* C. ADMINISTRATOR ACCESS                                                */}
+      {/* ===================================================================== */}
+      <section className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <Users size={17} className="text-amber-600" />
-              <h3 className="text-sm font-bold text-slate-900">
-                Authorized Administrator Accounts
-              </h3>
+              <Users size={17} className="text-blue-700" />
+              <h3 className="text-sm font-bold text-slate-900">C. Administrator Access</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Only active accounts registered below hold write permissions across inventory, settings, and customer leads.
+              Authorized accounts, role permissions, invitations, and safe access revocation. Primary owners are protected from accidental removal.
             </p>
           </div>
 
@@ -700,18 +846,10 @@ export default function AdminSecuritySection({
             onSubmit={handleAddAuthorizedAdmin}
             className="bg-white p-4 rounded-xl border border-amber-300 space-y-3"
           >
-            <p className="text-xs text-slate-600">
-              Enter the Firebase Authentication UID and email address of the trusted account to authorize:
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Authorize a trusted collaborator by entering their email and full name. Leave the Firebase UID blank to send a pre-authorized email invitation (redeemed when they sign in with their verified Google account), or enter an existing Firebase Auth UID directly.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <input
-                type="text"
-                required
-                placeholder="Firebase Auth UID *"
-                value={newAdminUid}
-                onChange={(e) => setNewAdminUid(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs font-mono text-slate-900"
-              />
               <input
                 type="email"
                 required
@@ -728,13 +866,21 @@ export default function AdminSecuritySection({
                 onChange={(e) => setNewAdminName(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs text-slate-900"
               />
+              <input
+                type="text"
+                placeholder="Firebase Auth UID (Optional)"
+                value={newAdminUid}
+                onChange={(e) => setNewAdminUid(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs font-mono text-slate-900"
+              />
               <select
-                value={newAdminRole}
+                value={newAdminUid ? newAdminRole : 'admin'}
+                disabled={!newAdminUid}
                 onChange={(e) => setNewAdminRole(e.target.value as 'admin' | 'owner')}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs font-bold text-slate-900"
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs font-bold text-slate-900 disabled:opacity-60"
               >
                 <option value="admin">Administrator</option>
-                <option value="owner">Co-Owner</option>
+                <option value="owner">Co-Owner (Requires UID)</option>
               </select>
             </div>
             <div className="flex justify-end">
@@ -752,79 +898,270 @@ export default function AdminSecuritySection({
         {loadingAdmins ? (
           <div className="text-xs text-slate-500 py-4 flex items-center gap-2">
             <RefreshCw size={14} className="animate-spin text-amber-500" />
-            <span>Loading authorized accounts...</span>
+            <span>Loading authorized administrator accounts...</span>
           </div>
-        ) : authorizedAdmins.length === 0 ? (
-          <p className="text-xs text-slate-500 py-2">
-            Active primary administrator session verified.
-          </p>
         ) : (
-          <div className="divide-y divide-slate-200 bg-white rounded-xl border border-slate-200 overflow-hidden">
-            {authorizedAdmins.map((admin) => {
-              const isSelf = admin.uid === user?.uid;
-              return (
-                <div
-                  key={admin.uid}
-                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold text-slate-900">
-                        {admin.displayName || 'Administrator'}
-                      </span>
-                      <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">
-                        {admin.role}
-                      </span>
-                      {isSelf && (
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
-                          Current Session
-                        </span>
-                      )}
-                      <span
-                        className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold ${
-                          admin.active
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {admin.active ? 'Active' : 'Revoked'}
-                      </span>
-                    </div>
-                    <p className="text-xs font-mono text-slate-600 truncate">{admin.email}</p>
-                    <p className="text-[11px] font-mono text-slate-400">
-                      UID: {admin.uid}
-                      {admin.lastLoginAt
-                        ? ` · Last Sign-In: ${new Date(admin.lastLoginAt).toLocaleString()}`
-                        : ''}
-                    </p>
-                  </div>
-
-                  {!isSelf && (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleAdminStatus(admin)}
-                      className={`px-3.5 py-2 min-h-[40px] rounded-xl text-xs font-bold border transition-colors cursor-pointer shrink-0 ${
-                        admin.active
-                          ? 'border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700'
-                          : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                      }`}
+          <div className="space-y-3">
+            {authorizedAdmins.length > 0 && (
+              <div className="divide-y divide-slate-200 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                {authorizedAdmins.map((admin) => {
+                  const isSelf = admin.uid === user?.uid;
+                  const isOwner = admin.role === 'owner';
+                  return (
+                    <div
+                      key={admin.uid}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
-                      {admin.active ? 'Revoke Access' : 'Restore Access'}
-                    </button>
-                  )}
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900">
+                            {admin.displayName || 'Administrator'}
+                          </span>
+                          <span
+                            className={`text-[11px] font-mono uppercase px-2 py-0.5 rounded font-bold ${
+                              isOwner
+                                ? 'bg-blue-100 text-blue-900'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {isOwner ? 'Primary Owner' : 'Administrator'}
+                          </span>
+                          {isSelf && (
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
+                              Current Session
+                            </span>
+                          )}
+                          <span
+                            className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold ${
+                              admin.active
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {admin.active ? 'Active' : 'Revoked'}
+                          </span>
+                        </div>
+                        <p className="text-xs font-mono text-slate-600 truncate">{admin.email}</p>
+                        <p className="text-[11px] font-mono text-slate-400">
+                          UID: {admin.uid}
+                          {admin.lastLoginAt
+                            ? ` · Last Sign-In: ${new Date(admin.lastLoginAt).toLocaleString()}`
+                            : ''}
+                        </p>
+                      </div>
+
+                      {isOwner ? (
+                        <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1 shrink-0">
+                          <Lock size={12} />
+                          <span>Protected Owner</span>
+                        </span>
+                      ) : !isSelf ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAdminStatus(admin)}
+                          className={`px-3.5 py-2 min-h-[40px] rounded-xl text-xs font-bold border transition-colors cursor-pointer shrink-0 ${
+                            admin.active
+                              ? 'border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700'
+                              : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {admin.active ? 'Revoke Access' : 'Restore Access'}
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {adminInvites.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 text-[11px] font-mono uppercase tracking-wider font-bold text-slate-600">
+                  Authorized Email Invitations ({adminInvites.length})
                 </div>
-              );
-            })}
+                <div className="divide-y divide-slate-200">
+                  {adminInvites.map((invite) => (
+                    <div
+                      key={invite.email}
+                      className="p-3.5 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {invite.displayName || 'Invited Administrator'} ({invite.email})
+                        </p>
+                        <p className="text-[11px] font-mono text-slate-500">
+                          Pre-authorized for verified Google sign-in
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInvite(invite.email)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer shrink-0"
+                      >
+                        <Trash2 size={13} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-950">
-        <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
-        <span>
-          <strong>Firebase Console Check:</strong> To allow seamless password and Google authentication across your preview and live domains, ensure <strong>Email/Password</strong> is enabled under <em>Authentication &gt; Sign-in method</em> and your domains are listed under <em>Authorized domains</em>.
-        </span>
-      </div>
+      {/* ===================================================================== */}
+      {/* D. SESSION & PRIVACY                                                   */}
+      {/* ===================================================================== */}
+      <section className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <Clock size={17} className="text-blue-700" />
+            <h3 className="text-sm font-bold text-slate-900">D. Session &amp; Privacy</h3>
+          </div>
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold">
+            Encrypted Persistence + Timeout Active
+          </span>
+        </div>
+
+        <form onSubmit={handleSaveProfileAndTimeout} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                Inactivity Auto-Sign-Out Timeout
+              </label>
+              <select
+                value={timeoutInput}
+                onChange={(e) => setTimeoutInput(Number(e.target.value))}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-sm text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+              >
+                <option value={15}>15 minutes (Strict)</option>
+                <option value={30}>30 minutes (Recommended)</option>
+                <option value={60}>60 minutes (Extended Session)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Session Behaviour</label>
+              <div className="bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 min-h-[44px] text-xs text-slate-600 flex items-center">
+                Restores securely across reloads until timeout or explicit sign out.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold cursor-pointer"
+            >
+              <LogOut size={14} />
+              <span>Sign Out Now</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={savingProfile}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {savingProfile && <RefreshCw size={14} className="animate-spin text-amber-400" />}
+              <span>Save Timeout Preference</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ===================================================================== */}
+      {/* E. SECURITY STATUS (LIVE VERIFICATION — NO FAKE GREEN INDICATORS)      */}
+      {/* ===================================================================== */}
+      <section className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <Activity size={17} className="text-blue-700" />
+            <h3 className="text-sm font-bold text-slate-900">E. Security Status</h3>
+          </div>
+          <button
+            type="button"
+            onClick={refreshDiagnostics}
+            disabled={runningDiagnostics}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={runningDiagnostics ? 'animate-spin text-blue-700' : ''} />
+            <span>{runningDiagnostics ? 'Verifying...' : 'Re-Check Live Status'}</span>
+          </button>
+        </div>
+
+        {diagnostics && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                    Firebase Authentication
+                  </span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      diagnostics.firebaseAuthOk ? 'bg-emerald-500' : 'bg-rose-500'
+                    }`}
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-900">
+                  {diagnostics.firebaseAuthOk ? 'Verified Active' : 'Attention Required'}
+                </p>
+                <p className="text-[11px] text-slate-600">{diagnostics.firebaseAuthSummary}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                    Database Connection
+                  </span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      diagnostics.databaseConnected ? 'bg-emerald-500' : 'bg-rose-500'
+                    }`}
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-900">
+                  {diagnostics.databaseConnected ? 'Connected' : 'Unreachable'}
+                </p>
+                <p className="text-[11px] text-slate-600">{diagnostics.databaseSummary}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                    Authorization Status
+                  </span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      diagnostics.authorizationOk ? 'bg-emerald-500' : 'bg-rose-500'
+                    }`}
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-900">
+                  {diagnostics.authorizationOk ? 'Authorized Session' : 'Verification Incomplete'}
+                </p>
+                <p className="text-[11px] text-slate-600">{diagnostics.authorizationSummary}</p>
+              </div>
+            </div>
+
+            {diagnostics.warnings.length > 0 && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5 text-xs text-amber-950">
+                <div className="flex items-center gap-2 font-bold">
+                  <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                  <span>Configuration Advisories</span>
+                </div>
+                <ul className="list-disc pl-5 space-y-1 text-[11px]">
+                  {diagnostics.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

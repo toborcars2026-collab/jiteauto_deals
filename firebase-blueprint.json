@@ -138,10 +138,24 @@
       "properties": {
         "setupCompleted": { "type": "boolean" },
         "setupCompletedAt": { "type": "string" },
-        "primaryAdminUid": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["setupCompleted", "primaryAdminUid"]
+      "required": ["setupCompleted"]
+    },
+    "AdminInvite": {
+      "title": "AdminInvite",
+      "description": "Pre-authorized administrator email invitation record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin"] },
+        "active": { "type": "boolean" },
+        "invitedByUid": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "role", "active"]
     },
     "AdminAuditLog": {
       "title": "AdminAuditLog",
@@ -187,6 +201,10 @@
     "/admins/{adminId}": {
       "schema": { "$ref": "#/entities/Admin" },
       "description": "Verified administrator role registry"
+    },
+    "/admin_invites/{inviteEmail}": {
+      "schema": { "$ref": "#/entities/AdminInvite" },
+      "description": "Pre-authorized administrator email invitations"
     },
     "/admin_audit_logs/{logId}": {
       "schema": { "$ref": "#/entities/AdminAuditLog" },
