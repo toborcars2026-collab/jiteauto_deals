@@ -103,6 +103,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     bootstrapped: true,
     setupSecretRequired: false,
     firebaseAuthConfigured: true,
+    passwordLoginAvailable: true,
   });
 
   // Pre-auth Views: 'login' | 'setup' | 'forgot'
@@ -603,6 +604,21 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   </p>
                 </div>
               </div>
+
+              {bootstrapStatus.backend !== 'supabase' &&
+                bootstrapStatus.passwordLoginAvailable === false &&
+                !authError && (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-100 text-xs flex items-start gap-2.5">
+                    <ShieldAlert size={16} className="shrink-0 text-amber-400 mt-0.5" />
+                    <span className="leading-relaxed">
+                      Email/password login is not configured on this deployment host yet. Add{' '}
+                      <code className="font-mono text-amber-300">ADMIN_EMAIL</code> and{' '}
+                      <code className="font-mono text-amber-300">ADMIN_PASSWORD</code> (or Supabase
+                      Auth keys) in this host&apos;s environment variables, or use Google Sign-In
+                      below.
+                    </span>
+                  </div>
+                )}
 
               {authError && (
                 <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2.5">

@@ -976,6 +976,7 @@ export default async function handler(req, res) {
             envOverridden: Boolean(sbBootstrap?.dashboard_override),
             setupSecretRequired,
             firebaseAuthConfigured: false,
+            passwordLoginAvailable: true,
           })
         );
         return;
@@ -1000,6 +1001,7 @@ export default async function handler(req, res) {
           envOverridden: Boolean(cfg.envOverridden || bootstrapDoc?.dashboardOverride),
           setupSecretRequired,
           firebaseAuthConfigured: true,
+          passwordLoginAvailable: Boolean(cfg.configured),
         })
       );
       return;
@@ -1695,6 +1697,27 @@ export default async function handler(req, res) {
               envManaged: true,
               inactivityTimeoutMinutes: 30,
             },
+          })
+        );
+        return;
+      }
+
+      // Missing server credentials diagnostic (prevents misleading "incorrect password" when a host lacks env vars & Firebase password login is disabled)
+      if (!stored.configured && !envCfg && !fbLogin) {
+        pushSecurityEvent({
+          action: 'LOGIN_FAILED_NO_CREDENTIALS',
+          status: 'warning',
+          actorEmailMasked: maskEmailForAudit(email),
+          ipTag: hashIpForAudit(clientIp),
+          details: `Deployment host lacks ADMIN_EMAIL/ADMIN_PASSWORD and Firebase password login returned ${fbErrorCode || 'UNAVAILABLE'}.`,
+        });
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            code: 'SERVER_CREDENTIALS_MISSING',
+            error:
+              'No email/password credentials are configured on this deployed host (ADMIN_EMAIL / ADMIN_PASSWORD or Supabase Auth keys are missing on this server). Configure them in this deployment environment and redeploy, or sign in with an authorized Google account.',
           })
         );
         return;

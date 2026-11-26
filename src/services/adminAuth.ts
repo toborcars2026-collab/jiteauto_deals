@@ -51,6 +51,7 @@ export interface AdminBootstrapStatus {
   envOverridden?: boolean;
   setupSecretRequired: boolean;
   firebaseAuthConfigured: boolean;
+  passwordLoginAvailable?: boolean;
 }
 
 export interface ServerAdminSession {
@@ -486,6 +487,10 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
         firebaseAuthConfigured: Boolean(
           data.firebaseAuthConfigured ?? (backend === 'firebase' && !clientSbConfigured)
         ),
+        passwordLoginAvailable:
+          typeof data.passwordLoginAvailable === 'boolean'
+            ? data.passwordLoginAvailable
+            : backend === 'supabase' || Boolean(data.envManaged || data.configured),
       };
     }
   } catch {
@@ -501,6 +506,7 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
     envOverridden: false,
     setupSecretRequired: false,
     firebaseAuthConfigured: !clientSbConfigured,
+    passwordLoginAvailable: clientSbConfigured,
   };
 }
 
