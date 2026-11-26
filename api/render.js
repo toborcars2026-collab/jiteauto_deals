@@ -19,7 +19,8 @@ const FIRESTORE_DATABASE_ID =
 
 let cachedBaseHtml = null;
 let cachedBaseHtmlTime = 0;
-const BASE_HTML_TTL_MS = 60 * 1000;
+let cachedBaseHtmlDeployId = null;
+const BASE_HTML_TTL_MS = 15 * 1000;
 
 let cachedFallbackVehicles = null;
 let firestoreVehiclesCache = null;
@@ -1015,7 +1016,8 @@ function injectMetadataIntoHtml(html, meta) {
 
 async function loadBaseHtml(req) {
   const now = Date.now();
-  if (cachedBaseHtml && now - cachedBaseHtmlTime < BASE_HTML_TTL_MS) {
+  const deployId = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || 'local';
+  if (cachedBaseHtml && cachedBaseHtmlDeployId === deployId && now - cachedBaseHtmlTime < BASE_HTML_TTL_MS) {
     return cachedBaseHtml;
   }
 
@@ -1027,12 +1029,13 @@ async function loadBaseHtml(req) {
       if (html && html.includes('<head>')) {
         cachedBaseHtml = html;
         cachedBaseHtmlTime = now;
+        cachedBaseHtmlDeployId = deployId;
         return html;
       }
     }
   } catch {}
 
-  // 2. Fetch deployed static /index.html from Vercel CDN edge (contains production hashed JS/CSS bundles)
+  // 2. Fetch deployed static /index.html from Vercel CDN edge bypassing cache
   const rawHost = req.headers['x-forwarded-host'] || req.headers.host || 'jiteautodeals.vercel.app';
   const host = String(Array.isArray(rawHost) ? rawHost[0] : rawHost).split(',')[0].trim();
   const rawProto = req.headers['x-forwarded-proto'] || 'https';
@@ -1045,7 +1048,8 @@ async function loadBaseHtml(req) {
       const timeout = setTimeout(() => controller.abort(), 3000);
       const res = await fetch(`${origin}/index.html`, {
         method: 'GET',
-        headers: { Accept: 'text/html' },
+        cache: 'no-store',
+        headers: { Accept: 'text/html', 'Cache-Control': 'no-cache' },
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1054,6 +1058,7 @@ async function loadBaseHtml(req) {
         if (html && html.includes('<head>')) {
           cachedBaseHtml = html;
           cachedBaseHtmlTime = now;
+          cachedBaseHtmlDeployId = deployId;
           return html;
         }
       }
@@ -1109,9 +1114,15 @@ export default async function handler(req, res) {
 
     const finalHtml = injectMetadataIntoHtml(baseHtml, meta);
 
+    const isAdminRoute = targetUrlOrPath.startsWith('/admin');
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+    res.setHeader(
+      'Cache-Control',
+      isAdminRoute
+        ? 'no-store, no-cache, must-revalidate, private'
+        : 'public, max-age=0, s-maxage=10, must-revalidate'
+    );
     res.end(finalHtml);
   } catch {
     try {
