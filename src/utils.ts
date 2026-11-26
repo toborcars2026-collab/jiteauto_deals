@@ -1,7 +1,3 @@
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
-import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage, OperationType, handleFirestoreError } from './firebase';
-import { getActiveAdminBearerToken } from './services/adminAuth';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
 import { INITIAL_VEHICLES } from './data';
 import {
@@ -9,6 +5,11 @@ import {
   EDITORIAL_INSPECTION_IMAGE,
   EDITORIAL_EXECUTIVE_IMAGE,
 } from './assets/visuals';
+
+const loadFirestore = () => import('firebase/firestore');
+const loadStorage = () => import('firebase/storage');
+const loadFirebaseCore = () => import('./firebase');
+const loadAdminAuth = () => import('./services/adminAuth');
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
 const VEHICLES_KEY = 'jite_vehicles_v14';
@@ -734,16 +735,19 @@ export function getImageUrl(url: string | undefined | null): string {
 }
 
 function buildCloudinaryUrl(url: string, width: number, quality = 'auto:good'): string {
-  // Inject Cloudinary responsive delivery transforms only when `/upload/` is present cleanly
+  // Inject Cloudinary responsive delivery transforms cleanly
   const uploadToken = '/image/upload/';
   const idx = url.indexOf(uploadToken);
   if (idx === -1) return url;
   const prefix = url.slice(0, idx + uploadToken.length);
   const rest = url.slice(idx + uploadToken.length);
-  // Skip if custom transforms already start right after /upload/ (avoid stacking duplicate w_/f_)
   const firstSegment = rest.split('/')[0] || '';
   if (firstSegment && !firstSegment.startsWith('v') && firstSegment.includes(',')) {
-    return url;
+    // If width transform already present, preserve custom crop/size; otherwise prepend width limit
+    if (/\bw_\d+/i.test(firstSegment) || /\bc_fill\b/i.test(firstSegment)) {
+      return url;
+    }
+    return `${prefix}c_limit,w_${width}/${rest}`;
   }
   return `${prefix}c_limit,w_${width},q_${quality},f_auto/${rest}`;
 }
@@ -780,47 +784,52 @@ export function getVehicleCardSrcSet(url: string | undefined | null): string | u
  * Any update (add, edit, delete) anywhere immediately updates all connected devices.
  */
 export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): () => void {
-  try {
-    const vehiclesCol = collection(db, 'vehicles');
-    
-    const unsubscribe = onSnapshot(
-      vehiclesCol,
-      (snapshot) => {
-        const list: Vehicle[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as Vehicle;
-          const normalized = normalizeVehicleData({
-            ...data,
-            id: docSnap.id || data.id,
+  let cancelled = false;
+  let innerUnsubscribe: (() => void) | null = null;
+
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ collection, onSnapshot }, { db }]) => {
+      if (cancelled) return;
+      const vehiclesCol = collection(db, 'vehicles');
+      innerUnsubscribe = onSnapshot(
+        vehiclesCol,
+        (snapshot) => {
+          const list: Vehicle[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Vehicle;
+            const normalized = normalizeVehicleData({
+              ...data,
+              id: docSnap.id || data.id,
+            });
+            list.push(normalized);
           });
-          list.push(normalized);
-        });
 
-        // Save authoritative live data into local cache
-        activeVehiclesCache = list;
-        try {
-          localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
-        } catch {}
+          activeVehiclesCache = list;
+          try {
+            localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
+          } catch {}
 
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
+          }
+
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('[Firestore] Vehicles sync notice:', error?.message || error);
+          onUpdate(getVehicles());
         }
+      );
+    })
+    .catch((e) => {
+      console.warn('[Firestore] Real-time vehicles subscription setup fallback:', e);
+      if (!cancelled) onUpdate(getVehicles());
+    });
 
-        onUpdate(list);
-      },
-      (error) => {
-        // Fallback to local cache if network is reconnecting
-        console.warn('[Firestore] Vehicles sync notice:', error?.message || error);
-        onUpdate(getVehicles());
-      }
-    );
-
-    return unsubscribe;
-  } catch (e) {
-    console.warn('[Firestore] Real-time vehicles subscription setup fallback:', e);
-    onUpdate(getVehicles());
-    return () => {};
-  }
+  return () => {
+    cancelled = true;
+    innerUnsubscribe?.();
+  };
 }
 
 /**
@@ -828,12 +837,18 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
  */
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
+    const serverPromise = fetch('/api/vehicles', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<Vehicle[]>) : []))
+      .catch(() => [] as Vehicle[]);
+
+    const [{ collection, getDocs }, { db }] = await Promise.all([
+      loadFirestore(),
+      loadFirebaseCore(),
+    ]);
     const vehiclesCol = collection(db, 'vehicles');
     const [snapshot, serverVehicles] = await Promise.all([
       getDocs(vehiclesCol),
-      fetch('/api/vehicles', { cache: 'no-store' })
-        .then((r) => (r.ok ? (r.json() as Promise<Vehicle[]>) : []))
-        .catch(() => [] as Vehicle[]),
+      serverPromise,
     ]);
 
     const byId = new Map<string, Vehicle>();
@@ -894,6 +909,11 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
     .replace(/\/+$/, '');
   if (!clean) return null;
 
+  const [{ collection, doc, getDoc, getDocs, query, where, limit }, { db }] = await Promise.all([
+    loadFirestore(),
+    loadFirebaseCore(),
+  ]);
+
   let hadQueryError = false;
   let lastError: unknown = null;
 
@@ -913,7 +933,7 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
     lastError = e;
   }
 
-  // 2. Targeted Firestore prefix query on `id` (e.g. "2013-dodge-charger" -> "2013-dodge-charger-munh8e3k" in 1 read)
+  // 2. Targeted Firestore prefix query on `id`
   try {
     const prefixQuery = query(
       collection(db, 'vehicles'),
@@ -954,7 +974,7 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
     lastError = e;
   }
 
-  // 3. Targeted Firestore query by model year (reads only the few vehicles of that year, e.g. 2013 or 2019)
+  // 3. Targeted Firestore query by model year
   const yearMatch = clean.match(/\b(19[89]\d|20[0-3]\d)\b/);
   if (yearMatch) {
     const yearNum = parseInt(yearMatch[1], 10);
@@ -993,7 +1013,7 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
     throw lastError;
   }
 
-  // 5. Final fallback for slugs where the year in the slug does not match the vehicle's year field
+  // 5. Final fallback
   try {
     const vehiclesCol = collection(db, 'vehicles');
     const snapshot = await getDocs(vehiclesCol);
@@ -1048,26 +1068,26 @@ export function getInitialServerRouteData(): InitialServerRoutePayload | null {
 /**
  * Preloads the primary HD vehicle image in the browser <head> using high priority link prefetching.
  */
-export function preloadPrimaryImage(rawUrl: string | undefined | null): void {
+export function preloadPrimaryImage(
+  rawUrl: string | undefined | null,
+  srcSet?: string,
+  sizes?: string
+): void {
   if (!rawUrl || typeof document === 'undefined') return;
   const url = getImageUrl(rawUrl);
   if (!url) return;
 
-  // Check if link already exists
   const existing = document.querySelector(`link[rel="preload"][href="${CSS.escape(url)}"]`);
   if (!existing) {
     const link = document.createElement('link');
     link.rel = 'preload';
     link.as = 'image';
     link.href = url;
+    if (srcSet) link.imageSrcset = srcSet;
+    if (sizes) link.imageSizes = sizes;
     link.fetchPriority = 'high';
     document.head.appendChild(link);
   }
-
-  // Also prime the browser Image cache object
-  const img = new Image();
-  img.decoding = 'async';
-  img.src = url;
 }
 
 /**
@@ -1142,6 +1162,7 @@ export async function isFirebaseStorageReachable(): Promise<boolean> {
   }
 
   try {
+    const { storage } = await loadFirebaseCore();
     const bucket = storage.app.options.storageBucket;
     if (!bucket) {
       storageBucketReachable = false;
@@ -1149,7 +1170,6 @@ export async function isFirebaseStorageReachable(): Promise<boolean> {
       return false;
     }
 
-    // Quick non-blocking probe to Storage bucket metadata endpoint with 2.5s abort timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
@@ -1160,13 +1180,7 @@ export async function isFirebaseStorageReachable(): Promise<boolean> {
     });
     clearTimeout(timeoutId);
 
-    // If bucket exists, Firebase returns 200 or 401/403 (auth required).
-    // A 404 indicates the Cloud Storage bucket is not created or activated yet.
-    if (res.status === 404) {
-      storageBucketReachable = false;
-    } else {
-      storageBucketReachable = true;
-    }
+    storageBucketReachable = res.status !== 404;
   } catch {
     storageBucketReachable = false;
   }
@@ -1606,11 +1620,12 @@ export async function uploadVehicleImageFile(
     onProgress(5, 0, uploadBlob.size, optimizedResult.statusNote);
   }
 
-  // Step 2: Check if Firebase Storage bucket is actively usable AND Firebase user is signed in
+  const { auth, storage } = await loadFirebaseCore();
   const isStorageReady = auth.currentUser ? await isFirebaseStorageReachable() : false;
 
   if (isStorageReady) {
     try {
+      const { ref, uploadBytesResumable, getDownloadURL } = await loadStorage();
       const storageRef = ref(storage, filename);
       const uploadTask = uploadBytesResumable(storageRef, uploadBlob, {
         contentType: optimizedResult.mimeType,
@@ -1642,8 +1657,8 @@ export async function uploadVehicleImageFile(
     }
   }
 
-  // Step 3: Resilient high-speed upload fallback using robust arrayBuffer data URL conversion
   const base64Data = await readBlobAsDataUrl(uploadBlob);
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
   return new Promise<string>((resolve, reject) => {
@@ -1713,10 +1728,14 @@ export async function uploadVehicleImageDataUrl(
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
-  const isStorageReady = await isFirebaseStorageReachable();
+  const [{ auth, storage }, isStorageReady] = await Promise.all([
+    loadFirebaseCore(),
+    isFirebaseStorageReachable(),
+  ]);
 
   if (isStorageReady) {
     try {
+      const { ref, uploadString, getDownloadURL } = await loadStorage();
       const storageRef = ref(storage, filename);
       const snapshot = await uploadString(storageRef, dataUrl, 'data_url', {
         contentType: 'image/jpeg',
@@ -1731,7 +1750,6 @@ export async function uploadVehicleImageDataUrl(
     }
   }
 
-  // Fallback to server route
   const bearerToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
   const response = await fetch('/api/upload-vehicle-image', {
     method: 'POST',
@@ -1807,6 +1825,7 @@ export async function runConcurrentQueue<T, R>(
  */
 export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle> {
   const normalized = normalizeVehicleData(vehicle);
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
   if (bearerToken) {
@@ -1824,8 +1843,10 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
     }
   }
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
+      const { doc, setDoc, getDoc } = await loadFirestore();
       const docRef = doc(db, 'vehicles', normalized.id);
       const payload = cleanFirestoreData(normalized);
       await setDoc(docRef, payload);
@@ -1857,7 +1878,6 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
     }
   }
 
-  // Standalone Server Email/Password session persistence
   const current = getVehicles().filter((v) => v.id !== normalized.id);
   current.unshift(normalized);
   activeVehiclesCache = current;
@@ -1872,16 +1892,10 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
   return normalized;
 }
 
-/**
- * Creates a brand-new vehicle in Cloud Firestore.
- */
 export async function createVehicle(vehicle: Vehicle): Promise<Vehicle> {
   return saveVehicleToFirestore(vehicle);
 }
 
-/**
- * Updates an existing vehicle in Cloud Firestore.
- */
 export async function updateVehicle(vehicleId: string, updates: Partial<Vehicle>): Promise<Vehicle> {
   const currentVehicles = getVehicles();
   const existing = currentVehicles.find(v => v.id === vehicleId);
@@ -1895,24 +1909,16 @@ export async function updateVehicle(vehicleId: string, updates: Partial<Vehicle>
   return saveVehicleToFirestore(merged);
 }
 
-/**
- * Publishes a vehicle (sets status: 'Active' in Firestore).
- */
 export async function publishVehicle(vehicleId: string): Promise<Vehicle> {
   return updateVehicle(vehicleId, { status: 'Active' });
 }
 
-/**
- * Unpublishes a vehicle (sets status: 'Inactive' in Firestore).
- */
 export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
   return updateVehicle(vehicleId, { status: 'Inactive' });
 }
 
-/**
- * Deletes a single vehicle directly from Cloud Firestore.
- */
 export async function deleteVehicleFromFirestore(id: string): Promise<void> {
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
   if (bearerToken) {
@@ -1928,8 +1934,10 @@ export async function deleteVehicleFromFirestore(id: string): Promise<void> {
     }
   }
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
+      const { doc, deleteDoc } = await loadFirestore();
       const docRef = doc(db, 'vehicles', id);
       await deleteDoc(docRef);
     } catch (error) {
@@ -1948,23 +1956,14 @@ export async function deleteVehicleFromFirestore(id: string): Promise<void> {
   }
 }
 
-/**
- * Refreshes local catalog cache directly from live Cloud Firestore.
- */
 export async function syncVehiclesFromFirestore(): Promise<Vehicle[]> {
   return fetchVehicles();
 }
 
-/**
- * Legacy reset method: alias to syncVehiclesFromFirestore to ensure no mock data is ever re-seeded.
- */
 export async function resetFirestoreVehiclesToDefault(): Promise<Vehicle[]> {
   return fetchVehicles();
 }
 
-/**
- * Synchronizes an array of vehicles to Firestore and LocalStorage (backward compatible).
- */
 export function saveVehicles(vehicles: Vehicle[]): void {
   const normalized = vehicles.map(normalizeVehicleData);
 
@@ -1976,24 +1975,20 @@ export function saveVehicles(vehicles: Vehicle[]): void {
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
   }
 
-  // Batch save to Firestore
-  try {
-    const batch = writeBatch(db);
-    normalized.forEach((v) => {
-      const docRef = doc(db, 'vehicles', v.id);
-      batch.set(docRef, v);
-    });
-    batch.commit().catch((err) => {
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ doc, writeBatch }, { db }]) => {
+      const batch = writeBatch(db);
+      normalized.forEach((v) => {
+        const docRef = doc(db, 'vehicles', v.id);
+        batch.set(docRef, v);
+      });
+      return batch.commit();
+    })
+    .catch((err) => {
       console.warn('[Firestore] Batch save background error:', err);
     });
-  } catch (err) {
-    console.warn('[Firestore] Error initiating batch save:', err);
-  }
 }
 
-/**
- * Permanently deletes a vehicle (backward compatible).
- */
 export function deleteVehicle(id: string): void {
   deleteVehicleFromFirestore(id).catch(() => {});
   const current = getVehicles().filter(v => v.id !== id);
@@ -2009,43 +2004,47 @@ export function deleteVehicle(id: string): void {
 // LEADS & INQUIRIES FIRESTORE INTEGRATION
 // ============================================================================
 
-/**
- * Subscribes in real-time to the Cloud Firestore `leads` collection.
- */
 export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void {
-  try {
-    const leadsCol = collection(db, 'leads');
-    const unsubscribe = onSnapshot(
-      leadsCol,
-      (snapshot) => {
-        const list: Lead[] = [];
-        snapshot.forEach((docSnap) => {
-          list.push({ ...docSnap.data(), id: docSnap.id } as Lead);
-        });
-        // Sort newest first
-        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        try {
-          localStorage.setItem(LEADS_KEY, JSON.stringify(list));
-        } catch {}
-        onUpdate(list);
-      },
-      (error) => {
-        console.warn('[Firestore] Leads sync notice:', error?.message || error);
-        onUpdate(getLeads());
-      }
-    );
-    return unsubscribe;
-  } catch (e) {
-    onUpdate(getLeads());
-    return () => {};
-  }
+  let cancelled = false;
+  let innerUnsubscribe: (() => void) | null = null;
+
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ collection, onSnapshot }, { db }]) => {
+      if (cancelled) return;
+      const leadsCol = collection(db, 'leads');
+      innerUnsubscribe = onSnapshot(
+        leadsCol,
+        (snapshot) => {
+          const list: Lead[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ ...docSnap.data(), id: docSnap.id } as Lead);
+          });
+          list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          try {
+            localStorage.setItem(LEADS_KEY, JSON.stringify(list));
+          } catch {}
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('[Firestore] Leads sync notice:', error?.message || error);
+          onUpdate(getLeads());
+        }
+      );
+    })
+    .catch(() => {
+      if (!cancelled) onUpdate(getLeads());
+    });
+
+  return () => {
+    cancelled = true;
+    innerUnsubscribe?.();
+  };
 }
 
-/**
- * Fetches all leads from Cloud Firestore.
- */
 export async function fetchLeads(): Promise<Lead[]> {
+  const { auth, db } = await loadFirebaseCore();
   if (!auth.currentUser) {
+    const { getActiveAdminBearerToken } = await loadAdminAuth();
     const token = await getActiveAdminBearerToken();
     if (token) {
       try {
@@ -2063,14 +2062,13 @@ export async function fetchLeads(): Promise<Lead[]> {
             return data;
           }
         }
-      } catch {
-        // Fallback to local cache
-      }
+      } catch {}
     }
     return getLeads();
   }
 
   try {
+    const { collection, getDocs } = await loadFirestore();
     const snapshot = await getDocs(collection(db, 'leads'));
     const list: Lead[] = [];
     snapshot.forEach((docSnap) => {
@@ -2081,14 +2079,11 @@ export async function fetchLeads(): Promise<Lead[]> {
       localStorage.setItem(LEADS_KEY, JSON.stringify(list));
     } catch {}
     return list;
-  } catch (error) {
+  } catch {
     return getLeads();
   }
 }
 
-/**
- * Gets leads from localStorage cache.
- */
 export function getLeads(): Lead[] {
   try {
     const data = localStorage.getItem(LEADS_KEY);
@@ -2098,10 +2093,6 @@ export function getLeads(): Lead[] {
   }
 }
 
-/**
- * Recursively cleans an object by stripping out all `undefined` values,
- * which Firestore strictly forbids in setDoc, updateDoc, and addDoc.
- */
 export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Record<string, any> {
   if (!obj || typeof obj !== 'object') return obj;
   const cleaned: Record<string, any> = {};
@@ -2118,9 +2109,6 @@ export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Recor
   return cleaned;
 }
 
-/**
- * Saves a new lead to Cloud Firestore.
- */
 export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead {
   const newLead: Lead = {
     ...lead,
@@ -2135,25 +2123,22 @@ export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead 
     localStorage.setItem(LEADS_KEY, JSON.stringify(current));
   } catch {}
 
-  // Mirror to backend store so standalone server admin login also receives leads
   fetch('/api/leads/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(newLead),
   }).catch(() => {});
 
-  // Write to Cloud Firestore safely stripping undefined properties
   const payload = cleanFirestoreData(newLead);
-  setDoc(doc(db, 'leads', newLead.id), payload).catch((err) => {
-    console.warn('[Firestore] Error saving lead to Firestore:', err);
-  });
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'leads', newLead.id), payload))
+    .catch((err) => {
+      console.warn('[Firestore] Error saving lead to Firestore:', err);
+    });
 
   return newLead;
 }
 
-/**
- * Updates a lead in Cloud Firestore.
- */
 export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
   const current = getLeads();
   const updated = current.map(l => l.id === leadId ? { ...l, ...updates } : l);
@@ -2161,53 +2146,59 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
     localStorage.setItem(LEADS_KEY, JSON.stringify(updated));
   } catch {}
 
-  // Update in Cloud Firestore
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    updateDoc(doc(db, 'leads', leadId), payload).catch((err) => {
-      console.warn('[Firestore] Error updating lead in Firestore:', err);
-    });
+    Promise.all([loadFirestore(), loadFirebaseCore()])
+      .then(([{ doc, updateDoc }, { db }]) => updateDoc(doc(db, 'leads', leadId), payload))
+      .catch((err) => {
+        console.warn('[Firestore] Error updating lead in Firestore:', err);
+      });
   }
 
   return updated;
 }
 
-/**
- * Subscribes in real-time to the Cloud Firestore `inquiries` collection.
- */
 export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): () => void {
-  try {
-    const inqCol = collection(db, 'inquiries');
-    const unsubscribe = onSnapshot(
-      inqCol,
-      (snapshot) => {
-        const list: Inquiry[] = [];
-        snapshot.forEach((docSnap) => {
-          list.push({ ...docSnap.data(), id: docSnap.id } as Inquiry);
-        });
-        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        try {
-          localStorage.setItem(INQUIRIES_KEY, JSON.stringify(list));
-        } catch {}
-        onUpdate(list);
-      },
-      (error) => {
-        console.warn('[Firestore] Inquiries sync notice:', error?.message || error);
-        onUpdate(getInquiries());
-      }
-    );
-    return unsubscribe;
-  } catch (e) {
-    onUpdate(getInquiries());
-    return () => {};
-  }
+  let cancelled = false;
+  let innerUnsubscribe: (() => void) | null = null;
+
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ collection, onSnapshot }, { db }]) => {
+      if (cancelled) return;
+      const inqCol = collection(db, 'inquiries');
+      innerUnsubscribe = onSnapshot(
+        inqCol,
+        (snapshot) => {
+          const list: Inquiry[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ ...docSnap.data(), id: docSnap.id } as Inquiry);
+          });
+          list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          try {
+            localStorage.setItem(INQUIRIES_KEY, JSON.stringify(list));
+          } catch {}
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('[Firestore] Inquiries sync notice:', error?.message || error);
+          onUpdate(getInquiries());
+        }
+      );
+    })
+    .catch(() => {
+      if (!cancelled) onUpdate(getInquiries());
+    });
+
+  return () => {
+    cancelled = true;
+    innerUnsubscribe?.();
+  };
 }
 
-/**
- * Fetches inquiries from Cloud Firestore.
- */
 export async function fetchInquiries(): Promise<Inquiry[]> {
+  const { auth, db } = await loadFirebaseCore();
   if (!auth.currentUser) {
+    const { getActiveAdminBearerToken } = await loadAdminAuth();
     const token = await getActiveAdminBearerToken();
     if (token) {
       try {
@@ -2225,14 +2216,13 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
             return data;
           }
         }
-      } catch {
-        // Fallback to local cache
-      }
+      } catch {}
     }
     return getInquiries();
   }
 
   try {
+    const { collection, getDocs } = await loadFirestore();
     const snapshot = await getDocs(collection(db, 'inquiries'));
     const list: Inquiry[] = [];
     snapshot.forEach((docSnap) => {
@@ -2243,14 +2233,11 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
       localStorage.setItem(INQUIRIES_KEY, JSON.stringify(list));
     } catch {}
     return list;
-  } catch (error) {
+  } catch {
     return getInquiries();
   }
 }
 
-/**
- * Gets inquiries from localStorage cache.
- */
 export function getInquiries(): Inquiry[] {
   try {
     const data = localStorage.getItem(INQUIRIES_KEY);
@@ -2260,9 +2247,6 @@ export function getInquiries(): Inquiry[] {
   }
 }
 
-/**
- * Saves a new inquiry to Cloud Firestore.
- */
 export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'>): Inquiry {
   const newInquiry: Inquiry = {
     ...inquiry,
@@ -2277,25 +2261,22 @@ export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'
     localStorage.setItem(INQUIRIES_KEY, JSON.stringify(current));
   } catch {}
 
-  // Mirror to backend store so standalone server admin login also receives inquiries
   fetch('/api/inquiries/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(newInquiry),
   }).catch(() => {});
 
-  // Write to Cloud Firestore safely stripping undefined properties
   const payload = cleanFirestoreData(newInquiry);
-  setDoc(doc(db, 'inquiries', newInquiry.id), payload).catch((err) => {
-    console.warn('[Firestore] Error saving inquiry to Firestore:', err);
-  });
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'inquiries', newInquiry.id), payload))
+    .catch((err) => {
+      console.warn('[Firestore] Error saving inquiry to Firestore:', err);
+    });
 
   return newInquiry;
 }
 
-/**
- * Updates an inquiry in Cloud Firestore.
- */
 export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inquiry[] {
   const current = getInquiries();
   const updated = current.map(i => i.id === inquiryId ? { ...i, ...updates } : i);
@@ -2303,12 +2284,13 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
     localStorage.setItem(INQUIRIES_KEY, JSON.stringify(updated));
   } catch {}
 
-  // Update in Cloud Firestore
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    updateDoc(doc(db, 'inquiries', inquiryId), payload).catch((err) => {
-      console.warn('[Firestore] Error updating inquiry in Firestore:', err);
-    });
+    Promise.all([loadFirestore(), loadFirebaseCore()])
+      .then(([{ doc, updateDoc }, { db }]) => updateDoc(doc(db, 'inquiries', inquiryId), payload))
+      .catch((err) => {
+        console.warn('[Firestore] Error updating inquiry in Firestore:', err);
+      });
   }
 
   return updated;
@@ -2335,9 +2317,6 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   updatedAt: new Date().toISOString(),
 };
 
-/**
- * Gets cached business settings or defaults.
- */
 export function getBusinessSettings(): BusinessSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -2348,11 +2327,12 @@ export function getBusinessSettings(): BusinessSettings {
   return DEFAULT_BUSINESS_SETTINGS;
 }
 
-/**
- * Fetches the central business settings from Cloud Firestore (`settings/business`).
- */
 export async function fetchBusinessSettings(): Promise<BusinessSettings> {
   try {
+    const [{ doc, getDoc, setDoc }, { db }] = await Promise.all([
+      loadFirestore(),
+      loadFirebaseCore(),
+    ]);
     const docRef = doc(db, 'settings', 'business');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -2362,7 +2342,6 @@ export async function fetchBusinessSettings(): Promise<BusinessSettings> {
       } catch {}
       return data;
     } else {
-      // Seed default settings to Firestore if not present
       await setDoc(docRef, DEFAULT_BUSINESS_SETTINGS);
       return DEFAULT_BUSINESS_SETTINGS;
     }
@@ -2372,42 +2351,44 @@ export async function fetchBusinessSettings(): Promise<BusinessSettings> {
   }
 }
 
-/**
- * Real-time subscription to central business settings from Cloud Firestore.
- */
 export function subscribeToBusinessSettings(onUpdate: (settings: BusinessSettings) => void): () => void {
-  try {
-    const docRef = doc(db, 'settings', 'business');
-    const unsubscribe = onSnapshot(
-      docRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = { ...DEFAULT_BUSINESS_SETTINGS, ...docSnap.data() } as BusinessSettings;
-          try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
-          } catch {}
-          onUpdate(data);
-        } else {
-          // Initialize doc if missing
-          setDoc(docRef, DEFAULT_BUSINESS_SETTINGS).catch(() => {});
-          onUpdate(DEFAULT_BUSINESS_SETTINGS);
+  let cancelled = false;
+  let innerUnsubscribe: (() => void) | null = null;
+
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ doc, onSnapshot, setDoc }, { db }]) => {
+      if (cancelled) return;
+      const docRef = doc(db, 'settings', 'business');
+      innerUnsubscribe = onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = { ...DEFAULT_BUSINESS_SETTINGS, ...docSnap.data() } as BusinessSettings;
+            try {
+              localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+            } catch {}
+            onUpdate(data);
+          } else {
+            setDoc(docRef, DEFAULT_BUSINESS_SETTINGS).catch(() => {});
+            onUpdate(DEFAULT_BUSINESS_SETTINGS);
+          }
+        },
+        (error) => {
+          console.warn('[Firestore] Settings sync notice:', error?.message || error);
+          onUpdate(getBusinessSettings());
         }
-      },
-      (error) => {
-        console.warn('[Firestore] Settings sync notice:', error?.message || error);
-        onUpdate(getBusinessSettings());
-      }
-    );
-    return unsubscribe;
-  } catch (e) {
-    onUpdate(getBusinessSettings());
-    return () => {};
-  }
+      );
+    })
+    .catch(() => {
+      if (!cancelled) onUpdate(getBusinessSettings());
+    });
+
+  return () => {
+    cancelled = true;
+    innerUnsubscribe?.();
+  };
 }
 
-/**
- * Saves updated business settings directly to Cloud Firestore.
- */
 export async function saveBusinessSettingsToFirestore(settings: Partial<BusinessSettings>): Promise<BusinessSettings> {
   const current = getBusinessSettings();
   const updated: BusinessSettings = {
@@ -2420,6 +2401,7 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
   } catch {}
 
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
   if (bearerToken) {
     try {
@@ -2431,13 +2413,13 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
         },
         body: JSON.stringify(updated),
       });
-    } catch {
-      // Non-blocking server save
-    }
+    } catch {}
   }
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
+      const { doc, setDoc } = await loadFirestore();
       const docRef = doc(db, 'settings', 'business');
       const payload = cleanFirestoreData(updated);
       await setDoc(docRef, payload, { merge: true });
@@ -2514,6 +2496,10 @@ export function getEditorialPosts(): EditorialPost[] {
 
 export async function fetchEditorialPosts(): Promise<EditorialPost[]> {
   try {
+    const [{ doc, getDoc }, { db }] = await Promise.all([
+      loadFirestore(),
+      loadFirebaseCore(),
+    ]);
     const docRef = doc(db, 'settings', 'editorial');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -2532,31 +2518,41 @@ export async function fetchEditorialPosts(): Promise<EditorialPost[]> {
 }
 
 export function subscribeToEditorialPosts(onUpdate: (posts: EditorialPost[]) => void): () => void {
-  try {
-    const docRef = doc(db, 'settings', 'editorial');
-    return onSnapshot(
-      docRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (Array.isArray(data?.posts) && data.posts.length > 0) {
-            try {
-              localStorage.setItem(EDITORIAL_KEY, JSON.stringify(data.posts));
-            } catch {}
-            onUpdate(data.posts as EditorialPost[]);
-            return;
+  let cancelled = false;
+  let innerUnsubscribe: (() => void) | null = null;
+
+  Promise.all([loadFirestore(), loadFirebaseCore()])
+    .then(([{ doc, onSnapshot }, { db }]) => {
+      if (cancelled) return;
+      const docRef = doc(db, 'settings', 'editorial');
+      innerUnsubscribe = onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (Array.isArray(data?.posts) && data.posts.length > 0) {
+              try {
+                localStorage.setItem(EDITORIAL_KEY, JSON.stringify(data.posts));
+              } catch {}
+              onUpdate(data.posts as EditorialPost[]);
+              return;
+            }
           }
+          onUpdate(getEditorialPosts());
+        },
+        () => {
+          onUpdate(getEditorialPosts());
         }
-        onUpdate(getEditorialPosts());
-      },
-      () => {
-        onUpdate(getEditorialPosts());
-      }
-    );
-  } catch {
-    onUpdate(getEditorialPosts());
-    return () => {};
-  }
+      );
+    })
+    .catch(() => {
+      if (!cancelled) onUpdate(getEditorialPosts());
+    });
+
+  return () => {
+    cancelled = true;
+    innerUnsubscribe?.();
+  };
 }
 
 export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Promise<EditorialPost[]> {
@@ -2571,6 +2567,7 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
     localStorage.setItem(EDITORIAL_KEY, JSON.stringify(sanitized));
   } catch {}
 
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
   if (bearerToken) {
     try {
@@ -2582,13 +2579,13 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
         },
         body: JSON.stringify({ posts: sanitized }),
       });
-    } catch {
-      // Non-blocking
-    }
+    } catch {}
   }
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
+      const { doc, setDoc } = await loadFirestore();
       const docRef = doc(db, 'settings', 'editorial');
       await setDoc(
         docRef,
@@ -2621,6 +2618,7 @@ async function mirrorVehicleQuickPatch(vehicleId: string, updates: Partial<Vehic
     try {
       localStorage.setItem(VEHICLES_KEY, JSON.stringify(next));
     } catch {}
+    const { getActiveAdminBearerToken } = await loadAdminAuth();
     const bearerToken = await getActiveAdminBearerToken();
     if (bearerToken) {
       await fetch('/api/vehicles/upsert', {
@@ -2635,13 +2633,12 @@ async function mirrorVehicleQuickPatch(vehicleId: string, updates: Partial<Vehic
   }
 }
 
-/**
- * Updates a vehicle's status (Available, Reserved, Sold, Hidden).
- */
 export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus): Promise<void> {
   await mirrorVehicleQuickPatch(vehicleId, { status });
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
       status,
@@ -2653,14 +2650,13 @@ export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus
   }
 }
 
-/**
- * Updates a vehicle's price directly.
- */
 export async function saveVehiclePrice(vehicleId: string, newPrice: number): Promise<void> {
   const price = Number(newPrice) || 0;
   await mirrorVehicleQuickPatch(vehicleId, { price });
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
       price,
@@ -2672,13 +2668,12 @@ export async function saveVehiclePrice(vehicleId: string, newPrice: number): Pro
   }
 }
 
-/**
- * Updates a vehicle's featured flag directly.
- */
 export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean): Promise<void> {
   await mirrorVehicleQuickPatch(vehicleId, { isFeatured });
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
       isFeatured,
@@ -2690,16 +2685,15 @@ export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean
   }
 }
 
-/**
- * Updates a vehicle's homepage slideshow flag and order directly.
- */
 export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boolean, slideshowOrder?: number): Promise<void> {
   await mirrorVehicleQuickPatch(
     vehicleId,
     typeof slideshowOrder === 'number' ? { inSlideshow, slideshowOrder } : { inSlideshow }
   );
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
     const updates: any = {
       inSlideshow,
@@ -2715,10 +2709,8 @@ export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boole
   }
 }
 
-/**
- * Updates lead status cleanly.
- */
 export async function saveLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
   if (bearerToken) {
     await fetch('/api/leads/status', {
@@ -2730,8 +2722,10 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
       body: JSON.stringify({ id: leadId, status }),
     }).catch(() => {});
   }
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'leads', leadId);
     await updateDoc(docRef, {
       status,
@@ -2743,10 +2737,8 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
   }
 }
 
-/**
- * Updates inquiry status cleanly.
- */
 export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): Promise<void> {
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
   if (bearerToken) {
     await fetch('/api/inquiries/status', {
@@ -2758,8 +2750,10 @@ export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): 
       body: JSON.stringify({ id: inquiryId, status }),
     }).catch(() => {});
   }
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (!auth.currentUser) return;
   try {
+    const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'inquiries', inquiryId);
     await updateDoc(docRef, {
       status,

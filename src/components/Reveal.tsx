@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { useAdaptiveMotion } from '../hooks/useAdaptiveMotion';
 
 interface RevealProps {
@@ -11,12 +10,9 @@ interface RevealProps {
   duration?: number;
 }
 
-const PREMIUM_EASE = [0.16, 1, 0.3, 1] as const;
-
 /**
- * Lightweight, compositor-only (transform + opacity) viewport reveal wrapper.
- * Ensures immediate zero-latency fallback under reduced-motion or save-data modes
- * and never blocks initial above-the-fold DOM availability.
+ * Lightweight, zero-dependency GPU-composited (transform + opacity) viewport reveal wrapper.
+ * Replaces heavy JS motion library in initial homepage bundle while preserving exact easing & reduced-motion behavior.
  */
 export default function Reveal({
   children,
@@ -27,7 +23,7 @@ export default function Reveal({
 }: RevealProps) {
   const { reducedMotion, enableCinematicMotion } = useAdaptiveMotion();
   const ref = useRef<HTMLDivElement | null>(null);
-  const [hasEntered, setHasEntered] = useState(!enableCinematicMotion);
+  const [hasEntered, setHasEntered] = useState(!enableCinematicMotion || reducedMotion);
 
   useEffect(() => {
     if (!enableCinematicMotion || reducedMotion) {
@@ -42,7 +38,7 @@ export default function Reveal({
     }
 
     const rect = node.getBoundingClientRect();
-    if (rect.top < window.innerHeight * 0.96) {
+    if (rect.top < window.innerHeight * 0.98) {
       setHasEntered(true);
       return;
     }
@@ -57,7 +53,7 @@ export default function Reveal({
           }
         }
       },
-      { rootMargin: '0px 0px -6% 0px', threshold: 0.05 }
+      { rootMargin: '0px 0px -4% 0px', threshold: 0.02 }
     );
 
     observer.observe(node);
@@ -69,14 +65,19 @@ export default function Reveal({
   }
 
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={{ opacity: 0, y: yOffset }}
-      animate={hasEntered ? { opacity: 1, y: 0 } : { opacity: 0, y: yOffset }}
-      transition={{ duration, delay, ease: PREMIUM_EASE }}
       className={className}
+      style={{
+        opacity: hasEntered ? 1 : 0,
+        transform: hasEntered ? 'translate3d(0, 0, 0)' : `translate3d(0, ${yOffset}px, 0)`,
+        transitionProperty: 'opacity, transform',
+        transitionDuration: `${Math.round(duration * 1000)}ms`,
+        transitionDelay: `${Math.round(delay * 1000)}ms`,
+        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

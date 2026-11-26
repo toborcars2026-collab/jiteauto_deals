@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, MessageSquare, Phone, MapPin, ShieldCheck } from 'lucide-react';
 import { BusinessSettings } from '../types';
-import toborPhoto from '../assets/images/tobor_jite_consultant.jpg';
+import toborPhoto from '../assets/images/tobor_jite_consultant.webp';
 import {
   getBusinessPhoneDisplay,
   getBusinessPhoneCallUrl,

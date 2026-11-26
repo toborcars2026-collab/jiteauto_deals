@@ -1,6 +1,6 @@
 import React from 'react';
 import { MessageSquare, Check, ArrowRight } from 'lucide-react';
-import toborPhoto from '../assets/images/tobor_jite_consultant.jpg';
+import toborPhoto from '../assets/images/tobor_jite_consultant.webp';
 import Reveal from './Reveal';
 
 interface AboutFounderProps {
@@ -27,6 +27,8 @@ export default function AboutFounder({ onTalkToConsultant, onReadFullStory }: Ab
                 <img
                   src={toborPhoto}
                   alt="Tobor Jite - Vehicle Consultant at Jite Auto Deals"
+                  width={960}
+                  height={1280}
                   className="w-full h-auto aspect-[3/4] sm:aspect-[4/5] object-cover object-top filter contrast-[1.02] brightness-[1.01] transition-transform duration-500 group-hover:scale-[1.02]"
                   loading="lazy"
                   decoding="async"

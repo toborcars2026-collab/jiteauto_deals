@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, MessageSquare, Phone, Send, Shield, CheckCircle2, Car } from 'lucide-react';
 import { Vehicle, BusinessSettings } from '../types';
-import toborPhoto from '../assets/images/tobor_jite_consultant.jpg';
+import toborPhoto from '../assets/images/tobor_jite_consultant.webp';
 import {
   saveInquiry,
   formatCurrency,

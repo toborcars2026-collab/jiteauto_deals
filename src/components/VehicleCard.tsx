@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { MapPin, ArrowUpRight, CalendarCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Vehicle } from '../types';
 import { formatCurrency, getOptimizedImageUrl, getVehicleCardSrcSet } from '../utils';
 import { FALLBACK_VEHICLE_IMAGE } from '../assets/visuals';
@@ -19,11 +18,12 @@ export default function VehicleCard({
   onViewDetails,
   onBookInspection,
 }: VehicleCardProps) {
-  const { imagePreset, reducedMotion } = useAdaptiveMotion();
+  const { imagePreset } = useAdaptiveMotion();
   const [currentImgIdx, setCurrentImgIdx] = useState(0);
-  const [direction, setDirection] = useState(1);
   const [imgErrored, setImgErrored] = useState(false);
   const dragOccurredRef = useRef(false);
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
 
   const images =
     vehicle.images && vehicle.images.length > 0
@@ -37,19 +37,25 @@ export default function VehicleCard({
   const isSold = vehicle.status === 'Sold';
   const isReserved = vehicle.status === 'Reserved';
 
-  const handleDragEnd = (_event: any, info: any) => {
-    const swipe = info.offset.x;
-    const velocity = info.velocity.x;
-    if (swipe < -35 || velocity < -150) {
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (images.length <= 1) return;
+    dragOccurredRef.current = false;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (images.length <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+    if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY)) {
       dragOccurredRef.current = true;
-      setDirection(1);
       setImgErrored(false);
-      setCurrentImgIdx((prev) => (prev + 1) % images.length);
-    } else if (swipe > 35 || velocity > 150) {
-      dragOccurredRef.current = true;
-      setDirection(-1);
-      setImgErrored(false);
-      setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
+      if (deltaX < 0) {
+        setCurrentImgIdx((prev) => (prev + 1) % images.length);
+      } else {
+        setCurrentImgIdx((prev) => (prev - 1 + images.length) % images.length);
+      }
     }
   };
 
@@ -62,7 +68,12 @@ export default function VehicleCard({
       }`}
     >
       {/* 1. Vehicle Image Area */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-900 select-none">
+      <div
+        className="relative aspect-[16/10] overflow-hidden bg-slate-900 select-none"
+        style={{ touchAction: 'pan-y' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {imgErrored ? (
           <div
             onClick={() => onViewDetails(vehicle)}
@@ -74,41 +85,28 @@ export default function VehicleCard({
             />
           </div>
         ) : (
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.img
-              key={currentImgIdx}
-              custom={direction}
-              initial={reducedMotion ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={reducedMotion ? undefined : { opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              src={activeImageUrl}
-              srcSet={activeSrcSet}
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 420px"
-              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-              width={480}
-              height={300}
-              loading="lazy"
-              decoding="async"
-              className={`h-full w-full object-cover cursor-pointer transition-transform duration-500 ${
-                isSold ? 'grayscale-[35%]' : 'group-hover:scale-[1.03]'
-              }`}
-              drag={images.length > 1 ? 'x' : false}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.2}
-              onDragStart={() => {
-                dragOccurredRef.current = false;
-              }}
-              onDragEnd={handleDragEnd}
-              onClick={() => {
-                if (!dragOccurredRef.current) {
-                  onViewDetails(vehicle);
-                }
-              }}
-              onError={() => setImgErrored(true)}
-              referrerPolicy="no-referrer"
-            />
-          </AnimatePresence>
+          <img
+            key={currentImgIdx}
+            src={activeImageUrl}
+            srcSet={activeSrcSet}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 420px"
+            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            width={480}
+            height={300}
+            loading="lazy"
+            decoding="async"
+            className={`h-full w-full object-cover cursor-pointer transition-transform duration-500 ${
+              isSold ? 'grayscale-[35%]' : 'group-hover:scale-[1.03]'
+            }`}
+            onClick={() => {
+              if (!dragOccurredRef.current) {
+                onViewDetails(vehicle);
+              }
+              dragOccurredRef.current = false;
+            }}
+            onError={() => setImgErrored(true)}
+            referrerPolicy="no-referrer"
+          />
         )}
 
         {/* Contrast Scrim */}
@@ -144,7 +142,6 @@ export default function VehicleCard({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDirection(idx > currentImgIdx ? 1 : -1);
                   setImgErrored(false);
                   setCurrentImgIdx(idx);
                 }}

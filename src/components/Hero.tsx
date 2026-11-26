@@ -78,24 +78,35 @@ export default function Hero({
     }
   }, [count]);
 
-  // Eagerly preload slideshow images
+  // Defer preloading strictly to the next upcoming slide during browser idle time
   useEffect(() => {
-    if (!slideshowVehicles.length) return;
-    slideshowVehicles.forEach((veh) => {
-      const raw = veh.images?.[0];
-      if (raw) {
-        const url = getOptimizedImageUrl(raw, 'card');
-        if (url && !preloadedUrlsRef.current.has(url)) {
-          preloadedUrlsRef.current.add(url);
-          const img = new Image();
-          img.src = url;
-          if (img.decode) {
-            img.decode().catch(() => {});
-          }
-        }
+    if (count <= 1) return;
+    const nextIdx = (activeVehicleIndex + 1) % count;
+    const raw = slideshowVehicles[nextIdx]?.images?.[0];
+    if (!raw) return;
+
+    const scheduleIdle =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? (cb: () => void) => (window as any).requestIdleCallback(cb, { timeout: 2000 })
+        : (cb: () => void) => window.setTimeout(cb, 900);
+
+    const cancelIdle =
+      typeof window !== 'undefined' && 'cancelIdleCallback' in window
+        ? (id: number) => (window as any).cancelIdleCallback(id)
+        : (id: number) => window.clearTimeout(id);
+
+    const idleId = scheduleIdle(() => {
+      const url = getOptimizedImageUrl(raw, 'card');
+      if (url && !preloadedUrlsRef.current.has(url)) {
+        preloadedUrlsRef.current.add(url);
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
       }
     });
-  }, [slideshowVehicles]);
+
+    return () => cancelIdle(idleId);
+  }, [activeVehicleIndex, count, slideshowVehicles]);
 
   const handleNext = useCallback(() => {
     if (count <= 1 || isTransitioningRef.current) return;
@@ -317,6 +328,10 @@ export default function Hero({
         <img
           src={HERO_SHOWROOM_BACKDROP}
           alt=""
+          width={1280}
+          height={714}
+          decoding="async"
+          fetchPriority="low"
           referrerPolicy="no-referrer"
           className="w-full h-[115%] object-cover object-center opacity-35 will-change-transform"
           style={{
@@ -457,8 +472,8 @@ export default function Hero({
                               height={440}
                               alt={`${veh.year} ${veh.make} ${veh.model}`}
                               referrerPolicy="no-referrer"
-                              loading="eager"
-                              fetchPriority={idx === trackIndex ? 'high' : 'auto'}
+                              loading={idx === trackIndex || idx === trackIndex + 1 ? 'eager' : 'lazy'}
+                              fetchPriority={idx === trackIndex ? 'high' : 'low'}
                               decoding="async"
                               onError={() =>
                                 setFailedImages((prev) => ({ ...prev, [slideKey]: true }))

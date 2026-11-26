@@ -8,7 +8,6 @@ import FeaturedVehicles from './components/FeaturedVehicles';
 import WhyChooseUs from './components/WhyChooseUs';
 import HowItWorks from './components/HowItWorks';
 import AboutFounder from './components/AboutFounder';
-import VehicleDetailsModal from './components/VehicleDetailsModal';
 import Footer from './components/Footer';
 import { Vehicle, NavigationTab, BusinessSettings } from './types';
 import {
@@ -29,10 +28,12 @@ import {
   getInitialServerRouteData,
   getSlideshowVehicles,
   getOptimizedImageUrl,
+  getVehicleCardSrcSet,
 } from './utils';
 import { generateVehicleMetadata, generateTabMetadata, updateClientMeta } from './metaHelper';
 
-// Code-split heavy and secondary page views to keep initial bundle ultra-lightweight
+// Code-split heavy modals and secondary views to keep initial homepage JS ultra-lightweight
+const VehicleDetailsModal = lazy(() => import('./components/VehicleDetailsModal'));
 const BrowseCarsPage = lazy(() => import('./components/BrowseCarsPage'));
 const FindMyCarPage = lazy(() => import('./components/FindMyCarPage'));
 const SourceCarPage = lazy(() => import('./components/SourceCarPage'));
@@ -63,10 +64,15 @@ const initialMatchedVehicle =
 if (initialMatchedVehicle?.images?.[0]) {
   preloadPrimaryImage(initialMatchedVehicle.images[0]);
 } else {
-  // Preload primary hero slideshow vehicle image eagerly
+  // Preload primary hero slideshow vehicle image eagerly with responsive srcSet
   const initialHeroVehicles = getSlideshowVehicles(initialVehiclesList);
-  if (initialHeroVehicles[0]?.images?.[0]) {
-    preloadPrimaryImage(getOptimizedImageUrl(initialHeroVehicles[0].images[0], 'card'));
+  const rawHeroImg = initialHeroVehicles[0]?.images?.[0];
+  if (rawHeroImg) {
+    preloadPrimaryImage(
+      getOptimizedImageUrl(rawHeroImg, 'card'),
+      getVehicleCardSrcSet(rawHeroImg),
+      '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px'
+    );
   }
 }
 
@@ -265,11 +271,6 @@ export default function App() {
 
   // 1. Initial Page Load and Data Prioritization
   useEffect(() => {
-    // Dismiss initial branded loader smoothly once App component tree is mounted
-    if (typeof window !== 'undefined' && (window as any).__dismissInitialLoader) {
-      (window as any).__dismissInitialLoader();
-    }
-
     const route = getInitialVehicleRoute();
     const searchParams = new URLSearchParams(window.location.search);
     const tabParam = searchParams.get('tab') as NavigationTab | null;
@@ -350,15 +351,41 @@ export default function App() {
       }
     }
 
-    // Priority 2: Deferred background sync of the remaining catalogue and business settings
-    fetchVehicles().then((loadedVehicles) => {
-      if (loadedVehicles && loadedVehicles.length > 0) {
-        setVehicles(loadedVehicles);
+    let isDisposed = false;
+    let unsubscribeVehicles: (() => void) | null = null;
+    let unsubscribeSettings: (() => void) | null = null;
+    let syncTimeoutId: number | null = null;
 
+    const startBackgroundSync = () => {
+      if (isDisposed) return;
+
+      fetchVehicles().then((loadedVehicles) => {
+        if (!isDisposed && loadedVehicles && loadedVehicles.length > 0) {
+          setVehicles(loadedVehicles);
+
+          if (route.slugOrId) {
+            const matched = findVehicleBySlugOrId(loadedVehicles, route.slugOrId);
+            if (matched) {
+              preloadPrimaryImage(matched.images?.[0]);
+              if (route.qualify) {
+                setInspectionVehicle((prev) => prev || matched);
+              } else {
+                setSelectedVehicle((prev) => prev || matched);
+                setIsDetailsOpen(true);
+                setIsVehicleLoading(false);
+                setVehicleFetchError(false);
+              }
+            }
+          }
+        }
+      });
+
+      unsubscribeVehicles = subscribeToVehicles((updatedVehicles) => {
+        if (isDisposed) return;
+        setVehicles(updatedVehicles);
         if (route.slugOrId) {
-          const matched = findVehicleBySlugOrId(loadedVehicles, route.slugOrId);
+          const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
           if (matched) {
-            preloadPrimaryImage(matched.images?.[0]);
             if (route.qualify) {
               setInspectionVehicle((prev) => prev || matched);
             } else {
@@ -369,43 +396,35 @@ export default function App() {
             }
           }
         }
-      }
-    });
+      });
 
-    // Real-time Firestore sync for vehicles
-    const unsubscribeVehicles = subscribeToVehicles((updatedVehicles) => {
-      setVehicles(updatedVehicles);
-      if (route.slugOrId) {
-        const matched = findVehicleBySlugOrId(updatedVehicles, route.slugOrId);
-        if (matched) {
-          if (route.qualify) {
-            setInspectionVehicle((prev) => prev || matched);
-          } else {
-            setSelectedVehicle((prev) => prev || matched);
-            setIsDetailsOpen(true);
-            setIsVehicleLoading(false);
-            setVehicleFetchError(false);
-          }
+      fetchBusinessSettings().then((loadedSettings) => {
+        if (!isDisposed && loadedSettings) {
+          setBusinessSettings(loadedSettings);
         }
-      }
-    });
+      });
 
-    // Real-time Firestore sync for business settings
-    fetchBusinessSettings().then((loadedSettings) => {
-      if (loadedSettings) {
-        setBusinessSettings(loadedSettings);
-      }
-    });
+      unsubscribeSettings = subscribeToBusinessSettings((updatedSettings) => {
+        if (!isDisposed && updatedSettings) {
+          setBusinessSettings(updatedSettings);
+        }
+      });
+    };
 
-    const unsubscribeSettings = subscribeToBusinessSettings((updatedSettings) => {
-      if (updatedSettings) {
-        setBusinessSettings(updatedSettings);
-      }
-    });
+    // Defer heavy Firestore SDK download/hydration until after first paint on homepage
+    if (route.slugOrId || initialTab === 'admin') {
+      startBackgroundSync();
+    } else {
+      requestAnimationFrame(() => {
+        syncTimeoutId = window.setTimeout(startBackgroundSync, 50);
+      });
+    }
 
     return () => {
-      unsubscribeVehicles();
-      unsubscribeSettings();
+      isDisposed = true;
+      if (syncTimeoutId !== null) window.clearTimeout(syncTimeoutId);
+      unsubscribeVehicles?.();
+      unsubscribeSettings?.();
     };
   }, []);
 
@@ -603,46 +622,50 @@ export default function App() {
         businessSettings={businessSettings}
       />
 
-      {/* Vehicle Details Modal - Primary priority, rendered instantly */}
-      <VehicleDetailsModal
-        vehicle={selectedVehicle}
-        isOpen={isDetailsOpen}
-        isLoading={isVehicleLoading}
-        hasError={vehicleFetchError}
-        onRetry={() => {
-          const currentRoute = getInitialVehicleRoute();
-          const targetSlug = currentRoute.slugOrId || initialRoute.slugOrId;
-          if (!targetSlug) return;
-          setIsVehicleLoading(true);
-          setVehicleFetchError(false);
-          fetchSingleVehicle(targetSlug)
-            .then((matched) => {
-              if (matched) {
-                setSelectedVehicle(matched);
-                const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-                const meta = generateVehicleMetadata(matched, origin, `/vehicles/${encodeURIComponent(targetSlug)}`);
-                updateClientMeta(meta);
-              }
+      {/* Vehicle Details Modal - Lazy-loaded unless needed or viewing vehicle route */}
+      {(isDetailsOpen || isVehicleLoading) && (
+        <Suspense fallback={null}>
+          <VehicleDetailsModal
+            vehicle={selectedVehicle}
+            isOpen={isDetailsOpen}
+            isLoading={isVehicleLoading}
+            hasError={vehicleFetchError}
+            onRetry={() => {
+              const currentRoute = getInitialVehicleRoute();
+              const targetSlug = currentRoute.slugOrId || initialRoute.slugOrId;
+              if (!targetSlug) return;
+              setIsVehicleLoading(true);
               setVehicleFetchError(false);
-              setIsVehicleLoading(false);
-            })
-            .catch(() => {
-              setVehicleFetchError(true);
-              setIsVehicleLoading(false);
-            });
-        }}
-        onClose={handleCloseDetails}
-        onOpenInspection={handleOpenInspection}
-        onOpenQualifier={handleOpenInspection}
-        businessSettings={businessSettings}
-        onOpenConsultantModal={(car, channel) => {
-          if (channel === 'call') {
-            window.location.href = getBusinessPhoneCallUrl(businessSettings);
-          } else {
-            handleOpenConsultant(car);
-          }
-        }}
-      />
+              fetchSingleVehicle(targetSlug)
+                .then((matched) => {
+                  if (matched) {
+                    setSelectedVehicle(matched);
+                    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+                    const meta = generateVehicleMetadata(matched, origin, `/vehicles/${encodeURIComponent(targetSlug)}`);
+                    updateClientMeta(meta);
+                  }
+                  setVehicleFetchError(false);
+                  setIsVehicleLoading(false);
+                })
+                .catch(() => {
+                  setVehicleFetchError(true);
+                  setIsVehicleLoading(false);
+                });
+            }}
+            onClose={handleCloseDetails}
+            onOpenInspection={handleOpenInspection}
+            onOpenQualifier={handleOpenInspection}
+            businessSettings={businessSettings}
+            onOpenConsultantModal={(car, channel) => {
+              if (channel === 'call') {
+                window.location.href = getBusinessPhoneCallUrl(businessSettings);
+              } else {
+                handleOpenConsultant(car);
+              }
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* 1-on-1 Consultant Modal */}
       {isConsultantOpen && (
