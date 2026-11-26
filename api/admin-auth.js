@@ -877,6 +877,7 @@ export default async function handler(req, res) {
           JSON.stringify({
             success: false,
             code: updatedRate.allowed ? 'INVALID_CREDENTIALS' : 'RATE_LIMITED',
+            envManaged: Boolean(cfg.envManaged),
             error: updatedRate.allowed
               ? 'The email or password you entered is incorrect. Please try again.'
               : `Too many failed attempts. Please wait ${updatedRate.waitSeconds} seconds.`,

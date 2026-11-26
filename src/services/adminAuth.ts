@@ -549,10 +549,14 @@ export async function signInAdminWithEmailPassword(
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success || !data.token || !data.admin) {
+      const envHint =
+        data.envManaged && data.code === 'INVALID_CREDENTIALS'
+          ? ' This environment currently has ADMIN_EMAIL / ADMIN_PASSWORD set in server Secrets—verify or update those Secrets to match your credentials.'
+          : '';
       return {
         success: false,
         code: data.code || 'INVALID_CREDENTIALS',
-        error: data.error || AUTH_MESSAGES.INVALID_PASSWORD,
+        error: `${data.error || AUTH_MESSAGES.INVALID_PASSWORD}${envHint}`,
       };
     }
 
