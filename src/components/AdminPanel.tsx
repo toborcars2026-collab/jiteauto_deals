@@ -163,9 +163,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     const bootstrapPromise = getAdminAuthStatus().then((status) => {
       if (!mounted) return status;
       setBootstrapStatus(status);
-      if (!status.bootstrapped) {
-        setAuthView('setup');
-      }
+      setAuthView((prev) => {
+        if (!status.bootstrapped) return 'setup';
+        return prev === 'setup' ? 'login' : prev;
+      });
       return status;
     });
 
@@ -285,13 +286,37 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     const unsubVehicles = subscribeToVehicles(setVehicles);
     const unsubSettings = subscribeToBusinessSettings(setBusinessSettings);
 
+    // In Email/Password mode without a Firebase client user, poll non-subscribed collections gently
+    const pollInterval = !auth.currentUser
+      ? window.setInterval(() => {
+          fetchLeads().then(setLeads).catch(() => {});
+          fetchInquiries().then(setInquiries).catch(() => {});
+          fetchBusinessSettings().then(setBusinessSettings).catch(() => {});
+        }, 45000)
+      : null;
+
     return () => {
       unsubLeads();
       unsubInquiries();
       unsubVehicles();
       unsubSettings();
+      if (pollInterval) window.clearInterval(pollInterval);
     };
   }, [isAuthenticated, setVehicles]);
+
+  // Refresh leads, inquiries, or audit logs when opening those tabs
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (activeTab === 'overview' || activeTab === 'leads') {
+      fetchLeads().then(setLeads).catch(() => {});
+    }
+    if (activeTab === 'overview' || activeTab === 'inquiries') {
+      fetchInquiries().then(setInquiries).catch(() => {});
+    }
+    if (activeTab === 'overview' || activeTab === 'audit') {
+      fetchAdminAuditLogs(8).then(setRecentAuditLogs).catch(() => {});
+    }
+  }, [isAuthenticated, activeTab]);
 
   // 3. Inactivity Auto-Timeout Monitor
   const handleSignOut = useCallback(
@@ -788,26 +813,17 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   First-Time Administrator Setup
                 </h1>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Configure your permanent administrator email and password directly on the server (independent of Firestore).
+                  Configure your permanent administrator email and password synchronized across your live site and workspace.
                 </p>
               </div>
 
-              {bootstrapStatus.envManaged && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-200 text-xs flex items-start gap-2">
-                  <ShieldAlert size={16} className="shrink-0 text-amber-400 mt-0.5" />
-                  <span className="leading-relaxed">
-                    Server environment variables (ADMIN_EMAIL / ADMIN_PASSWORD) are currently active in this runtime. Update or clear them in your hosting environment settings if you want to claim credentials through this form.
-                  </span>
-                </div>
-              )}
-
-              {!bootstrapStatus.envManaged && bootstrapStatus.bootstrapped && (
+              {bootstrapStatus.bootstrapped && (
                 <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-400/35 text-blue-100 text-xs flex items-start gap-2">
                   <ShieldCheck size={16} className="shrink-0 text-amber-400 mt-0.5" />
                   <span className="leading-relaxed">
                     {bootstrapStatus.setupSecretRequired
                       ? 'Administrator credentials are already configured. Enter your Setup Authorization Secret below to reset them, or return to Sign In.'
-                      : 'Administrator credentials are already configured on this server. Sign in and visit Security & Account Settings to change your email or password.'}
+                      : 'Administrator credentials are already configured. Sign in and visit Security & Account Settings to change your email or password.'}
                   </span>
                 </div>
               )}
@@ -1504,7 +1520,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                     adminProfile={adminProfile}
                     inactivityTimeoutMinutes={timeoutMinutes}
                     onTimeoutChange={setTimeoutMinutes}
-                    onProfileUpdated={setAdminProfile}
+                    onProfileUpdated={(nextProfile) => {
+                      setAdminProfile(nextProfile);
+                      if (nextProfile.inactivityTimeoutMinutes) {
+                        setTimeoutMinutes(nextProfile.inactivityTimeoutMinutes);
+                      }
+                    }}
                     onSignOut={() => handleSignOut('manual')}
                   />
                 )}

@@ -41,6 +41,7 @@ export interface AdminBootstrapStatus {
   bootstrapped: boolean;
   configured?: boolean;
   envManaged?: boolean;
+  envOverridden?: boolean;
   setupSecretRequired: boolean;
   firebaseAuthConfigured: boolean;
 }
@@ -48,6 +49,9 @@ export interface AdminBootstrapStatus {
 export interface ServerAdminSession {
   token: string;
   expiresAt: number;
+  firebaseIdToken?: string;
+  firebaseRefreshToken?: string;
+  firebaseExpiresAt?: number;
   profile: AdminProfile;
 }
 
@@ -94,22 +98,85 @@ const LAST_ACTIVITY_KEY = 'jite_admin_last_activity_ms';
 const TIMEOUT_MINUTES_KEY = 'jite_admin_timeout_min';
 const CONFIG_ALERT_SESSION_KEY = 'jite_admin_auth_config_alert';
 
-// In-memory Bearer session for standalone server Email/Password auth (never stored in localStorage/sessionStorage)
+// In-memory Bearer session for Email/Password auth (never stored in localStorage/sessionStorage)
 let activeServerSession: ServerAdminSession | null = null;
+let inflightRefreshPromise: Promise<string | null> | null = null;
 
 export function getCurrentServerAdminSession(): ServerAdminSession | null {
   if (!activeServerSession) return null;
-  if (Date.now() >= activeServerSession.expiresAt) {
+  const maxExp = Math.max(
+    activeServerSession.expiresAt || 0,
+    activeServerSession.firebaseExpiresAt || 0
+  );
+  if (Date.now() >= maxExp && !activeServerSession.firebaseRefreshToken) {
     activeServerSession = null;
     return null;
   }
   return activeServerSession;
 }
 
+async function refreshServerFirebaseTokenIfNeeded(): Promise<string | null> {
+  const srv = activeServerSession;
+  if (!srv) return null;
+
+  const bufferMs = 4 * 60 * 1000;
+  if (
+    srv.firebaseIdToken &&
+    (!srv.firebaseExpiresAt || Date.now() < srv.firebaseExpiresAt - bufferMs)
+  ) {
+    return srv.firebaseIdToken;
+  }
+
+  if (!srv.firebaseRefreshToken) {
+    return srv.firebaseIdToken || srv.token || null;
+  }
+
+  if (inflightRefreshPromise) {
+    return inflightRefreshPromise;
+  }
+
+  inflightRefreshPromise = (async () => {
+    try {
+      const res = await fetch('/api/admin-auth?action=refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: srv.firebaseRefreshToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.success && data?.firebaseIdToken && activeServerSession) {
+        activeServerSession = {
+          ...activeServerSession,
+          token: data.token || activeServerSession.token,
+          expiresAt: Number(data.expiresAt) || activeServerSession.expiresAt,
+          firebaseIdToken: String(data.firebaseIdToken),
+          firebaseRefreshToken: String(
+            data.firebaseRefreshToken || activeServerSession.firebaseRefreshToken
+          ),
+          firebaseExpiresAt: Number(data.firebaseExpiresAt) || Date.now() + 55 * 60 * 1000,
+        };
+        return activeServerSession.firebaseIdToken || null;
+      }
+    } catch {
+      // Non-blocking fallback
+    } finally {
+      inflightRefreshPromise = null;
+    }
+    return activeServerSession?.firebaseIdToken || activeServerSession?.token || null;
+  })();
+
+  return inflightRefreshPromise;
+}
+
 export async function getActiveAdminBearerToken(): Promise<string | null> {
   const srv = getCurrentServerAdminSession();
-  if (srv?.token) {
-    return srv.token;
+  if (srv) {
+    if (srv.firebaseIdToken || srv.firebaseRefreshToken) {
+      const refreshed = await refreshServerFirebaseTokenIfNeeded();
+      if (refreshed) return refreshed;
+    }
+    if (srv.token) {
+      return srv.token;
+    }
   }
   if (auth.currentUser) {
     try {
@@ -326,6 +393,7 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
         bootstrapped: configured,
         configured,
         envManaged: Boolean(data.envManaged),
+        envOverridden: Boolean(data.envOverridden),
         setupSecretRequired: Boolean(data.setupSecretRequired),
         firebaseAuthConfigured: Boolean(data.firebaseAuthConfigured ?? true),
       };
@@ -338,6 +406,7 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
     bootstrapped: false,
     configured: false,
     envManaged: false,
+    envOverridden: false,
     setupSecretRequired: false,
     firebaseAuthConfigured: true,
   };
@@ -549,14 +618,10 @@ export async function signInAdminWithEmailPassword(
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success || !data.token || !data.admin) {
-      const envHint =
-        data.envManaged && data.code === 'INVALID_CREDENTIALS'
-          ? ' This environment currently has ADMIN_EMAIL / ADMIN_PASSWORD set in server Secrets—verify or update those Secrets to match your credentials.'
-          : '';
       return {
         success: false,
         code: data.code || 'INVALID_CREDENTIALS',
-        error: `${data.error || AUTH_MESSAGES.INVALID_PASSWORD}${envHint}`,
+        error: data.error || AUTH_MESSAGES.INVALID_PASSWORD,
       };
     }
 
@@ -565,18 +630,24 @@ export async function signInAdminWithEmailPassword(
       uid: String(data.admin.uid || 'server_admin_owner'),
       email: String(data.admin.email || trimmedEmail),
       displayName: String(data.admin.displayName || 'Primary Administrator'),
-      role: 'owner',
+      role: data.admin.role === 'admin' ? 'admin' : 'owner',
       authMethods: ['password'],
       active: true,
       inactivityTimeoutMinutes: Number(data.admin.inactivityTimeoutMinutes) || 30,
-      lastLoginAt: nowIso,
+      lastLoginAt: data.admin.lastLoginAt || nowIso,
+      createdAt: data.admin.createdAt,
+      updatedAt: data.admin.updatedAt,
       authMode: 'server-credentials',
+      firebaseSynced: Boolean(data.admin.firebaseSynced),
       envManaged: Boolean(data.admin.envManaged),
     };
 
     const session: ServerAdminSession = {
       token: String(data.token),
       expiresAt: Number(data.expiresAt) || Date.now() + 8 * 60 * 60 * 1000,
+      firebaseIdToken: data.firebaseIdToken ? String(data.firebaseIdToken) : undefined,
+      firebaseRefreshToken: data.firebaseRefreshToken ? String(data.firebaseRefreshToken) : undefined,
+      firebaseExpiresAt: data.firebaseExpiresAt ? Number(data.firebaseExpiresAt) : undefined,
       profile,
     };
 
@@ -673,7 +744,28 @@ export async function sendAdminPasswordReset(email: string): Promise<{
     };
   }
 
-  // If currently signed in with Google/Firebase Auth, Firebase password reset works
+  try {
+    const res = await fetch('/api/admin-auth?action=password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: trimmed }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        message:
+          data.message ||
+          `A password reset link has been sent to ${trimmed}. Check your inbox to reset your password.`,
+      };
+    }
+    if (data?.error) {
+      return { success: false, message: data.error };
+    }
+  } catch {
+    // Fall through to Firebase Web SDK attempt
+  }
+
   if (auth.currentUser) {
     try {
       await sendPasswordResetEmail(auth, trimmed);
@@ -681,15 +773,17 @@ export async function sendAdminPasswordReset(email: string): Promise<{
         success: true,
         message: 'A password reset link has been sent to your email address.',
       };
-    } catch {
-      // Fall through to server credential message
+    } catch (err: any) {
+      return {
+        success: false,
+        message: mapFirebaseAuthError(err, 'reset').message,
+      };
     }
   }
 
   return {
-    success: true,
-    message:
-      'Administrator email and password login is managed directly on the server (independent of Firestore). To change credentials while signed in, open Security & Account Settings, or update ADMIN_EMAIL / ADMIN_PASSWORD in your hosting environment settings.',
+    success: false,
+    message: AUTH_MESSAGES.NETWORK_ISSUE,
   };
 }
 
@@ -980,15 +1074,17 @@ export async function changeAdminPassword(params: {
   const srv = getCurrentServerAdminSession();
   if (srv) {
     try {
+      const bearer = await getActiveAdminBearerToken();
       const res = await fetch('/api/admin-auth?action=update-credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${srv.token}`,
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           currentPassword: params.currentPassword || '',
           newPassword: params.newPassword,
+          firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -998,19 +1094,25 @@ export async function changeAdminPassword(params: {
 
       const updatedProfile: AdminProfile = {
         ...srv.profile,
+        uid: data.admin?.uid || srv.profile.uid,
         email: data.admin?.email || srv.profile.email,
         displayName: data.admin?.displayName || srv.profile.displayName,
-        updatedAt: new Date().toISOString(),
+        firebaseSynced: Boolean(data.admin?.firebaseSynced ?? srv.profile.firebaseSynced),
+        envManaged: false,
+        updatedAt: data.admin?.updatedAt || new Date().toISOString(),
       };
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
+        firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
+        firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
         profile: updatedProfile,
       };
       return {
         success: true,
         profile: updatedProfile,
-        message: 'Administrator password updated successfully.',
+        message: 'Administrator password updated and synced across your live site and workspace.',
       };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update password.' };
@@ -1035,13 +1137,27 @@ export async function changeAdminPassword(params: {
   try {
     await reauthenticateCurrentAdmin(params.currentPassword);
     await updatePassword(user, params.newPassword);
+    await setDoc(
+      doc(db, 'settings', 'admin_bootstrap'),
+      {
+        setupCompleted: true,
+        primaryAdminUid: user.uid,
+        dashboardOverride: true,
+        passwordUpdatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    ).catch(() => {});
     await recordAdminAuditLog({
       action: 'PASSWORD_CHANGED',
       status: 'success',
-      details: 'Administrator password updated.',
+      details: 'Administrator password updated and synced globally.',
       authMethod: 'password',
     });
-    return { success: true, message: 'Administrator password updated successfully.' };
+    return {
+      success: true,
+      message: 'Administrator password updated and synced across your live site and workspace.',
+    };
   } catch (err: any) {
     return {
       success: false,
@@ -1051,7 +1167,7 @@ export async function changeAdminPassword(params: {
 }
 
 /**
- * Updates administrator email cleanly on server store (standalone mode) or Firebase Auth (Google mode).
+ * Updates administrator email cleanly on Firebase Auth + Cloud Firestore.
  */
 export async function changeAdminEmail(params: {
   currentPassword?: string;
@@ -1068,15 +1184,17 @@ export async function changeAdminEmail(params: {
       return { success: false, error: 'New email address must differ from the current email.' };
     }
     try {
+      const bearer = await getActiveAdminBearerToken();
       const res = await fetch('/api/admin-auth?action=update-credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${srv.token}`,
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           currentPassword: params.currentPassword || '',
           newEmail: trimmed,
+          firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1086,13 +1204,19 @@ export async function changeAdminEmail(params: {
 
       const updatedProfile: AdminProfile = {
         ...srv.profile,
+        uid: data.admin?.uid || srv.profile.uid,
         email: data.admin?.email || trimmed,
         displayName: data.admin?.displayName || srv.profile.displayName,
-        updatedAt: new Date().toISOString(),
+        firebaseSynced: Boolean(data.admin?.firebaseSynced ?? srv.profile.firebaseSynced),
+        envManaged: false,
+        updatedAt: data.admin?.updatedAt || new Date().toISOString(),
       };
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
+        firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
+        firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
         profile: updatedProfile,
       };
       return {
@@ -1140,15 +1264,17 @@ export async function updateAdminProfileSettings(params: {
   const srv = getCurrentServerAdminSession();
   if (srv) {
     try {
+      const bearer = await getActiveAdminBearerToken();
       const res = await fetch('/api/admin-auth?action=update-credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${srv.token}`,
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           fullName: cleanName,
           inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
+          firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1158,13 +1284,17 @@ export async function updateAdminProfileSettings(params: {
 
       const updatedProfile: AdminProfile = {
         ...srv.profile,
+        uid: data.admin?.uid || srv.profile.uid,
         displayName: cleanName,
         inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
-        updatedAt: new Date().toISOString(),
+        updatedAt: data.admin?.updatedAt || new Date().toISOString(),
       };
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
+        firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
+        firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
         profile: updatedProfile,
       };
       touchAdminActivity(params.inactivityTimeoutMinutes);
@@ -1193,7 +1323,24 @@ export async function updateAdminProfileSettings(params: {
 
 export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
   if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
     const srv = getCurrentServerAdminSession();
+    if (token) {
+      try {
+        const res = await fetch('/api/admin-auth?action=access-registry', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.admins) && data.admins.length > 0) {
+            return data.admins;
+          }
+        }
+      } catch {
+        // Fallback below
+      }
+    }
     return srv ? [srv.profile] : [];
   }
 
@@ -1223,7 +1370,26 @@ export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
 }
 
 export async function listAdminInvites(): Promise<AdminInvite[]> {
-  if (!auth.currentUser) return [];
+  if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
+    if (token) {
+      try {
+        const res = await fetch('/api/admin-auth?action=access-registry', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.invites)) {
+            return data.invites;
+          }
+        }
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
 
   try {
     const snap = await getDocs(collection(db, 'admin_invites'));
@@ -1252,13 +1418,6 @@ export async function registerAuthorizedAdmin(input: {
   displayName: string;
   role: 'owner' | 'admin';
 }): Promise<{ success: boolean; error?: string; mode?: 'uid' | 'invite' }> {
-  if (!auth.currentUser) {
-    return {
-      success: false,
-      error: 'Adding Firebase Google co-admins requires signing in with Google.',
-    };
-  }
-
   const cleanUid = (input.uid || '').trim();
   const cleanEmail = input.email.trim();
   const cleanName = input.displayName.trim();
@@ -1268,6 +1427,35 @@ export async function registerAuthorizedAdmin(input: {
   }
   if (!cleanName || cleanName.length < 2) {
     return { success: false, error: 'Administrator full name is required.' };
+  }
+
+  if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
+    if (!token) {
+      return { success: false, error: 'Active administrator session required.' };
+    }
+    try {
+      const res = await fetch('/api/admin-auth?action=authorize-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid: cleanUid || undefined,
+          email: cleanEmail,
+          displayName: cleanName,
+          role: input.role,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Unable to authorize administrator.' };
+      }
+      return { success: true, mode: data.mode };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Network error authorizing administrator.' };
+    }
   }
 
   try {
@@ -1315,7 +1503,27 @@ export async function registerAuthorizedAdmin(input: {
 }
 
 export async function removeAdminInvite(email: string): Promise<{ success: boolean; error?: string }> {
-  if (!auth.currentUser) return { success: false, error: 'Google Firebase session required.' };
+  if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
+    if (!token) return { success: false, error: 'Active administrator session required.' };
+    try {
+      const res = await fetch('/api/admin-auth?action=remove-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return res.ok && data.success
+        ? { success: true }
+        : { success: false, error: data.error || 'Failed to remove invitation.' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to remove invitation.' };
+    }
+  }
+
   try {
     await deleteDoc(doc(db, 'admin_invites', email.trim().toLowerCase()));
     return { success: true };
@@ -1329,10 +1537,31 @@ export async function setAuthorizedAdminActive(
   active: boolean,
   targetRole?: 'owner' | 'admin'
 ): Promise<{ success: boolean; error?: string }> {
-  const currentUid = auth.currentUser?.uid;
-  if (!currentUid) {
-    return { success: false, error: 'Google Firebase session required.' };
+  if (!auth.currentUser) {
+    const srv = getCurrentServerAdminSession();
+    const token = await getActiveAdminBearerToken();
+    if (!token || !srv) {
+      return { success: false, error: 'Active administrator session required.' };
+    }
+    try {
+      const res = await fetch('/api/admin-auth?action=toggle-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid: targetUid, active, role: targetRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return res.ok && data.success
+        ? { success: true }
+        : { success: false, error: data.error || 'Failed to update administrator status.' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update administrator status.' };
+    }
   }
+
+  const currentUid = auth.currentUser.uid;
   if (targetUid === currentUid && !active) {
     return { success: false, error: 'You cannot revoke your own currently active administrator account.' };
   }
@@ -1361,13 +1590,14 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
 
   const databaseConnected = await testFirestoreConnection();
   const databaseSummary = databaseConnected
-    ? 'Cloud Firestore server reachable for vehicle catalog.'
+    ? 'Cloud Firestore reachable and synchronized between Vercel and Workspace.'
     : 'Unable to reach Cloud Firestore server cleanly.';
 
   const token = await getActiveAdminBearerToken();
 
   let authorizationOk = false;
   let authorizationSummary: string = AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT;
+  let firebaseSynced = Boolean(user || srv?.firebaseIdToken);
 
   if (token) {
     try {
@@ -1379,15 +1609,10 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
       if (diagRes.ok) {
         const diagData = await diagRes.json();
         authorizationOk = Boolean(diagData.success);
-        authorizationSummary =
-          diagData.authMode === 'server-credentials'
-            ? 'Standalone Server Email & Password verified (HMAC Bearer session, zero Firestore dependency).'
-            : 'Google Sign-In & Firestore permissions verified.';
-        if (diagData.authMode === 'server-credentials' && !diagData.envManaged) {
-          warnings.push(
-            'Tip: For stateless Vercel deployments, you can optionally mirror ADMIN_EMAIL and ADMIN_PASSWORD in your Vercel Environment Variables.'
-          );
-        }
+        firebaseSynced = Boolean(diagData.firebaseSynced ?? firebaseSynced);
+        authorizationSummary = firebaseSynced
+          ? 'Dashboard credentials & Cloud Firestore admin permissions verified globally.'
+          : 'Server administrator session verified locally.';
       } else {
         authorizationSummary = `Backend verification returned HTTP ${diagRes.status}.`;
       }
@@ -1402,7 +1627,9 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
 
   const firebaseAuthOk = srv ? true : Boolean(user);
   const firebaseAuthSummary = srv
-    ? 'Authenticated via Standalone Server Email & Password (decoupled from Firestore).'
+    ? firebaseSynced
+      ? 'Email & Password authenticated and synced with Firebase Cloud.'
+      : 'Authenticated via local server credentials.'
     : user
     ? 'Authenticated via Google Sign-In.'
     : 'No active administrator session.';
@@ -1421,16 +1648,14 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
 }
 
 export async function logoutAdminSession(reason: 'manual' | 'timeout' = 'manual'): Promise<void> {
-  if (auth.currentUser) {
-    await recordAdminAuditLog({
-      action: reason === 'timeout' ? 'SESSION_TIMEOUT' : 'LOGOUT',
-      status: reason === 'timeout' ? 'warning' : 'success',
-      details:
-        reason === 'timeout'
-          ? 'Administrator session ended automatically due to inactivity timeout.'
-          : 'Administrator signed out explicitly.',
-    });
-  }
+  await recordAdminAuditLog({
+    action: reason === 'timeout' ? 'SESSION_TIMEOUT' : 'LOGOUT',
+    status: reason === 'timeout' ? 'warning' : 'success',
+    details:
+      reason === 'timeout'
+        ? 'Administrator session ended automatically due to inactivity timeout.'
+        : 'Administrator signed out explicitly.',
+  }).catch(() => {});
 
   clearAdminActivityState();
 

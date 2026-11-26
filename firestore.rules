@@ -37,7 +37,10 @@ service cloud.firestore {
         data.year <= 2035 &&
         data.price is number &&
         data.price >= 0 &&
-        (!('images' in data) || (data.images is list && data.images.size() <= 40));
+        (!('dutyStatus' in data) || (data.dutyStatus is string && data.dutyStatus.size() <= 100)) &&
+        (!('keyFeatures' in data) || (data.keyFeatures is list && data.keyFeatures.size() <= 30 && (data.keyFeatures.size() == 0 || data.keyFeatures[0] is string))) &&
+        (!('images' in data) || (data.images is list && data.images.size() <= 40)) &&
+        (!('imageMetadata' in data) || (data.imageMetadata is list && data.imageMetadata.size() <= 40));
     }
 
     function isValidLeadCreate(data) {

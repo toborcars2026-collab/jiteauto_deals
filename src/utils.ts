@@ -1,4 +1,4 @@
-import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
+import { Vehicle, VehicleImageRecord, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
 import { INITIAL_VEHICLES } from './data';
 import {
   FALLBACK_VEHICLE_IMAGE,
@@ -413,10 +413,15 @@ export function normalizeVehicleData(vehicle: Vehicle): Vehicle {
     color: decodeUnicodeEscapes(vehicle.color || ''),
     condition: decodeUnicodeEscapes(vehicle.condition || 'Foreign Used') as any,
     location: decodeUnicodeEscapes(vehicle.location || 'Lagos'),
+    dutyStatus: vehicle.dutyStatus ? decodeUnicodeEscapes(vehicle.dutyStatus) : undefined,
+    keyFeatures: Array.isArray(vehicle.keyFeatures)
+      ? vehicle.keyFeatures.filter((f): f is string => typeof f === 'string' && f.trim().length > 0).map((f) => decodeUnicodeEscapes(f.trim()))
+      : undefined,
     description: decodeUnicodeEscapes(vehicle.description || ''),
     status: vehicle.status || 'Active',
     isFeatured: vehicle.isFeatured ?? true,
     images: Array.isArray(vehicle.images) ? vehicle.images.filter(Boolean) : [],
+    imageMetadata: Array.isArray(vehicle.imageMetadata) ? vehicle.imageMetadata : undefined,
     createdAt: vehicle.createdAt || new Date().toISOString(),
     updatedAt: vehicle.updatedAt || new Date().toISOString(),
   };
@@ -775,6 +780,15 @@ export function getVehicleCardSrcSet(url: string | undefined | null): string | u
   return undefined;
 }
 
+export function getVehicleDetailSrcSet(url: string | undefined | null): string | undefined {
+  const base = getImageUrl(url);
+  if (!base) return undefined;
+  if (base.includes('res.cloudinary.com') && base.includes('/image/upload/')) {
+    return `${buildCloudinaryUrl(base, 800, 'auto:good')} 800w, ${buildCloudinaryUrl(base, 1400, 'auto:good')} 1400w, ${buildCloudinaryUrl(base, 2000, 'auto:best')} 2000w`;
+  }
+  return undefined;
+}
+
 // ============================================================================
 // CLOUD FIRESTORE INTEGRATION & REAL-TIME SYNC
 // ============================================================================
@@ -837,19 +851,12 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
  */
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
-    const serverPromise = fetch('/api/vehicles', { cache: 'no-store' })
-      .then((r) => (r.ok ? (r.json() as Promise<Vehicle[]>) : []))
-      .catch(() => [] as Vehicle[]);
-
     const [{ collection, getDocs }, { db }] = await Promise.all([
       loadFirestore(),
       loadFirebaseCore(),
     ]);
     const vehiclesCol = collection(db, 'vehicles');
-    const [snapshot, serverVehicles] = await Promise.all([
-      getDocs(vehiclesCol),
-      serverPromise,
-    ]);
+    const snapshot = await getDocs(vehiclesCol);
 
     const byId = new Map<string, Vehicle>();
     snapshot.forEach((docSnap) => {
@@ -860,23 +867,6 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       });
       byId.set(normalized.id, normalized);
     });
-
-    if (Array.isArray(serverVehicles)) {
-      serverVehicles.forEach((srvCar) => {
-        if (!srvCar?.id) return;
-        const normalizedSrv = normalizeVehicleData(srvCar);
-        const existing = byId.get(normalizedSrv.id);
-        if (!existing) {
-          byId.set(normalizedSrv.id, normalizedSrv);
-        } else {
-          const fsTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-          const srvTime = new Date(normalizedSrv.updatedAt || normalizedSrv.createdAt || 0).getTime();
-          if (srvTime > fsTime) {
-            byId.set(normalizedSrv.id, normalizedSrv);
-          }
-        }
-      });
-    }
 
     const list = Array.from(byId.values());
     activeVehiclesCache = list;
@@ -890,6 +880,23 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 
     return list;
   } catch (error) {
+    try {
+      const res = await fetch('/api/vehicles', { cache: 'no-store' });
+      if (res.ok) {
+        const srvList = (await res.json()) as Vehicle[];
+        if (Array.isArray(srvList)) {
+          const normalized = srvList.map(normalizeVehicleData);
+          activeVehiclesCache = normalized;
+          try {
+            localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
+          } catch {}
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
+          }
+          return normalized;
+        }
+      }
+    } catch {}
     console.warn('[Firestore] Error fetching vehicles, using local cache:', error);
     return getVehicles();
   }
@@ -1715,6 +1722,272 @@ export async function uploadVehicleImageFile(
   });
 }
 
+// ============================================================================
+// CLOUDINARY SIGNED DIRECT BROWSER-TO-CLOUDINARY UPLOAD & CLEANUP ENGINE
+// ============================================================================
+
+export interface CloudinaryUploadStatus {
+  configured: boolean;
+  cloudNameConfigured: boolean;
+  apiKeyConfigured: boolean;
+  apiSecretConfigured: boolean;
+  uploadPresetConfigured: boolean;
+  cloudName: string;
+  missing: string[];
+  folderPattern: string;
+  maxFileSizeBytes: number;
+  allowedFormats: string[];
+}
+
+export interface CloudinaryUploadResult {
+  secureUrl: string;
+  publicId: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  format?: string;
+  uploadedAt: string;
+  folder: string;
+  statusNote?: string;
+}
+
+async function getAdminAuthHeaders(): Promise<Record<string, string>> {
+  const { auth } = await loadFirebaseCore();
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
+  const bearerToken =
+    (await getActiveAdminBearerToken()) ||
+    (auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null);
+
+  const headers: Record<string, string> = {};
+  if (bearerToken) {
+    headers['Authorization'] = `Bearer ${bearerToken}`;
+  }
+  if (auth.currentUser) {
+    try {
+      const fbToken = await auth.currentUser.getIdToken();
+      if (fbToken) headers['x-firebase-id-token'] = fbToken;
+    } catch {}
+  }
+  return headers;
+}
+
+export async function getCloudinaryUploadStatus(): Promise<CloudinaryUploadStatus> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/cloudinary?action=status', {
+    method: 'GET',
+    headers,
+    cache: 'no-store',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Failed to verify Cloudinary setup (HTTP ${res.status}).`);
+  }
+  return data as CloudinaryUploadStatus;
+}
+
+export async function uploadVehicleImageToCloudinary(params: {
+  file: File | Blob;
+  vehicleId: string;
+  slotIndex: number;
+  onProgress?: (
+    progressPercent: number,
+    bytesTransferred?: number,
+    totalBytes?: number,
+    statusNote?: string,
+    stage?: 'optimizing' | 'signing' | 'uploading' | 'done'
+  ) => void;
+  onRegisterAbort?: (abortFn: () => void) => void;
+}): Promise<CloudinaryUploadResult> {
+  const { file, vehicleId, slotIndex, onProgress, onRegisterAbort } = params;
+  const cleanId = (vehicleId || 'car')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || `car-${Date.now().toString(36)}`;
+
+  let aborted = false;
+  let activeXhr: XMLHttpRequest | null = null;
+  if (onRegisterAbort) {
+    onRegisterAbort(() => {
+      aborted = true;
+      if (activeXhr) {
+        try {
+          activeXhr.abort();
+        } catch {}
+      }
+    });
+  }
+
+  onProgress?.(5, 0, file.size, 'Preparing photograph...', 'optimizing');
+
+  // High-quality optimization keeping crisp automotive details (max 2048px, quality 0.86)
+  const optimizedResult = await optimizeVehicleImage(file, 2048, 2048, 0.86);
+  if (aborted) {
+    throw new Error('Upload cancelled.');
+  }
+
+  const uploadBlob = optimizedResult.blob;
+  if (uploadBlob.size > 15 * 1024 * 1024) {
+    throw new Error('Image exceeds the 15MB maximum upload limit even after optimization.');
+  }
+
+  onProgress?.(10, 0, uploadBlob.size, optimizedResult.statusNote, 'signing');
+
+  // Request signed upload parameters from authenticated backend endpoint
+  const authHeaders = await getAdminAuthHeaders();
+  if (!authHeaders['Authorization'] && !authHeaders['x-firebase-id-token']) {
+    throw new Error('Administrator authentication required. Please sign in again.');
+  }
+
+  const signRes = await fetch('/api/cloudinary?action=sign', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      vehicleId: cleanId,
+      slot: slotIndex + 1,
+      mimeType: optimizedResult.mimeType || (file as File).type || 'image/jpeg',
+      fileName: (file as File).name || `vehicle_photo_${slotIndex + 1}.jpg`,
+      fileSize: uploadBlob.size,
+    }),
+  });
+
+  const signData = await signRes.json().catch(() => ({}));
+  if (!signRes.ok) {
+    if (signData?.code === 'CLOUDINARY_NOT_CONFIGURED') {
+      throw new Error(
+        signData.error ||
+          'Cloudinary environment variables are not configured on the server yet.'
+      );
+    }
+    throw new Error(signData?.error || `Failed to authorize Cloudinary upload (HTTP ${signRes.status}).`);
+  }
+
+  if (aborted) {
+    throw new Error('Upload cancelled.');
+  }
+
+  onProgress?.(15, 0, uploadBlob.size, optimizedResult.statusNote, 'uploading');
+
+  // Direct Browser-to-Cloudinary Multipart Upload using XMLHttpRequest for real byte progress
+  return new Promise<CloudinaryUploadResult>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+    xhr.open('POST', signData.uploadUrl, true);
+    xhr.timeout = 90000;
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable && evt.total > 0) {
+          const pct = Math.min(98, Math.max(15, Math.round((evt.loaded / evt.total) * 100)));
+          onProgress(pct, evt.loaded, evt.total, optimizedResult.statusNote, 'uploading');
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      activeXhr = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const payload = JSON.parse(xhr.responseText);
+          if (!payload?.secure_url || !payload?.public_id) {
+            reject(new Error('Cloudinary returned an incomplete upload response.'));
+            return;
+          }
+          onProgress?.(100, uploadBlob.size, uploadBlob.size, optimizedResult.statusNote, 'done');
+          resolve({
+            secureUrl: payload.secure_url,
+            publicId: payload.public_id,
+            width: typeof payload.width === 'number' ? payload.width : optimizedResult.width || undefined,
+            height: typeof payload.height === 'number' ? payload.height : optimizedResult.height || undefined,
+            bytes: typeof payload.bytes === 'number' ? payload.bytes : uploadBlob.size,
+            format: payload.format || undefined,
+            uploadedAt: payload.created_at || new Date().toISOString(),
+            folder: signData.folder,
+            statusNote: optimizedResult.statusNote,
+          });
+        } catch (parseErr: any) {
+          reject(new Error('Could not parse Cloudinary upload response: ' + (parseErr?.message || parseErr)));
+        }
+      } else {
+        let cloudinaryErrMsg = `Cloudinary upload failed (HTTP ${xhr.status}).`;
+        try {
+          const errJson = JSON.parse(xhr.responseText);
+          if (errJson?.error?.message) {
+            cloudinaryErrMsg = `Cloudinary upload failed: ${errJson.error.message}`;
+          }
+        } catch {}
+        reject(new Error(cloudinaryErrMsg));
+      }
+    };
+
+    xhr.onabort = () => {
+      activeXhr = null;
+      reject(new Error('Upload cancelled.'));
+    };
+
+    xhr.onerror = () => {
+      activeXhr = null;
+      reject(new Error('Network interruption while uploading directly to Cloudinary. Please check your connection and retry.'));
+    };
+
+    xhr.ontimeout = () => {
+      activeXhr = null;
+      reject(new Error('Cloudinary upload timed out. Please retry on a stable connection.'));
+    };
+
+    const formData = new FormData();
+    const ext = optimizedResult.mimeType.includes('webp')
+      ? 'webp'
+      : optimizedResult.mimeType.includes('png')
+      ? 'png'
+      : 'jpg';
+    const uploadFilename = `${signData.publicId}.${ext}`;
+    formData.append('file', uploadBlob, uploadFilename);
+    formData.append('api_key', signData.apiKey);
+    formData.append('timestamp', String(signData.timestamp));
+    formData.append('signature', signData.signature);
+    formData.append('folder', signData.folder);
+    formData.append('public_id', signData.publicId);
+    if (signData.tags) {
+      formData.append('tags', signData.tags);
+    }
+    if (signData.uploadPreset) {
+      formData.append('upload_preset', signData.uploadPreset);
+    }
+
+    xhr.send(formData);
+  });
+}
+
+export async function deleteVehicleCloudinaryAssets(params: {
+  vehicleId: string;
+  publicIds?: string[];
+  imageUrls?: string[];
+}): Promise<{
+  success: boolean;
+  deleted: string[];
+  skippedShared: string[];
+  notConfigured?: boolean;
+}> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/cloudinary?action=delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Cloudinary cleanup failed (HTTP ${res.status}).`);
+  }
+  return data;
+}
+
 /**
  * Uploads a base64 Data URL string to Firebase Storage or direct CDN with progress tracking.
  */
@@ -1750,7 +2023,10 @@ export async function uploadVehicleImageDataUrl(
     }
   }
 
-  const bearerToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
+  const bearerToken =
+    (await getActiveAdminBearerToken()) ||
+    (auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null);
   const response = await fetch('/api/upload-vehicle-image', {
     method: 'POST',
     headers: {
@@ -1825,25 +2101,10 @@ export async function runConcurrentQueue<T, R>(
  */
 export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle> {
   const normalized = normalizeVehicleData(vehicle);
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (bearerToken) {
-    try {
-      await fetch('/api/vehicles/upsert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${bearerToken}`,
-        },
-        body: JSON.stringify(normalized),
-      });
-    } catch {
-      // Non-blocking server mirror
-    }
-  }
-
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
       const { doc, setDoc, getDoc } = await loadFirestore();
@@ -1861,8 +2122,20 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
         id: verifySnap.id,
       });
 
+      if (bearerToken) {
+        fetch('/api/vehicles/upsert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${bearerToken}`,
+          },
+          body: JSON.stringify(confirmedData),
+        }).catch(() => {});
+      }
+
       const current = getVehicles().filter((v) => v.id !== confirmedData.id);
       current.unshift(confirmedData);
+      activeVehiclesCache = current;
       try {
         localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
       } catch {}
@@ -1878,8 +2151,26 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
     }
   }
 
-  const current = getVehicles().filter((v) => v.id !== normalized.id);
-  current.unshift(normalized);
+  if (!bearerToken) {
+    throw new Error('Administrator session expired. Please sign in again to publish vehicles.');
+  }
+
+  const res = await fetch('/api/vehicles/upsert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearerToken}`,
+    },
+    body: JSON.stringify(normalized),
+  });
+  const resData = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(resData?.error || `Failed to save vehicle to Cloud Firestore (HTTP ${res.status}).`);
+  }
+
+  const confirmedVehicle = normalizeVehicleData(resData?.vehicle || normalized);
+  const current = getVehicles().filter((v) => v.id !== confirmedVehicle.id);
+  current.unshift(confirmedVehicle);
   activeVehiclesCache = current;
   try {
     localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
@@ -1889,7 +2180,7 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
     window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
   }
 
-  return normalized;
+  return confirmedVehicle;
 }
 
 export async function createVehicle(vehicle: Vehicle): Promise<Vehicle> {
@@ -1920,28 +2211,33 @@ export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
 export async function deleteVehicleFromFirestore(id: string): Promise<void> {
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
-
-  if (bearerToken) {
-    try {
-      await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${bearerToken}`,
-        },
-      });
-    } catch {
-      // Non-blocking server delete
-    }
-  }
-
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+
   if (auth.currentUser) {
     try {
       const { doc, deleteDoc } = await loadFirestore();
       const docRef = doc(db, 'vehicles', id);
       await deleteDoc(docRef);
+      if (bearerToken) {
+        fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${bearerToken}` },
+        }).catch(() => {});
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+    }
+  } else {
+    if (!bearerToken) {
+      throw new Error('Administrator session expired. Please sign in again to delete vehicles.');
+    }
+    const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || `Failed to delete vehicle from Cloud Firestore (HTTP ${res.status}).`);
     }
   }
 
@@ -2148,8 +2444,26 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
 
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    Promise.all([loadFirestore(), loadFirebaseCore()])
-      .then(([{ doc, updateDoc }, { db }]) => updateDoc(doc(db, 'leads', leadId), payload))
+    loadFirebaseCore()
+      .then(async ({ auth, db }) => {
+        if (auth.currentUser) {
+          const { doc, updateDoc } = await loadFirestore();
+          await updateDoc(doc(db, 'leads', leadId), payload);
+          return;
+        }
+        const { getActiveAdminBearerToken } = await loadAdminAuth();
+        const token = await getActiveAdminBearerToken();
+        if (token) {
+          await fetch('/api/leads/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ id: leadId, updates: payload }),
+          });
+        }
+      })
       .catch((err) => {
         console.warn('[Firestore] Error updating lead in Firestore:', err);
       });
@@ -2286,8 +2600,26 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
 
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    Promise.all([loadFirestore(), loadFirebaseCore()])
-      .then(([{ doc, updateDoc }, { db }]) => updateDoc(doc(db, 'inquiries', inquiryId), payload))
+    loadFirebaseCore()
+      .then(async ({ auth, db }) => {
+        if (auth.currentUser) {
+          const { doc, updateDoc } = await loadFirestore();
+          await updateDoc(doc(db, 'inquiries', inquiryId), payload);
+          return;
+        }
+        const { getActiveAdminBearerToken } = await loadAdminAuth();
+        const token = await getActiveAdminBearerToken();
+        if (token) {
+          await fetch('/api/inquiries/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ id: inquiryId, updates: payload }),
+          });
+        }
+      })
       .catch((err) => {
         console.warn('[Firestore] Error updating inquiry in Firestore:', err);
       });
@@ -2401,32 +2733,48 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
   } catch {}
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
-  if (bearerToken) {
-    try {
-      await fetch('/api/business-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${bearerToken}`,
-        },
-        body: JSON.stringify(updated),
-      });
-    } catch {}
-  }
 
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
       const { doc, setDoc } = await loadFirestore();
       const docRef = doc(db, 'settings', 'business');
       const payload = cleanFirestoreData(updated);
       await setDoc(docRef, payload, { merge: true });
+      if (bearerToken) {
+        fetch('/api/business-settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${bearerToken}`,
+          },
+          body: JSON.stringify(updated),
+        }).catch(() => {});
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'settings/business');
       throw error;
     }
+    return updated;
+  }
+
+  if (!bearerToken) {
+    throw new Error('Administrator session expired. Please sign in again.');
+  }
+
+  const res = await fetch('/api/business-settings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearerToken}`,
+    },
+    body: JSON.stringify(updated),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error || `Failed to save business settings (HTTP ${res.status}).`);
   }
 
   return updated;
@@ -2567,22 +2915,10 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
     localStorage.setItem(EDITORIAL_KEY, JSON.stringify(sanitized));
   } catch {}
 
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
-  if (bearerToken) {
-    try {
-      await fetch('/api/editorial-posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${bearerToken}`,
-        },
-        body: JSON.stringify({ posts: sanitized }),
-      });
-    } catch {}
-  }
 
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   if (auth.currentUser) {
     try {
       const { doc, setDoc } = await loadFirestore();
@@ -2595,10 +2931,38 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
         },
         { merge: true }
       );
+      if (bearerToken) {
+        fetch('/api/editorial-posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${bearerToken}`,
+          },
+          body: JSON.stringify({ posts: sanitized }),
+        }).catch(() => {});
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
       throw error;
     }
+    return sanitized;
+  }
+
+  if (!bearerToken) {
+    throw new Error('Administrator session expired. Please sign in again.');
+  }
+
+  const res = await fetch('/api/editorial-posts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearerToken}`,
+    },
+    body: JSON.stringify({ posts: sanitized }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error || `Failed to save editorial posts (HTTP ${res.status}).`);
   }
 
   return sanitized;
@@ -2608,35 +2972,60 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
 // DIRECT VEHICLE QUICK-UPDATE HELPERS
 // ============================================================================
 
-async function mirrorVehicleQuickPatch(vehicleId: string, updates: Partial<Vehicle>): Promise<void> {
+async function mirrorVehicleQuickPatch(
+  vehicleId: string,
+  updates: Partial<Vehicle>,
+  requireBackendSuccess = false
+): Promise<void> {
   const currentVehicles = getVehicles();
   const existing = currentVehicles.find((v) => v.id === vehicleId);
-  if (existing) {
-    const merged = normalizeVehicleData({ ...existing, ...updates, updatedAt: new Date().toISOString() });
-    const next = currentVehicles.map((v) => (v.id === vehicleId ? merged : v));
-    activeVehiclesCache = next;
-    try {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(next));
-    } catch {}
-    const { getActiveAdminBearerToken } = await loadAdminAuth();
-    const bearerToken = await getActiveAdminBearerToken();
-    if (bearerToken) {
-      await fetch('/api/vehicles/upsert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${bearerToken}`,
-        },
-        body: JSON.stringify(merged),
-      }).catch(() => {});
+  if (!existing) return;
+
+  const merged = normalizeVehicleData({
+    ...existing,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+  const next = currentVehicles.map((v) => (v.id === vehicleId ? merged : v));
+  activeVehiclesCache = next;
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(next));
+  } catch {}
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: next }));
+  }
+
+  const { getActiveAdminBearerToken } = await loadAdminAuth();
+  const bearerToken = await getActiveAdminBearerToken();
+  if (!bearerToken) {
+    if (requireBackendSuccess) {
+      throw new Error('Administrator session expired. Please sign in again.');
     }
+    return;
+  }
+
+  const res = await fetch('/api/vehicles/upsert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearerToken}`,
+    },
+    body: JSON.stringify(merged),
+  });
+
+  if (!res.ok && requireBackendSuccess) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error || `Failed to persist vehicle change (HTTP ${res.status}).`);
   }
 }
 
 export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus): Promise<void> {
-  await mirrorVehicleQuickPatch(vehicleId, { status });
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) {
+    await mirrorVehicleQuickPatch(vehicleId, { status }, true);
+    return;
+  }
+  await mirrorVehicleQuickPatch(vehicleId, { status }, false).catch(() => {});
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
@@ -2652,9 +3041,12 @@ export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus
 
 export async function saveVehiclePrice(vehicleId: string, newPrice: number): Promise<void> {
   const price = Number(newPrice) || 0;
-  await mirrorVehicleQuickPatch(vehicleId, { price });
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) {
+    await mirrorVehicleQuickPatch(vehicleId, { price }, true);
+    return;
+  }
+  await mirrorVehicleQuickPatch(vehicleId, { price }, false).catch(() => {});
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
@@ -2669,9 +3061,12 @@ export async function saveVehiclePrice(vehicleId: string, newPrice: number): Pro
 }
 
 export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean): Promise<void> {
-  await mirrorVehicleQuickPatch(vehicleId, { isFeatured });
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) {
+    await mirrorVehicleQuickPatch(vehicleId, { isFeatured }, true);
+    return;
+  }
+  await mirrorVehicleQuickPatch(vehicleId, { isFeatured }, false).catch(() => {});
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
@@ -2686,12 +3081,13 @@ export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean
 }
 
 export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boolean, slideshowOrder?: number): Promise<void> {
-  await mirrorVehicleQuickPatch(
-    vehicleId,
-    typeof slideshowOrder === 'number' ? { inSlideshow, slideshowOrder } : { inSlideshow }
-  );
+  const patch = typeof slideshowOrder === 'number' ? { inSlideshow, slideshowOrder } : { inSlideshow };
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) {
+    await mirrorVehicleQuickPatch(vehicleId, patch, true);
+    return;
+  }
+  await mirrorVehicleQuickPatch(vehicleId, patch, false).catch(() => {});
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'vehicles', vehicleId);
@@ -2710,10 +3106,29 @@ export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boole
 }
 
 export async function saveLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
+
+  if (!auth.currentUser) {
+    if (!bearerToken) return;
+    const res = await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({ id: leadId, status }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || 'Failed to update lead status.');
+    }
+    return;
+  }
+
   if (bearerToken) {
-    await fetch('/api/leads/status', {
+    fetch('/api/leads/status', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2722,8 +3137,6 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
       body: JSON.stringify({ id: leadId, status }),
     }).catch(() => {});
   }
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'leads', leadId);
@@ -2738,10 +3151,29 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
 }
 
 export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): Promise<void> {
+  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
+
+  if (!auth.currentUser) {
+    if (!bearerToken) return;
+    const res = await fetch('/api/inquiries/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({ id: inquiryId, status }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || 'Failed to update inquiry status.');
+    }
+    return;
+  }
+
   if (bearerToken) {
-    await fetch('/api/inquiries/status', {
+    fetch('/api/inquiries/status', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2750,8 +3182,6 @@ export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): 
       body: JSON.stringify({ id: inquiryId, status }),
     }).catch(() => {});
   }
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) return;
   try {
     const { doc, updateDoc } = await loadFirestore();
     const docRef = doc(db, 'inquiries', inquiryId);

@@ -1,28 +1,18 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-
-const DEFAULT_PROJECT_ID = 'gen-lang-client-0327661147';
-const DEFAULT_DATABASE_ID = 'ai-studio-jiteautodeals-74aa2960-b1e2-41ac-9714-42ee44c5712a';
-
-function loadFirebaseRuntimeConfig() {
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      return {
-        projectId: process.env.FIREBASE_PROJECT_ID || parsed.projectId || DEFAULT_PROJECT_ID,
-        databaseId: process.env.FIRESTORE_DATABASE_ID || parsed.firestoreDatabaseId || DEFAULT_DATABASE_ID,
-      };
-    }
-  } catch {
-    // Fallback to defaults
-  }
-  return {
-    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
-    databaseId: process.env.FIRESTORE_DATABASE_ID || DEFAULT_DATABASE_ID,
-  };
-}
+import {
+  loadFirebaseRuntimeConfig,
+  firestoreGetDocument,
+  firestorePatchDocument,
+  firestoreCreateDocument,
+  firestoreDeleteDocument,
+  firestoreQueryCollection,
+  firebaseAuthSignInWithPassword,
+  firebaseAuthUpdateAccount,
+  firebaseAuthRefreshToken,
+  firebaseAuthSendPasswordReset,
+} from './firestore-rest.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
 const AUTH_STORE_FILE = path.join(DATA_DIR, 'admin_auth.json');
@@ -33,7 +23,7 @@ const SERVER_SESSION_SECRET =
   (process.env.ADMIN_SESSION_SECRET || '').trim() || crypto.randomBytes(32).toString('hex');
 const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
 
-// Cached Google public X.509 certificates for optional Google Sign-In RS256 ID token verification
+// Cached Google public X.509 certificates for Firebase RS256 ID token verification
 let certCache = {
   certs: /** @type {Record<string, string>} */ ({}),
   expiresAt: 0,
@@ -74,6 +64,7 @@ function pushSecurityEvent(event) {
   if (serverSecurityEvents.length > MAX_SECURITY_EVENTS) {
     serverSecurityEvents.length = MAX_SECURITY_EVENTS;
   }
+  return entry;
 }
 
 function checkRateLimit(ip) {
@@ -160,7 +151,11 @@ function validatePasswordPolicy(password) {
 }
 
 function base64UrlEncode(input) {
-  return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
 }
 
 function base64UrlDecode(str) {
@@ -178,6 +173,7 @@ function signServerSessionToken(payload) {
     role: payload.role || 'owner',
     authMode: 'server-credentials',
     envManaged: Boolean(payload.envManaged),
+    firebaseSynced: Boolean(payload.firebaseSynced),
     iat: nowSec,
     exp: nowSec + SESSION_TTL_SECONDS,
   };
@@ -235,13 +231,23 @@ function verifyServerSessionToken(token) {
 function readServerCredentialStore() {
   let latest = null;
   let latestMs = -1;
+  let bootstrappedFlag = false;
+  let primaryAdminUid = null;
 
-  for (const candidatePath of [AUTH_STORE_FILE, TMP_AUTH_STORE_FILE]) {
+  for (const candidatePath of [TMP_AUTH_STORE_FILE, AUTH_STORE_FILE]) {
     try {
       if (!fs.existsSync(candidatePath)) continue;
       const raw = JSON.parse(fs.readFileSync(candidatePath, 'utf-8'));
-      if (raw?.credentials && raw.credentials.emailLower && raw.credentials.passwordHash && raw.credentials.salt) {
-        const ts = Date.parse(raw.updatedAt || raw.credentials.updatedAt || raw.credentials.createdAt || '') || 0;
+      if (raw?.bootstrapped) bootstrappedFlag = true;
+      if (raw?.primaryAdminUid && !primaryAdminUid) primaryAdminUid = raw.primaryAdminUid;
+      if (
+        raw?.credentials &&
+        raw.credentials.emailLower &&
+        raw.credentials.passwordHash &&
+        raw.credentials.salt
+      ) {
+        const ts =
+          Date.parse(raw.updatedAt || raw.credentials.updatedAt || raw.credentials.createdAt || '') || 0;
         if (!latest || ts > latestMs) {
           latestMs = ts;
           latest = {
@@ -250,6 +256,7 @@ function readServerCredentialStore() {
             credentials: raw.credentials,
             inactivityTimeoutMinutes:
               typeof raw.inactivityTimeoutMinutes === 'number' ? raw.inactivityTimeoutMinutes : 30,
+            updatedAt: raw.updatedAt || raw.credentials.updatedAt || raw.credentials.createdAt || null,
           };
         }
       }
@@ -259,24 +266,33 @@ function readServerCredentialStore() {
   }
 
   if (latest) {
-    return latest;
+    return {
+      ...latest,
+      bootstrapped: true,
+      primaryAdminUid: primaryAdminUid || latest.credentials?.firebaseUid || null,
+    };
   }
 
   return {
     configured: false,
+    bootstrapped: bootstrappedFlag,
+    primaryAdminUid,
     source: null,
     credentials: null,
     inactivityTimeoutMinutes: 30,
+    updatedAt: null,
   };
 }
 
 function writeServerCredentialStore(data) {
+  const nowIso = new Date().toISOString();
   const payload = {
     bootstrapped: true,
     authMode: 'server-credentials',
+    primaryAdminUid: data.primaryAdminUid || data.credentials?.firebaseUid || null,
     inactivityTimeoutMinutes: data.inactivityTimeoutMinutes || 30,
     credentials: data.credentials,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
   };
 
   let persisted = false;
@@ -307,7 +323,7 @@ function isPlaceholderEnvValue(val) {
   return /^MY_[A-Z0-9_]+$/i.test(trimmed) || /^your[-_]/i.test(trimmed);
 }
 
-function resolveConfiguredServerCredentials() {
+function readEnvCredentials() {
   const envEmail = (process.env.ADMIN_EMAIL || '').trim();
   const envPassword = process.env.ADMIN_PASSWORD || '';
   const envHash = (process.env.ADMIN_PASSWORD_HASH || '').trim();
@@ -318,24 +334,37 @@ function resolveConfiguredServerCredentials() {
     (!isPlaceholderEnvValue(envPassword) && envPassword.length > 0) ||
     (!isPlaceholderEnvValue(envHash) && envHash.includes(':'));
 
-  if (hasValidEnvEmail && hasValidEnvSecret) {
-    return {
-      configured: true,
-      envManaged: true,
-      email: envEmail,
-      emailLower: envEmail.toLowerCase(),
-      fullName: envFullName,
-      envPassword,
-      envHash,
-      inactivityTimeoutMinutes: 30,
-    };
+  if (!hasValidEnvEmail || !hasValidEnvSecret) {
+    return null;
   }
 
+  return {
+    configured: true,
+    envManaged: true,
+    email: envEmail,
+    emailLower: envEmail.toLowerCase(),
+    fullName: envFullName,
+    envPassword,
+    envHash,
+    inactivityTimeoutMinutes: 30,
+  };
+}
+
+/**
+ * Resolves stored or environment credentials with Dashboard Precedence:
+ * Dashboard-saved credentials ALWAYS override static env vars when present.
+ */
+function resolveConfiguredServerCredentials() {
   const stored = readServerCredentialStore();
+  const envCfg = readEnvCredentials();
+
   if (stored.configured && stored.credentials) {
     return {
       configured: true,
       envManaged: false,
+      envOverridden: Boolean(envCfg),
+      dashboardOverride: Boolean(stored.credentials.dashboardOverride),
+      firebaseUid: stored.credentials.firebaseUid || stored.primaryAdminUid || null,
       email: stored.credentials.email,
       emailLower: stored.credentials.emailLower,
       fullName: stored.credentials.fullName || 'Primary Administrator',
@@ -343,13 +372,25 @@ function resolveConfiguredServerCredentials() {
       passwordHash: stored.credentials.passwordHash,
       inactivityTimeoutMinutes: stored.inactivityTimeoutMinutes || 30,
       createdAt: stored.credentials.createdAt,
-      updatedAt: stored.credentials.updatedAt,
+      updatedAt: stored.credentials.updatedAt || stored.updatedAt,
+    };
+  }
+
+  if (envCfg) {
+    return {
+      ...envCfg,
+      envOverridden: false,
+      dashboardOverride: false,
     };
   }
 
   return {
     configured: false,
     envManaged: false,
+    envOverridden: false,
+    dashboardOverride: false,
+    bootstrapped: stored.bootstrapped,
+    primaryAdminUid: stored.primaryAdminUid,
   };
 }
 
@@ -366,7 +407,6 @@ function verifyPasswordWithResolvedConfig(email, password, cfg) {
       return verifyPasswordAgainstStored(password, salt, hashHex);
     }
     if (cfg.envPassword) {
-      // Constant-time comparison via SHA-256 digests so length isn't leaked
       const inputDigest = crypto.createHash('sha256').update(String(password)).digest('hex');
       const expectedDigest = crypto.createHash('sha256').update(String(cfg.envPassword)).digest('hex');
       return safeTimingEqual(inputDigest, expectedDigest);
@@ -378,7 +418,7 @@ function verifyPasswordWithResolvedConfig(email, password, cfg) {
 }
 
 // ============================================================================
-// OPTIONAL GOOGLE FIREBASE ID TOKEN VERIFICATION (SECONDARY ONLY)
+// GOOGLE FIREBASE ID TOKEN VERIFICATION
 // ============================================================================
 async function fetchGooglePublicCerts() {
   const now = Date.now();
@@ -432,10 +472,16 @@ export async function verifyFirebaseIdToken(idToken) {
     throw new Error('Unsupported token algorithm or missing key id.');
   }
 
-  const certs = await fetchGooglePublicCerts();
-  const certPem = certs[header.kid];
+  let certs = await fetchGooglePublicCerts();
+  let certPem = certs[header.kid];
   if (!certPem) {
-    throw new Error('Unknown signing certificate for token.');
+    // Force refresh once in case Google rotated keys
+    certCache.expiresAt = 0;
+    certs = await fetchGooglePublicCerts();
+    certPem = certs[header.kid];
+    if (!certPem) {
+      throw new Error('Unknown signing certificate for token.');
+    }
   }
 
   const verifier = crypto.createVerify('RSA-SHA256');
@@ -469,6 +515,7 @@ export async function verifyFirebaseIdToken(idToken) {
     uid: payload.sub,
     email: typeof payload.email === 'string' ? payload.email : '',
     emailVerified: Boolean(payload.email_verified),
+    name: typeof payload.name === 'string' ? payload.name : '',
     signInProvider: payload.firebase?.sign_in_provider || 'unknown',
     isCustomAdminClaim: payload.admin === true,
     expiresAt: payload.exp * 1000,
@@ -476,47 +523,59 @@ export async function verifyFirebaseIdToken(idToken) {
 }
 
 async function checkFirestoreAdminAuthorization(idToken, decoded) {
-  const { projectId, databaseId } = loadFirebaseRuntimeConfig();
-  const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
+  let adminDoc = null;
+  try {
+    adminDoc = await firestoreGetDocument(`admins/${decoded.uid}`, idToken);
+  } catch {
+    adminDoc = null;
+  }
 
-  const adminDocRes = await fetch(`${baseUrl}/admins/${encodeURIComponent(decoded.uid)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
-
-  if (adminDocRes.status === 200) {
-    const docJson = await adminDocRes.json();
-    const fields = docJson?.fields || {};
-    const activeField = fields.active;
-    const isActive = activeField ? activeField.booleanValue !== false : true;
-    const role = fields.role?.stringValue === 'owner' ? 'owner' : 'admin';
+  if (adminDoc) {
+    const isActive = adminDoc.active !== false;
+    const role = adminDoc.role === 'owner' ? 'owner' : 'admin';
     return {
       authorized: isActive,
       revoked: !isActive,
       role,
       hasAdminDoc: true,
       invited: false,
+      profile: adminDoc,
     };
+  }
+
+  // Also check if UID matches primaryAdminUid in settings/admin_bootstrap
+  try {
+    const bootstrapDoc = await firestoreGetDocument('settings/admin_bootstrap', idToken);
+    if (bootstrapDoc && bootstrapDoc.primaryAdminUid === decoded.uid) {
+      return {
+        authorized: true,
+        revoked: false,
+        role: 'owner',
+        hasAdminDoc: false,
+        invited: false,
+        profile: null,
+      };
+    }
+  } catch {
+    // Ignore
   }
 
   if (decoded.email && decoded.emailVerified) {
     const emailLower = decoded.email.trim().toLowerCase();
-    const inviteRes = await fetch(`${baseUrl}/admin_invites/${encodeURIComponent(emailLower)}`, {
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-    if (inviteRes.status === 200) {
-      const inviteJson = await inviteRes.json();
-      const fields = inviteJson?.fields || {};
-      const activeField = fields.active;
-      const isActive = activeField ? activeField.booleanValue !== false : true;
-      if (isActive) {
+    try {
+      const inviteDoc = await firestoreGetDocument(`admin_invites/${emailLower}`, idToken);
+      if (inviteDoc && inviteDoc.active !== false) {
         return {
           authorized: true,
           revoked: false,
           role: 'admin',
           hasAdminDoc: false,
           invited: true,
+          profile: null,
         };
       }
+    } catch {
+      // Ignore
     }
   }
 
@@ -527,6 +586,7 @@ async function checkFirestoreAdminAuthorization(idToken, decoded) {
       role: 'admin',
       hasAdminDoc: false,
       invited: false,
+      profile: null,
     };
   }
 
@@ -536,6 +596,7 @@ async function checkFirestoreAdminAuthorization(idToken, decoded) {
     role: null,
     hasAdminDoc: false,
     invited: false,
+    profile: null,
   };
 }
 
@@ -549,10 +610,16 @@ export function extractBearerToken(req) {
 
 /**
  * Reusable verification helper for protected server endpoints (/api/vehicles, /api/upload-vehicle-image, etc.).
- * Accepts standalone Server Email/Password HMAC Bearer tokens (no Firestore needed) OR Firebase Google ID tokens.
+ * Verifies Google Firebase RS256 ID Tokens (stateless across Vercel & AI Studio) OR Server HMAC Bearer tokens.
  */
 export async function verifyRequestAdmin(req) {
-  const token = extractBearerToken(req) || req.body?.idToken;
+  const bearerToken = extractBearerToken(req) || req.body?.idToken;
+  const sidecarFirebaseToken =
+    typeof req.headers?.['x-firebase-id-token'] === 'string'
+      ? req.headers['x-firebase-id-token'].trim()
+      : '';
+
+  const token = bearerToken;
   if (!token) {
     return { authorized: false, error: 'Missing Bearer authentication token.' };
   }
@@ -562,6 +629,20 @@ export async function verifyRequestAdmin(req) {
     if (!verified) {
       return { authorized: false, error: 'Session expired or invalid. Please sign in again.' };
     }
+
+    let attachedFirebaseToken = null;
+    if (sidecarFirebaseToken && !sidecarFirebaseToken.startsWith('srv.')) {
+      try {
+        const fbDecoded = await verifyFirebaseIdToken(sidecarFirebaseToken);
+        const fsAuth = await checkFirestoreAdminAuthorization(sidecarFirebaseToken, fbDecoded);
+        if (fsAuth.authorized) {
+          attachedFirebaseToken = sidecarFirebaseToken;
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
     return {
       authorized: true,
       uid: verified.sub,
@@ -572,6 +653,7 @@ export async function verifyRequestAdmin(req) {
       authMode: 'server-credentials',
       envManaged: Boolean(verified.envManaged),
       signInProvider: 'password',
+      firebaseIdToken: attachedFirebaseToken,
     };
   }
 
@@ -584,11 +666,17 @@ export async function verifyRequestAdmin(req) {
     return {
       authorized: true,
       uid: decoded.uid,
-      email: decoded.email,
+      email: fsAuth.profile?.email || decoded.email,
+      fullName: fsAuth.profile?.displayName || decoded.name || 'Administrator',
       emailVerified: decoded.emailVerified,
       role: fsAuth.role || 'admin',
-      authMode: 'google-firebase',
+      authMode: decoded.signInProvider === 'password' ? 'server-credentials' : 'google-firebase',
       signInProvider: decoded.signInProvider,
+      inactivityTimeoutMinutes:
+        typeof fsAuth.profile?.inactivityTimeoutMinutes === 'number'
+          ? fsAuth.profile.inactivityTimeoutMinutes
+          : 30,
+      firebaseIdToken: token,
     };
   } catch (err) {
     return { authorized: false, error: err?.message || 'Invalid authentication token.' };
@@ -644,7 +732,39 @@ function setSecurityHeaders(req, res) {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-setup-secret');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token'
+  );
+}
+
+async function fetchBootstrapDocSafe() {
+  try {
+    return await firestoreGetDocument('settings/admin_bootstrap');
+  } catch {
+    return null;
+  }
+}
+
+async function writeFirestoreAuditSafe(idToken, { action, actorUid, actorEmail, status, details, authMethod }) {
+  if (!idToken) return;
+  try {
+    await firestoreCreateDocument(
+      'admin_audit_logs',
+      {
+        action: String(action || 'ADMIN_EVENT').slice(0, 100),
+        actorUid: String(actorUid || 'admin'),
+        actorEmail: String(actorEmail || ''),
+        status: status || 'success',
+        details: String(details || '').slice(0, 500),
+        authMethod: String(authMethod || 'password'),
+        timestamp: new Date().toISOString(),
+      },
+      idToken
+    );
+  } catch {
+    // Non-blocking audit mirror
+  }
 }
 
 export default async function handler(req, res) {
@@ -662,18 +782,24 @@ export default async function handler(req, res) {
   try {
     // ------------------------------------------------------------------------
     // 1. GET /api/admin-auth?action=status
-    //    Checks ONLY standalone server email/password configuration (zero Firestore)
+    //    Detects live configuration across Firebase Cloud + local store + env
     // ------------------------------------------------------------------------
     if (action === 'status' && req.method === 'GET') {
       const cfg = resolveConfiguredServerCredentials();
+      const stored = readServerCredentialStore();
+      const bootstrapDoc = await fetchBootstrapDocSafe();
       const setupSecretRequired = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
+      const isBootstrapped = Boolean(
+        cfg.configured || stored.bootstrapped || bootstrapDoc?.setupCompleted
+      );
 
       res.statusCode = 200;
       res.end(
         JSON.stringify({
-          configured: cfg.configured,
-          bootstrapped: cfg.configured,
-          envManaged: cfg.envManaged,
+          configured: isBootstrapped,
+          bootstrapped: isBootstrapped,
+          envManaged: Boolean(cfg.envManaged),
+          envOverridden: Boolean(cfg.envOverridden || bootstrapDoc?.dashboardOverride),
           setupSecretRequired,
           firebaseAuthConfigured: true,
         })
@@ -683,10 +809,12 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 2. POST /api/admin-auth?action=setup
-    //    One-time standalone server Email + Password registration (no Firestore)
+    //    One-time initial setup (locked once bootstrapped anywhere)
     // ------------------------------------------------------------------------
     if (action === 'setup' && req.method === 'POST') {
       const cfg = resolveConfiguredServerCredentials();
+      const stored = readServerCredentialStore();
+      const bootstrapDoc = await fetchBootstrapDocSafe();
       const body = await readJsonBody(req);
       const rawSecret = (process.env.ADMIN_SETUP_SECRET || '').trim();
       const configuredSecret = isPlaceholderEnvValue(rawSecret) ? '' : rawSecret;
@@ -694,27 +822,18 @@ export default async function handler(req, res) {
       const hasValidSetupSecret =
         Boolean(configuredSecret) && safeTimingEqual(String(providedSecret), configuredSecret);
 
-      if (cfg.envManaged) {
-        res.statusCode = 403;
-        res.end(
-          JSON.stringify({
-            success: false,
-            code: 'ENV_MANAGED',
-            error:
-              'Administrator email and password are set via server environment variables (ADMIN_EMAIL / ADMIN_PASSWORD). Update or clear them in your environment settings.',
-          })
-        );
-        return;
-      }
+      const alreadyBootstrapped = Boolean(
+        cfg.configured || stored.bootstrapped || bootstrapDoc?.setupCompleted
+      );
 
-      if (cfg.configured && !hasValidSetupSecret) {
+      if (alreadyBootstrapped && !hasValidSetupSecret) {
         res.statusCode = 403;
         res.end(
           JSON.stringify({
             success: false,
             code: 'ALREADY_CONFIGURED',
             error:
-              'Administrator email and password are already configured. Please sign in or update them inside Security Settings.',
+              'Administrator credentials are already configured. Please sign in with your email and password or manage credentials inside Security Settings.',
           })
         );
         return;
@@ -769,6 +888,7 @@ export default async function handler(req, res) {
           emailLower: email.toLowerCase(),
           salt,
           passwordHash,
+          dashboardOverride: true,
           createdAt: nowIso,
           updatedAt: nowIso,
         },
@@ -780,6 +900,7 @@ export default async function handler(req, res) {
         fullName,
         role: 'owner',
         envManaged: false,
+        firebaseSynced: false,
       });
 
       pushSecurityEvent({
@@ -787,7 +908,7 @@ export default async function handler(req, res) {
         status: 'success',
         actorEmailMasked: maskEmailForAudit(email),
         ipTag: hashIpForAudit(clientIp),
-        details: 'Standalone server email & password administrator account created.',
+        details: 'Administrator email & password configured cleanly.',
       });
 
       res.statusCode = 200;
@@ -802,6 +923,7 @@ export default async function handler(req, res) {
             displayName: fullName,
             role: 'owner',
             authMode: 'server-credentials',
+            firebaseSynced: false,
             envManaged: false,
             inactivityTimeoutMinutes: 30,
           },
@@ -812,7 +934,7 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 3. POST /api/admin-auth?action=login
-    //    Standalone Email + Password authentication (zero Firestore dependency)
+    //    Unified Email + Password login synced with Firebase Auth + Dashboard Override
     // ------------------------------------------------------------------------
     if (action === 'login' && req.method === 'POST') {
       const rateCheck = checkRateLimit(clientIp);
@@ -844,89 +966,345 @@ export default async function handler(req, res) {
         return;
       }
 
-      const cfg = resolveConfiguredServerCredentials();
-      if (!cfg.configured) {
-        res.statusCode = 403;
-        res.end(
-          JSON.stringify({
-            success: false,
-            code: 'NOT_CONFIGURED',
-            error:
-              'Administrator email and password have not been configured yet. Complete First-Time Setup first.',
-          })
-        );
-        return;
+      const bootstrapDoc = await fetchBootstrapDocSafe();
+      const stored = readServerCredentialStore();
+      const envCfg = readEnvCredentials();
+      const hasDashboardOverride = Boolean(
+        bootstrapDoc?.dashboardOverride ||
+          bootstrapDoc?.passwordUpdatedAt ||
+          stored.credentials?.dashboardOverride
+      );
+
+      // Step A: Attempt real Firebase Auth Identity Toolkit Sign-In (works everywhere: AI Studio + Vercel)
+      let fbLogin = null;
+      let fbErrorCode = '';
+      try {
+        fbLogin = await firebaseAuthSignInWithPassword(email, password);
+      } catch (err) {
+        fbErrorCode = String(err?.code || err?.message || 'AUTH_FAILED');
       }
 
-      const matched = verifyPasswordWithResolvedConfig(email, password, cfg);
-      if (!matched) {
-        const attempts = recordFailedAttempt(clientIp);
-        pushSecurityEvent({
-          action: 'LOGIN_FAILED',
-          status: attempts >= 5 ? 'warning' : 'failure',
-          actorEmailMasked: maskEmailForAudit(email),
-          ipTag: hashIpForAudit(clientIp),
-          details:
-            attempts >= 5
-              ? 'Repeated invalid password attempts triggered 5-minute cooldown.'
-              : 'Incorrect administrator email or password.',
+      if (fbLogin?.idToken) {
+        let decoded;
+        try {
+          decoded = await verifyFirebaseIdToken(fbLogin.idToken);
+        } catch (verifyErr) {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: verifyErr?.message || 'Unable to verify Firebase authentication token.',
+            })
+          );
+          return;
+        }
+
+        const fsAuth = await checkFirestoreAdminAuthorization(fbLogin.idToken, decoded);
+        if (!fsAuth.authorized) {
+          const attempts = recordFailedAttempt(clientIp);
+          pushSecurityEvent({
+            action: 'UNAUTHORIZED_ADMIN_LOGIN',
+            status: attempts >= 5 ? 'warning' : 'failure',
+            actorEmailMasked: maskEmailForAudit(email),
+            ipTag: hashIpForAudit(clientIp),
+            details: 'Signed in credentials do not belong to an authorized administrator.',
+          });
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              code: 'ACCESS_DENIED',
+              error: 'This account does not have administrator access.',
+            })
+          );
+          return;
+        }
+
+        clearRateLimit(clientIp);
+        const nowIso = new Date().toISOString();
+        const resolvedName =
+          fsAuth.profile?.displayName ||
+          fbLogin.displayName ||
+          stored.credentials?.fullName ||
+          'Primary Administrator';
+        const resolvedTimeout =
+          typeof fsAuth.profile?.inactivityTimeoutMinutes === 'number'
+            ? fsAuth.profile.inactivityTimeoutMinutes
+            : stored.inactivityTimeoutMinutes || 30;
+        const resolvedRole = fsAuth.role || 'owner';
+
+        // Sync fresh scrypt verifier into local/tmp store so offline/local state tracks latest dashboard creds
+        const salt = crypto.randomBytes(16).toString('hex');
+        const passwordHash = hashPasswordScrypt(password, salt);
+        writeServerCredentialStore({
+          primaryAdminUid: decoded.uid,
+          inactivityTimeoutMinutes: resolvedTimeout,
+          credentials: {
+            firebaseUid: decoded.uid,
+            fullName: resolvedName,
+            email: fbLogin.email || email,
+            emailLower: (fbLogin.email || email).toLowerCase(),
+            salt,
+            passwordHash,
+            dashboardOverride: hasDashboardOverride,
+            createdAt: stored.credentials?.createdAt || nowIso,
+            updatedAt: nowIso,
+          },
         });
-        const updatedRate = checkRateLimit(clientIp);
-        res.statusCode = updatedRate.allowed ? 401 : 429;
+
+        // Update admin doc lastLoginAt in Firestore asynchronously/cleanly
+        firestorePatchDocument(
+          `admins/${decoded.uid}`,
+          {
+            uid: decoded.uid,
+            email: fbLogin.email || email,
+            displayName: resolvedName,
+            role: resolvedRole,
+            active: true,
+            inactivityTimeoutMinutes: resolvedTimeout,
+            authMethods: Array.from(
+              new Set([...(Array.isArray(fsAuth.profile?.authMethods) ? fsAuth.profile.authMethods : []), 'password'])
+            ),
+            lastLoginAt: nowIso,
+            updatedAt: nowIso,
+            ...(fsAuth.profile?.createdAt ? {} : { createdAt: nowIso }),
+          },
+          fbLogin.idToken,
+          ['uid', 'email', 'displayName', 'role', 'active', 'inactivityTimeoutMinutes', 'authMethods', 'lastLoginAt', 'updatedAt', ...(fsAuth.profile?.createdAt ? [] : ['createdAt'])]
+        ).catch(() => {});
+
+        const signed = signServerSessionToken({
+          sub: decoded.uid,
+          email: fbLogin.email || email,
+          fullName: resolvedName,
+          role: resolvedRole,
+          envManaged: false,
+          firebaseSynced: true,
+        });
+
+        pushSecurityEvent({
+          action: 'LOGIN_SUCCESS',
+          status: 'success',
+          actorEmailMasked: maskEmailForAudit(fbLogin.email || email),
+          ipTag: hashIpForAudit(clientIp),
+          details: 'Administrator signed in (synced across Cloud Firestore & Firebase Auth).',
+        });
+
+        await writeFirestoreAuditSafe(fbLogin.idToken, {
+          action: 'LOGIN_SUCCESS',
+          actorUid: decoded.uid,
+          actorEmail: fbLogin.email || email,
+          status: 'success',
+          details: 'Administrator signed in with Email and Password.',
+          authMethod: 'password',
+        });
+
+        res.statusCode = 200;
         res.end(
           JSON.stringify({
-            success: false,
-            code: updatedRate.allowed ? 'INVALID_CREDENTIALS' : 'RATE_LIMITED',
-            envManaged: Boolean(cfg.envManaged),
-            error: updatedRate.allowed
-              ? 'The email or password you entered is incorrect. Please try again.'
-              : `Too many failed attempts. Please wait ${updatedRate.waitSeconds} seconds.`,
+            success: true,
+            token: signed.token,
+            expiresAt: signed.expiresAt,
+            firebaseIdToken: fbLogin.idToken,
+            firebaseRefreshToken: fbLogin.refreshToken,
+            firebaseExpiresAt: fbLogin.expiresAt,
+            admin: {
+              uid: decoded.uid,
+              email: fbLogin.email || email,
+              displayName: resolvedName,
+              role: resolvedRole,
+              authMode: 'server-credentials',
+              firebaseSynced: true,
+              envManaged: false,
+              inactivityTimeoutMinutes: resolvedTimeout,
+              createdAt: fsAuth.profile?.createdAt || stored.credentials?.createdAt || nowIso,
+              updatedAt: fsAuth.profile?.updatedAt || nowIso,
+              lastLoginAt: nowIso,
+            },
           })
         );
         return;
       }
 
-      clearRateLimit(clientIp);
+      // Step B: Fallback to local credential store ONLY if it isn't stale compared to Firestore bootstrap passwordUpdatedAt
+      const bootstrapPwMs = Date.parse(bootstrapDoc?.passwordUpdatedAt || '') || 0;
+      const localCredMs =
+        Date.parse(stored.credentials?.updatedAt || stored.updatedAt || '') || 0;
+      const isLocalStale = bootstrapPwMs > 0 && localCredMs + 5000 < bootstrapPwMs;
 
-      const signed = signServerSessionToken({
-        sub: 'server_admin_owner',
-        email: cfg.email,
-        fullName: cfg.fullName,
-        role: 'owner',
-        envManaged: cfg.envManaged,
-      });
+      if (
+        !isLocalStale &&
+        stored.configured &&
+        stored.credentials &&
+        verifyPasswordWithResolvedConfig(email, password, {
+          configured: true,
+          envManaged: false,
+          email: stored.credentials.email,
+          emailLower: stored.credentials.emailLower,
+          salt: stored.credentials.salt,
+          passwordHash: stored.credentials.passwordHash,
+        })
+      ) {
+        clearRateLimit(clientIp);
+        const signed = signServerSessionToken({
+          sub: stored.credentials.firebaseUid || stored.primaryAdminUid || 'server_admin_owner',
+          email: stored.credentials.email,
+          fullName: stored.credentials.fullName || 'Primary Administrator',
+          role: 'owner',
+          envManaged: false,
+          firebaseSynced: false,
+        });
 
+        pushSecurityEvent({
+          action: 'LOGIN_SUCCESS',
+          status: 'success',
+          actorEmailMasked: maskEmailForAudit(stored.credentials.email),
+          ipTag: hashIpForAudit(clientIp),
+          details: 'Administrator signed in via local server store.',
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: signed.token,
+            expiresAt: signed.expiresAt,
+            admin: {
+              uid: signed.payload.sub,
+              email: stored.credentials.email,
+              displayName: stored.credentials.fullName || 'Primary Administrator',
+              role: 'owner',
+              authMode: 'server-credentials',
+              firebaseSynced: false,
+              envManaged: false,
+              inactivityTimeoutMinutes: stored.inactivityTimeoutMinutes || 30,
+            },
+          })
+        );
+        return;
+      }
+
+      // Step C: Fallback to Env vars ONLY if dashboard has NEVER overridden credentials
+      if (!hasDashboardOverride && envCfg && verifyPasswordWithResolvedConfig(email, password, envCfg)) {
+        clearRateLimit(clientIp);
+        const signed = signServerSessionToken({
+          sub: 'server_admin_owner',
+          email: envCfg.email,
+          fullName: envCfg.fullName,
+          role: 'owner',
+          envManaged: true,
+          firebaseSynced: false,
+        });
+
+        pushSecurityEvent({
+          action: 'LOGIN_SUCCESS',
+          status: 'success',
+          actorEmailMasked: maskEmailForAudit(envCfg.email),
+          ipTag: hashIpForAudit(clientIp),
+          details: 'Administrator signed in with hosting environment credentials.',
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: signed.token,
+            expiresAt: signed.expiresAt,
+            admin: {
+              uid: signed.payload.sub,
+              email: envCfg.email,
+              displayName: envCfg.fullName,
+              role: 'owner',
+              authMode: 'server-credentials',
+              firebaseSynced: false,
+              envManaged: true,
+              inactivityTimeoutMinutes: 30,
+            },
+          })
+        );
+        return;
+      }
+
+      // Rejected login
+      const attempts = recordFailedAttempt(clientIp);
       pushSecurityEvent({
-        action: 'LOGIN_SUCCESS',
-        status: 'success',
-        actorEmailMasked: maskEmailForAudit(cfg.email),
+        action: 'LOGIN_FAILED',
+        status: attempts >= 5 ? 'warning' : 'failure',
+        actorEmailMasked: maskEmailForAudit(email),
         ipTag: hashIpForAudit(clientIp),
-        details: 'Administrator signed in with Email and Password (server-verified).',
+        details:
+          attempts >= 5
+            ? 'Repeated invalid password attempts triggered 5-minute cooldown.'
+            : `Incorrect administrator email or password (${fbErrorCode || 'MISMATCH'}).`,
       });
-
-      res.statusCode = 200;
+      const updatedRate = checkRateLimit(clientIp);
+      res.statusCode = updatedRate.allowed ? 401 : 429;
       res.end(
         JSON.stringify({
-          success: true,
-          token: signed.token,
-          expiresAt: signed.expiresAt,
-          admin: {
-            uid: signed.payload.sub,
-            email: cfg.email,
-            displayName: cfg.fullName,
-            role: 'owner',
-            authMode: 'server-credentials',
-            envManaged: cfg.envManaged,
-            inactivityTimeoutMinutes: cfg.inactivityTimeoutMinutes || 30,
-          },
+          success: false,
+          code: updatedRate.allowed ? 'INVALID_CREDENTIALS' : 'RATE_LIMITED',
+          error: updatedRate.allowed
+            ? 'The email or password you entered is incorrect. Please try again.'
+            : `Too many failed attempts. Please wait ${updatedRate.waitSeconds} seconds.`,
         })
       );
       return;
     }
 
     // ------------------------------------------------------------------------
-    // 4. POST /api/admin-auth?action=update-credentials
-    //    Signed-in admin updates Email, Full Name, Password, or Timeout cleanly
+    // 4. POST /api/admin-auth?action=refresh
+    //    Refreshes Firebase RS256 ID token cleanly before expiration
+    // ------------------------------------------------------------------------
+    if (action === 'refresh' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const refreshToken = String(body?.refreshToken || '').trim();
+      if (!refreshToken) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Missing refresh token.' }));
+        return;
+      }
+
+      try {
+        const refreshed = await firebaseAuthRefreshToken(refreshToken);
+        const decoded = await verifyFirebaseIdToken(refreshed.idToken);
+        const fsAuth = await checkFirestoreAdminAuthorization(refreshed.idToken, decoded);
+        if (!fsAuth.authorized) {
+          res.statusCode = 403;
+          res.end(JSON.stringify({ success: false, error: 'Administrator access revoked.' }));
+          return;
+        }
+
+        const resolvedName = fsAuth.profile?.displayName || decoded.name || 'Primary Administrator';
+        const signed = signServerSessionToken({
+          sub: decoded.uid,
+          email: fsAuth.profile?.email || decoded.email,
+          fullName: resolvedName,
+          role: fsAuth.role || 'owner',
+          envManaged: false,
+          firebaseSynced: true,
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: signed.token,
+            expiresAt: signed.expiresAt,
+            firebaseIdToken: refreshed.idToken,
+            firebaseRefreshToken: refreshed.refreshToken,
+            firebaseExpiresAt: refreshed.expiresAt,
+          })
+        );
+      } catch (err) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: err?.message || 'Session refresh failed.' }));
+      }
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 5. POST /api/admin-auth?action=update-credentials
+    //    Dashboard ALWAYS takes precedence over env vars & updates Firebase Auth + Firestore
     // ------------------------------------------------------------------------
     if (action === 'update-credentials' && req.method === 'POST') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -936,114 +1314,266 @@ export default async function handler(req, res) {
         return;
       }
 
-      const cfg = resolveConfiguredServerCredentials();
       const body = await readJsonBody(req);
+      const stored = readServerCredentialStore();
+      const cfg = resolveConfiguredServerCredentials();
 
-      if (cfg.envManaged && (body?.newEmail || body?.newPassword)) {
+      const wantsPasswordChange =
+        typeof body?.newPassword === 'string' && body.newPassword.length > 0;
+      const wantsEmailChange =
+        typeof body?.newEmail === 'string' && body.newEmail.trim().length > 0;
+
+      if (wantsEmailChange && !String(body.newEmail).trim().includes('@')) {
         res.statusCode = 400;
-        res.end(
-          JSON.stringify({
-            success: false,
-            error:
-              'Credentials are currently managed via server environment variables (ADMIN_EMAIL / ADMIN_PASSWORD). Update them in your hosting environment settings.',
-          })
-        );
+        res.end(JSON.stringify({ success: false, error: 'Please enter a valid email address.' }));
         return;
       }
-
-      if (!cfg.configured) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ success: false, error: 'Server credentials not initialized yet.' }));
-        return;
-      }
-
-      // Require current password verification when changing email or password
-      if (body?.newEmail || body?.newPassword) {
-        const currentPassword = String(body?.currentPassword || '');
-        if (!currentPassword || !verifyPasswordWithResolvedConfig(cfg.email, currentPassword, cfg)) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'Your current password could not be verified. Please try again.',
-            })
-          );
-          return;
-        }
-      }
-
-      let nextEmail = cfg.email;
-      let nextFullName = cfg.fullName;
-      let nextSalt = cfg.salt;
-      let nextHash = cfg.passwordHash;
-      let nextTimeout = cfg.inactivityTimeoutMinutes || 30;
-
-      if (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2) {
-        nextFullName = body.fullName.trim();
-      }
-      if (
-        typeof body?.inactivityTimeoutMinutes === 'number' &&
-        body.inactivityTimeoutMinutes >= 5 &&
-        body.inactivityTimeoutMinutes <= 180
-      ) {
-        nextTimeout = body.inactivityTimeoutMinutes;
-      }
-      if (typeof body?.newEmail === 'string' && body.newEmail.trim()) {
-        const cleanEmail = body.newEmail.trim();
-        if (!cleanEmail.includes('@')) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter a valid email address.' }));
-          return;
-        }
-        nextEmail = cleanEmail;
-      }
-      if (typeof body?.newPassword === 'string' && body.newPassword.length > 0) {
+      if (wantsPasswordChange) {
         const pwCheck = validatePasswordPolicy(body.newPassword);
         if (!pwCheck.valid) {
           res.statusCode = 400;
           res.end(JSON.stringify({ success: false, error: pwCheck.error }));
           return;
         }
-        nextSalt = crypto.randomBytes(16).toString('hex');
-        nextHash = hashPasswordScrypt(body.newPassword, nextSalt);
+      }
+
+      let activeFirebaseIdToken = adminCheck.firebaseIdToken || '';
+      let activeFirebaseRefreshToken = String(body?.firebaseRefreshToken || '').trim();
+      let activeFirebaseExpiresAt = 0;
+      let activeUid = adminCheck.uid || cfg.firebaseUid || 'server_admin_owner';
+      let currentEmail = adminCheck.email || cfg.email || '';
+
+      // Require and verify current password when changing email or password
+      if (wantsPasswordChange || wantsEmailChange) {
+        const currentPassword = String(body?.currentPassword || '');
+        if (!currentPassword) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Please enter your current password to verify your identity.',
+            })
+          );
+          return;
+        }
+
+        let verifiedViaFirebase = false;
+        if (currentEmail) {
+          try {
+            const reauth = await firebaseAuthSignInWithPassword(currentEmail, currentPassword);
+            activeFirebaseIdToken = reauth.idToken;
+            activeFirebaseRefreshToken = reauth.refreshToken;
+            activeFirebaseExpiresAt = reauth.expiresAt;
+            activeUid = reauth.uid || activeUid;
+            verifiedViaFirebase = true;
+          } catch {
+            verifiedViaFirebase = false;
+          }
+        }
+
+        if (!verifiedViaFirebase) {
+          const fallbackMatch = verifyPasswordWithResolvedConfig(currentEmail, currentPassword, cfg);
+          if (!fallbackMatch) {
+            res.statusCode = 403;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Your current password could not be verified. Please try again.',
+              })
+            );
+            return;
+          }
+        }
+      }
+
+      let nextEmail = currentEmail || cfg.email || '';
+      let nextFullName =
+        (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2
+          ? body.fullName.trim()
+          : adminCheck.fullName || cfg.fullName) || 'Primary Administrator';
+      let nextTimeout =
+        typeof body?.inactivityTimeoutMinutes === 'number' &&
+        body.inactivityTimeoutMinutes >= 5 &&
+        body.inactivityTimeoutMinutes <= 180
+          ? body.inactivityTimeoutMinutes
+          : adminCheck.inactivityTimeoutMinutes || cfg.inactivityTimeoutMinutes || 30;
+
+      // Apply password & email updates directly to Firebase Auth when we hold a Firebase ID token
+      if (activeFirebaseIdToken && (wantsPasswordChange || wantsEmailChange || typeof body?.fullName === 'string')) {
+        try {
+          if (wantsPasswordChange) {
+            const pwRes = await firebaseAuthUpdateAccount({
+              idToken: activeFirebaseIdToken,
+              password: body.newPassword,
+            });
+            activeFirebaseIdToken = pwRes.idToken || activeFirebaseIdToken;
+            if (pwRes.refreshToken) activeFirebaseRefreshToken = pwRes.refreshToken;
+            if (pwRes.expiresAt) activeFirebaseExpiresAt = pwRes.expiresAt;
+          }
+
+          if (wantsEmailChange) {
+            const cleanNewEmail = body.newEmail.trim();
+            try {
+              const emailRes = await firebaseAuthUpdateAccount({
+                idToken: activeFirebaseIdToken,
+                email: cleanNewEmail,
+              });
+              activeFirebaseIdToken = emailRes.idToken || activeFirebaseIdToken;
+              if (emailRes.refreshToken) activeFirebaseRefreshToken = emailRes.refreshToken;
+              if (emailRes.expiresAt) activeFirebaseExpiresAt = emailRes.expiresAt;
+              nextEmail = emailRes.email || cleanNewEmail;
+            } catch (emailErr) {
+              const errCode = String(emailErr?.code || emailErr?.message || '');
+              if (errCode.includes('EMAIL_EXISTS')) {
+                res.statusCode = 409;
+                res.end(
+                  JSON.stringify({
+                    success: false,
+                    error: 'That email address is already used by another account.',
+                  })
+                );
+                return;
+              }
+              if (errCode.includes('OPERATION_NOT_ALLOWED') || errCode.includes('VERIFICATION')) {
+                res.statusCode = 400;
+                res.end(
+                  JSON.stringify({
+                    success: false,
+                    error:
+                      'Firebase project policy requires email-link verification before changing the primary email address, or updating via Firebase Authentication settings.',
+                  })
+                );
+                return;
+              }
+              throw emailErr;
+            }
+          }
+
+          if (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2) {
+            await firebaseAuthUpdateAccount({
+              idToken: activeFirebaseIdToken,
+              displayName: nextFullName,
+            }).catch(() => {});
+          }
+        } catch (fbUpdateErr) {
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error:
+                fbUpdateErr?.message ||
+                'Failed to synchronize credential changes with Firebase Authentication.',
+            })
+          );
+          return;
+        }
+      } else if (wantsEmailChange) {
+        nextEmail = body.newEmail.trim();
       }
 
       const nowIso = new Date().toISOString();
-      writeServerCredentialStore({
-        inactivityTimeoutMinutes: nextTimeout,
-        credentials: {
-          fullName: nextFullName,
-          email: nextEmail,
-          emailLower: nextEmail.toLowerCase(),
-          salt: nextSalt,
-          passwordHash: nextHash,
-          createdAt: cfg.createdAt || nowIso,
-          updatedAt: nowIso,
-        },
-      });
+      let nextSalt = stored.credentials?.salt || cfg.salt || '';
+      let nextHash = stored.credentials?.passwordHash || cfg.passwordHash || '';
+
+      if (wantsPasswordChange) {
+        nextSalt = crypto.randomBytes(16).toString('hex');
+        nextHash = hashPasswordScrypt(body.newPassword, nextSalt);
+      } else if (body?.currentPassword && (!nextSalt || !nextHash)) {
+        nextSalt = crypto.randomBytes(16).toString('hex');
+        nextHash = hashPasswordScrypt(body.currentPassword, nextSalt);
+      }
+
+      if (nextEmail && nextSalt && nextHash) {
+        writeServerCredentialStore({
+          primaryAdminUid: activeUid,
+          inactivityTimeoutMinutes: nextTimeout,
+          credentials: {
+            firebaseUid: activeUid,
+            fullName: nextFullName,
+            email: nextEmail,
+            emailLower: nextEmail.toLowerCase(),
+            salt: nextSalt,
+            passwordHash: nextHash,
+            dashboardOverride: true,
+            createdAt: stored.credentials?.createdAt || cfg.createdAt || nowIso,
+            updatedAt: nowIso,
+          },
+        });
+      }
+
+      // Persist profile, timeout, and Dashboard Override marker to Cloud Firestore
+      if (activeFirebaseIdToken && activeUid) {
+        await Promise.allSettled([
+          firestorePatchDocument(
+            `admins/${activeUid}`,
+            {
+              uid: activeUid,
+              email: nextEmail,
+              displayName: nextFullName,
+              role: adminCheck.role || 'owner',
+              active: true,
+              inactivityTimeoutMinutes: nextTimeout,
+              updatedAt: nowIso,
+            },
+            activeFirebaseIdToken,
+            ['uid', 'email', 'displayName', 'role', 'active', 'inactivityTimeoutMinutes', 'updatedAt']
+          ),
+          firestorePatchDocument(
+            'settings/admin_bootstrap',
+            {
+              setupCompleted: true,
+              primaryAdminUid: activeUid,
+              dashboardOverride: true,
+              updatedAt: nowIso,
+              ...(wantsPasswordChange ? { passwordUpdatedAt: nowIso } : {}),
+            },
+            activeFirebaseIdToken,
+            [
+              'setupCompleted',
+              'primaryAdminUid',
+              'dashboardOverride',
+              'updatedAt',
+              ...(wantsPasswordChange ? ['passwordUpdatedAt'] : []),
+            ]
+          ),
+        ]);
+      }
 
       const refreshed = signServerSessionToken({
-        sub: 'server_admin_owner',
+        sub: activeUid,
         email: nextEmail,
         fullName: nextFullName,
-        role: 'owner',
+        role: adminCheck.role || 'owner',
         envManaged: false,
+        firebaseSynced: Boolean(activeFirebaseIdToken),
       });
 
+      const actionLabel = wantsPasswordChange
+        ? 'PASSWORD_CHANGED'
+        : wantsEmailChange
+        ? 'EMAIL_CHANGED'
+        : 'PROFILE_UPDATED';
+      const actionDetail = wantsPasswordChange
+        ? 'Administrator password updated from Dashboard and synced globally.'
+        : wantsEmailChange
+        ? `Administrator login email updated to ${nextEmail} and synced globally.`
+        : `Updated administrator profile ("${nextFullName}", timeout ${nextTimeout} min).`;
+
       pushSecurityEvent({
-        action: body?.newPassword
-          ? 'PASSWORD_CHANGED'
-          : body?.newEmail
-          ? 'EMAIL_CHANGED'
-          : 'PROFILE_UPDATED',
+        action: actionLabel,
         status: 'success',
         actorEmailMasked: maskEmailForAudit(nextEmail),
         ipTag: hashIpForAudit(clientIp),
-        details: body?.newPassword
-          ? 'Administrator password updated cleanly on backend server.'
-          : body?.newEmail
-          ? 'Administrator login email updated cleanly on backend server.'
-          : `Updated administrator profile ("${nextFullName}", timeout ${nextTimeout} min).`,
+        details: actionDetail,
+      });
+
+      await writeFirestoreAuditSafe(activeFirebaseIdToken, {
+        action: actionLabel,
+        actorUid: activeUid,
+        actorEmail: nextEmail,
+        status: 'success',
+        details: actionDetail,
+        authMethod: 'password',
       });
 
       res.statusCode = 200;
@@ -1052,14 +1582,19 @@ export default async function handler(req, res) {
           success: true,
           token: refreshed.token,
           expiresAt: refreshed.expiresAt,
+          ...(activeFirebaseIdToken ? { firebaseIdToken: activeFirebaseIdToken } : {}),
+          ...(activeFirebaseRefreshToken ? { firebaseRefreshToken: activeFirebaseRefreshToken } : {}),
+          ...(activeFirebaseExpiresAt ? { firebaseExpiresAt: activeFirebaseExpiresAt } : {}),
           admin: {
-            uid: refreshed.payload.sub,
+            uid: activeUid,
             email: nextEmail,
             displayName: nextFullName,
-            role: 'owner',
+            role: adminCheck.role || 'owner',
             authMode: 'server-credentials',
+            firebaseSynced: Boolean(activeFirebaseIdToken),
             envManaged: false,
             inactivityTimeoutMinutes: nextTimeout,
+            updatedAt: nowIso,
           },
         })
       );
@@ -1067,8 +1602,72 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 5. POST /api/admin-auth?action=verify-session
-    //    Verifies standalone Server HMAC token OR optional Firebase Google token
+    // 6. POST /api/admin-auth?action=password-reset
+    //    Sends real Firebase Authentication Password Reset email cleanly
+    // ------------------------------------------------------------------------
+    if (action === 'password-reset' && req.method === 'POST') {
+      const rateCheck = checkRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.statusCode = 429;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: `Too many requests. Please wait ${rateCheck.waitSeconds} seconds.`,
+          })
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const email = String(body?.email || '').trim();
+      if (!email || !email.includes('@')) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Please enter a valid email address.' }));
+        return;
+      }
+
+      try {
+        await firebaseAuthSendPasswordReset(email);
+        pushSecurityEvent({
+          action: 'PASSWORD_RESET_DISPATCHED',
+          status: 'success',
+          actorEmailMasked: maskEmailForAudit(email),
+          ipTag: hashIpForAudit(clientIp),
+          details: 'Password recovery email dispatched via Firebase Authentication.',
+        });
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            message: `A password reset link has been sent to ${email}. Check your inbox (and spam folder) and follow the link to set a new password.`,
+          })
+        );
+      } catch (err) {
+        const code = String(err?.code || err?.message || '');
+        if (code.includes('TOO_MANY_ATTEMPTS')) {
+          res.statusCode = 429;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Too many reset requests. Please wait a few minutes and try again.',
+            })
+          );
+          return;
+        }
+        // Return neutral privacy-safe confirmation if EMAIL_NOT_FOUND
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            message: `If an administrator account exists for ${email}, a password reset link has been sent.`,
+          })
+        );
+      }
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 7. POST /api/admin-auth?action=verify-session
     // ------------------------------------------------------------------------
     if (action === 'verify-session' && req.method === 'POST') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -1094,6 +1693,7 @@ export default async function handler(req, res) {
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           signInProvider: adminCheck.signInProvider,
+          firebaseSynced: Boolean(adminCheck.firebaseIdToken),
           bootstrapped: true,
         })
       );
@@ -1101,7 +1701,305 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 6. POST /api/admin-auth?action=record-security-event
+    // 8. POST /api/admin-auth?action=record-audit (Admin-only)
+    // ------------------------------------------------------------------------
+    if (action === 'record-audit' && req.method === 'POST') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+      const body = await readJsonBody(req);
+      pushSecurityEvent({
+        action: String(body?.action || 'ADMIN_EVENT').slice(0, 100),
+        status: ['success', 'failure', 'warning'].includes(body?.status) ? body.status : 'success',
+        actorEmailMasked: maskEmailForAudit(adminCheck.email),
+        ipTag: hashIpForAudit(clientIp),
+        details: String(body?.details || '').slice(0, 500),
+      });
+      await writeFirestoreAuditSafe(adminCheck.firebaseIdToken, {
+        action: body?.action,
+        actorUid: adminCheck.uid,
+        actorEmail: adminCheck.email,
+        status: body?.status,
+        details: body?.details,
+        authMethod: body?.authMethod || adminCheck.signInProvider || 'password',
+      });
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 9. GET /api/admin-auth?action=audit-logs (Admin-only, merged Firestore + server events)
+    // ------------------------------------------------------------------------
+    if (action === 'audit-logs' && req.method === 'GET') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+
+      const urlObj = new URL(req.url || '/', 'http://localhost');
+      const maxEntries = Math.min(100, Math.max(5, Number(urlObj.searchParams.get('limit')) || 50));
+      const entries = [];
+
+      if (adminCheck.firebaseIdToken) {
+        try {
+          const fsLogs = await firestoreQueryCollection('admin_audit_logs', {
+            idToken: adminCheck.firebaseIdToken,
+            orderByField: 'timestamp',
+            orderDirection: 'DESCENDING',
+            limitCount: maxEntries,
+          });
+          for (const item of fsLogs) {
+            entries.push({
+              id: item.id,
+              action: String(item.action || 'ADMIN_EVENT'),
+              actorUid: String(item.actorUid || ''),
+              actorEmail: typeof item.actorEmail === 'string' ? item.actorEmail : undefined,
+              status: item.status || 'success',
+              details: String(item.details || ''),
+              authMethod: typeof item.authMethod === 'string' ? item.authMethod : undefined,
+              timestamp: String(item.timestamp || new Date().toISOString()),
+              source: 'firestore',
+            });
+          }
+        } catch {
+          // Non-blocking fallback
+        }
+      }
+
+      for (const ev of serverSecurityEvents) {
+        entries.push({
+          id: String(ev.id),
+          action: String(ev.action || 'SECURITY_EVENT'),
+          actorUid: String(ev.ipTag || 'network'),
+          actorEmail: typeof ev.actorEmailMasked === 'string' ? ev.actorEmailMasked : undefined,
+          status: ev.status || 'warning',
+          details: String(ev.details || ''),
+          authMethod: 'server-security',
+          timestamp: String(ev.timestamp || new Date().toISOString()),
+          source: 'security-server',
+        });
+      }
+
+      entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true, logs: entries.slice(0, maxEntries) }));
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 10. Access Registry (admins & admin_invites via Firestore REST)
+    // ------------------------------------------------------------------------
+    if (action === 'access-registry' && req.method === 'GET') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+
+      let admins = [];
+      let invites = [];
+
+      if (adminCheck.firebaseIdToken) {
+        const [fsAdmins, fsInvites] = await Promise.all([
+          firestoreQueryCollection('admins', { idToken: adminCheck.firebaseIdToken }).catch(() => []),
+          firestoreQueryCollection('admin_invites', { idToken: adminCheck.firebaseIdToken }).catch(
+            () => []
+          ),
+        ]);
+        admins = fsAdmins.map((d) => ({
+          uid: d.uid || d.id,
+          email: String(d.email || ''),
+          displayName: typeof d.displayName === 'string' ? d.displayName : undefined,
+          role: d.role === 'owner' ? 'owner' : 'admin',
+          authMethods: Array.isArray(d.authMethods) ? d.authMethods : ['password'],
+          active: d.active !== false,
+          inactivityTimeoutMinutes:
+            typeof d.inactivityTimeoutMinutes === 'number' ? d.inactivityTimeoutMinutes : 30,
+          lastLoginAt: typeof d.lastLoginAt === 'string' ? d.lastLoginAt : undefined,
+          createdAt: typeof d.createdAt === 'string' ? d.createdAt : undefined,
+          updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : undefined,
+        }));
+        invites = fsInvites.map((d) => ({
+          email: String(d.email || d.id),
+          displayName: typeof d.displayName === 'string' ? d.displayName : undefined,
+          role: 'admin',
+          active: d.active !== false,
+          invitedByUid: typeof d.invitedByUid === 'string' ? d.invitedByUid : undefined,
+          createdAt: typeof d.createdAt === 'string' ? d.createdAt : undefined,
+          updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : undefined,
+        }));
+      }
+
+      if (admins.length === 0) {
+        admins.push({
+          uid: adminCheck.uid || 'server_admin_owner',
+          email: adminCheck.email || '',
+          displayName: adminCheck.fullName || 'Primary Administrator',
+          role: adminCheck.role || 'owner',
+          authMethods: ['password'],
+          active: true,
+          inactivityTimeoutMinutes: adminCheck.inactivityTimeoutMinutes || 30,
+        });
+      }
+
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true, admins, invites }));
+      return;
+    }
+
+    if (action === 'authorize-admin' && req.method === 'POST') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Cloud-synced administrator session required.',
+          })
+        );
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      const cleanUid = String(body?.uid || '').trim();
+      const cleanEmail = String(body?.email || '').trim();
+      const cleanName = String(body?.displayName || '').trim();
+      const cleanRole = body?.role === 'owner' ? 'owner' : 'admin';
+
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Valid administrator email is required.' }));
+        return;
+      }
+      if (!cleanName || cleanName.length < 2) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Administrator full name is required.' }));
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      if (cleanUid) {
+        if (cleanUid.length < 6) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Firebase Auth UID appears too short.' }));
+          return;
+        }
+        await firestorePatchDocument(
+          `admins/${cleanUid}`,
+          {
+            uid: cleanUid,
+            email: cleanEmail,
+            displayName: cleanName,
+            role: cleanRole,
+            active: true,
+            authMethods: [],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+          adminCheck.firebaseIdToken
+        );
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true, mode: 'uid' }));
+        return;
+      }
+
+      const emailLower = cleanEmail.toLowerCase();
+      await firestorePatchDocument(
+        `admin_invites/${emailLower}`,
+        {
+          email: cleanEmail,
+          displayName: cleanName,
+          role: 'admin',
+          active: true,
+          invitedByUid: adminCheck.uid || '',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        },
+        adminCheck.firebaseIdToken
+      );
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true, mode: 'invite' }));
+      return;
+    }
+
+    if (action === 'toggle-admin' && req.method === 'POST') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+      const body = await readJsonBody(req);
+      const targetUid = String(body?.uid || '').trim();
+      const active = Boolean(body?.active);
+      const targetRole = body?.role;
+
+      if (!targetUid) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Missing target administrator UID.' }));
+        return;
+      }
+      if (targetUid === adminCheck.uid && !active) {
+        res.statusCode = 400;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'You cannot revoke your own currently active administrator account.',
+          })
+        );
+        return;
+      }
+      if (targetRole === 'owner' && !active) {
+        res.statusCode = 400;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Primary owner accounts are protected and cannot be revoked.',
+          })
+        );
+        return;
+      }
+
+      await firestorePatchDocument(
+        `admins/${targetUid}`,
+        { active, updatedAt: new Date().toISOString() },
+        adminCheck.firebaseIdToken,
+        ['active', 'updatedAt']
+      );
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    if (action === 'remove-invite' && req.method === 'POST') {
+      const adminCheck = await verifyRequestAdmin(req);
+      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+      const body = await readJsonBody(req);
+      const emailLower = String(body?.email || '').trim().toLowerCase();
+      if (!emailLower) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'Missing invitation email.' }));
+        return;
+      }
+      await firestoreDeleteDocument(`admin_invites/${emailLower}`, adminCheck.firebaseIdToken);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 11. POST /api/admin-auth?action=record-security-event
     // ------------------------------------------------------------------------
     if (action === 'record-security-event' && req.method === 'POST') {
       const rateCheck = checkRateLimit(clientIp);
@@ -1144,7 +2042,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 7. GET /api/admin-auth?action=security-events (Admin-only)
+    // 12. GET /api/admin-auth?action=security-events (Admin-only)
     // ------------------------------------------------------------------------
     if (action === 'security-events' && req.method === 'GET') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -1165,7 +2063,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 8. GET /api/admin-auth?action=diagnostics (Admin-only live health check)
+    // 13. GET /api/admin-auth?action=diagnostics (Admin-only live health check)
     // ------------------------------------------------------------------------
     if (action === 'diagnostics' && req.method === 'GET') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -1176,17 +2074,21 @@ export default async function handler(req, res) {
       }
 
       const cfg = resolveConfiguredServerCredentials();
+      const bootstrapDoc = await fetchBootstrapDocSafe();
       const setupSecretConfigured = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
 
       res.statusCode = 200;
       res.end(
         JSON.stringify({
           success: true,
+          uid: adminCheck.uid,
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           emailVerified: adminCheck.emailVerified,
-          serverCredentialsConfigured: cfg.configured,
-          envManaged: cfg.envManaged,
+          firebaseSynced: Boolean(adminCheck.firebaseIdToken),
+          dashboardOverrideActive: Boolean(bootstrapDoc?.dashboardOverride || cfg.dashboardOverride),
+          serverCredentialsConfigured: cfg.configured || Boolean(bootstrapDoc?.setupCompleted),
+          envManaged: Boolean(cfg.envManaged),
           setupSecretConfigured,
         })
       );
@@ -1194,7 +2096,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 9. POST /api/admin-auth?action=logout
+    // 14. POST /api/admin-auth?action=logout
     // ------------------------------------------------------------------------
     if (action === 'logout' && req.method === 'POST') {
       res.statusCode = 200;
@@ -1204,17 +2106,26 @@ export default async function handler(req, res) {
 
     res.statusCode = 404;
     res.end(JSON.stringify({ success: false, error: 'Endpoint not found.' }));
-  } catch {
+  } catch (err) {
     res.statusCode = 500;
-    res.end(JSON.stringify({ success: false, error: 'Internal authentication verification error.' }));
+    res.end(
+      JSON.stringify({
+        success: false,
+        error: err?.message || 'Internal authentication verification error.',
+      })
+    );
   }
 }
 
 export async function getAdminAuthConfig() {
   const cfg = resolveConfiguredServerCredentials();
+  const bootstrapDoc = await fetchBootstrapDocSafe();
+  const isBootstrapped = Boolean(cfg.configured || bootstrapDoc?.setupCompleted);
   return {
-    bootstrapped: cfg.configured,
-    configured: cfg.configured,
-    envManaged: cfg.envManaged,
+    bootstrapped: isBootstrapped,
+    configured: isBootstrapped,
+    envManaged: Boolean(cfg.envManaged),
   };
 }
+
+export { loadFirebaseRuntimeConfig };

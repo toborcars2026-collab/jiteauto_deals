@@ -20,30 +20,51 @@ export interface RecordAuditInput {
 }
 
 /**
- * Writes an immutable administrator security or operational audit event to Firestore
- * when a Firebase Admin user is active. Skips silently in standalone server auth mode.
+ * Writes an immutable administrator security or operational audit event to Cloud Firestore
+ * (either directly via Firebase Web SDK or via verified backend endpoint).
  */
 export async function recordAdminAuditLog(input: RecordAuditInput): Promise<void> {
   const user = auth.currentUser;
-  if (!user) return;
+  if (user) {
+    try {
+      await addDoc(collection(db, 'admin_audit_logs'), {
+        action: input.action.slice(0, 100),
+        actorUid: user.uid,
+        actorEmail: user.email || '',
+        status: input.status,
+        details: input.details.slice(0, 500),
+        authMethod: input.authMethod || user.providerData?.[0]?.providerId || 'unknown',
+        timestamp: serverTimestamp(),
+      });
+      return;
+    } catch (err) {
+      console.warn('[Admin Audit Log Notice]:', err instanceof Error ? err.message : String(err));
+    }
+  }
 
   try {
-    await addDoc(collection(db, 'admin_audit_logs'), {
-      action: input.action.slice(0, 100),
-      actorUid: user.uid,
-      actorEmail: user.email || '',
-      status: input.status,
-      details: input.details.slice(0, 500),
-      authMethod: input.authMethod || user.providerData?.[0]?.providerId || 'unknown',
-      timestamp: serverTimestamp(),
+    const token = await getActiveAdminBearerToken();
+    if (!token) return;
+    await fetch('/api/admin-auth?action=record-audit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action: input.action.slice(0, 100),
+        status: input.status,
+        details: input.details.slice(0, 500),
+        authMethod: input.authMethod || 'password',
+      }),
     });
-  } catch (err) {
-    console.warn('[Admin Audit Log Notice]:', err instanceof Error ? err.message : String(err));
+  } catch {
+    // Non-blocking audit log fallback
   }
 }
 
 /**
- * Fetches server security logs and (when Firebase Auth is active) Firestore audit logs.
+ * Fetches server security logs and Cloud Firestore audit logs across both Google and Email/Password modes.
  */
 export async function fetchAdminAuditLogs(maxEntries = 50): Promise<AdminAuditLogEntry[]> {
   const results: AdminAuditLogEntry[] = [];
@@ -80,34 +101,53 @@ export async function fetchAdminAuditLogs(maxEntries = 50): Promise<AdminAuditLo
     } catch {
       // Non-blocking fallback
     }
+
+    try {
+      const token = await getActiveAdminBearerToken();
+      if (token) {
+        const res = await fetch('/api/admin-auth?action=security-events', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.events)) {
+            data.events.forEach((ev: any) => {
+              results.push({
+                id: String(ev.id || `sec_${Math.random().toString(36).slice(2)}`),
+                action: String(ev.action || 'SECURITY_EVENT'),
+                actorUid: String(ev.ipTag || 'network'),
+                actorEmail: typeof ev.actorEmailMasked === 'string' ? ev.actorEmailMasked : undefined,
+                status: (ev.status as AdminAuditLogEntry['status']) || 'warning',
+                details: String(ev.details || ''),
+                authMethod: 'server-security',
+                timestamp: String(ev.timestamp || new Date().toISOString()),
+                source: 'security-server',
+              });
+            });
+          }
+        }
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+
+    return results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   try {
     const token = await getActiveAdminBearerToken();
     if (token) {
-      const res = await fetch('/api/admin-auth?action=security-events', {
+      const res = await fetch(`/api/admin-auth?action=audit-logs&limit=${maxEntries}`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.events)) {
-          data.events.forEach((ev: any) => {
-            results.push({
-              id: String(ev.id || `sec_${Math.random().toString(36).slice(2)}`),
-              action: String(ev.action || 'SECURITY_EVENT'),
-              actorUid: String(ev.ipTag || 'network'),
-              actorEmail: typeof ev.actorEmailMasked === 'string' ? ev.actorEmailMasked : undefined,
-              status: (ev.status as AdminAuditLogEntry['status']) || 'warning',
-              details: String(ev.details || ''),
-              authMethod: 'server-security',
-              timestamp: String(ev.timestamp || new Date().toISOString()),
-              source: 'security-server',
-            });
-          });
+        if (Array.isArray(data.logs)) {
+          return data.logs as AdminAuditLogEntry[];
         }
       }
     }
@@ -115,5 +155,5 @@ export async function fetchAdminAuditLogs(maxEntries = 50): Promise<AdminAuditLo
     // Non-blocking fallback
   }
 
-  return results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return results;
 }

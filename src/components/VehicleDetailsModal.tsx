@@ -28,6 +28,7 @@ import {
   getVehicleInquiryMessage,
   getImageUrl,
   getOptimizedImageUrl,
+  getVehicleDetailSrcSet,
   decodeUnicodeEscapes,
   getVehicleSlug,
   getBusinessPhoneDisplay,
@@ -472,6 +473,7 @@ export default function VehicleDetailsModal({
   // Specs array
   const specs = [
     { label: 'Condition', value: vehicle.condition, isHighlight: true },
+    ...(vehicle.dutyStatus ? [{ label: 'Duty Status', value: vehicle.dutyStatus, isHighlight: true }] : []),
     { label: 'Exterior Color', value: vehicle.color },
     { label: 'Transmission', value: vehicle.transmission },
     { label: 'Fuel Compound', value: vehicle.fuelType },
@@ -610,6 +612,8 @@ export default function VehicleDetailsModal({
                             opacity: { duration: 0.2 },
                           }}
                           src={getOptimizedImageUrl(images[currentImageIndex], 'detail')}
+                          srcSet={getVehicleDetailSrcSet(images[currentImageIndex])}
+                          sizes="(max-width: 1024px) 100vw, 600px"
                           alt={`${vehicle.make} ${vehicle.model} - view ${currentImageIndex + 1}`}
                           className="w-full h-full object-cover transition-transform cursor-pointer"
                           loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
@@ -807,9 +811,21 @@ export default function VehicleDetailsModal({
             </div>
           </div>
 
-          {/* Description Section */}
-          <div className="space-y-3 pt-4 border-t border-slate-150">
+          {/* Description & Key Features Section */}
+          <div className="space-y-4 pt-4 border-t border-slate-150">
             <h3 className="font-display text-lg font-bold text-slate-900">Vehicle Description & Features</h3>
+            {vehicle.keyFeatures && vehicle.keyFeatures.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {vehicle.keyFeatures.map((feat, idx) => (
+                  <span
+                    key={`${feat}_${idx}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-amber-300 border border-slate-800 text-xs font-semibold"
+                  >
+                    <span>{feat}</span>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="text-slate-700 text-sm sm:text-base leading-relaxed font-normal whitespace-pre-line bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-100 font-sans break-words select-text">
               {decodeUnicodeEscapes(vehicle.description)}
             </div>

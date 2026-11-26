@@ -106,6 +106,14 @@
       "destination": "/api/data?resource=editorial-posts"
     },
     {
+      "source": "/api/cloudinary-sign",
+      "destination": "/api/cloudinary?action=sign"
+    },
+    {
+      "source": "/api/cloudinary-delete",
+      "destination": "/api/cloudinary?action=delete"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

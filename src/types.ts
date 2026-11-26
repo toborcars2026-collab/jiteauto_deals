@@ -2,6 +2,20 @@ export type NavigationTab = 'home' | 'browse' | 'find-car' | 'source-car' | 'how
 
 export type VehicleStatus = 'Available' | 'Reserved' | 'Sold' | 'Hidden' | 'Active' | 'Inactive';
 
+export interface VehicleImageRecord {
+  vehicleId: string;
+  publicId: string;
+  secureUrl: string;
+  position: number;
+  isCover: boolean;
+  uploadedAt: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  format?: string;
+  angleTag?: string;
+}
+
 export interface Vehicle {
   id: string;
   make: string;
@@ -14,7 +28,10 @@ export interface Vehicle {
   bodyType: 'Sedan' | 'SUV' | 'Coupe' | 'Hatchback' | 'Truck' | 'Crossover' | 'Minivan' | 'Luxury SUV' | string;
   location: string;
   dealership?: string;
+  dutyStatus?: string;
+  keyFeatures?: string[];
   images: string[];
+  imageMetadata?: VehicleImageRecord[];
   description: string;
   engine?: string;
   color: string;
@@ -164,6 +181,7 @@ export interface AdminProfile {
   createdAt?: string;
   updatedAt?: string;
   authMode?: 'server-credentials' | 'google-firebase';
+  firebaseSynced?: boolean;
   envManaged?: boolean;
 }
 

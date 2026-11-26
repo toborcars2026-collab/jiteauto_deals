@@ -7,6 +7,9 @@ import { createServer as createViteServer } from "vite";
 import { resolveServerRouteMetadata, injectMetadataIntoHtml } from "./src/metaHelper";
 import compression from "compression";
 import adminAuthHandler, { verifyRequestAdmin } from "./api/admin-auth.js";
+import cloudinaryHandler from "./api/cloudinary.js";
+import dataHandler from "./api/data.js";
+import { firestoreQueryCollection } from "./api/firestore-rest.js";
 import renderPageHandler from "./api/render.js";
 
 const app = express();
@@ -34,9 +37,6 @@ app.use(
 );
 
 const VEHICLES_FILE = path.join(DATA_DIR, "vehicles.json");
-const DELETED_FILE = path.join(DATA_DIR, "deleted_ids.json");
-const LEADS_FILE = path.join(DATA_DIR, "leads.json");
-const INQUIRIES_FILE = path.join(DATA_DIR, "inquiries.json");
 
 async function requireVerifiedAdmin(
   req: express.Request,
@@ -54,43 +54,10 @@ async function requireVerifiedAdmin(
   });
 }
 
-const KNOWN_DELETED_IDS = new Set<string>([
-  "toyota-corolla-s-2015-silver-few-months-used",
-  "lexus-rx350-2015-silver-duty-paid",
-  "toyota-highlander-xle-2017-brown-foreign-used",
-  "toyota-corolla-le-2015-silver-direct-belgium",
-]);
-
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
-}
-
-function readDeletedIdsStore(): Set<string> {
-  ensureDataDir();
-  const deletedSet = new Set<string>(KNOWN_DELETED_IDS);
-  if (!fs.existsSync(DELETED_FILE)) {
-    fs.writeFileSync(DELETED_FILE, JSON.stringify(Array.from(deletedSet), null, 2), "utf-8");
-    return deletedSet;
-  }
-  try {
-    const raw = fs.readFileSync(DELETED_FILE, "utf-8");
-    const data = JSON.parse(raw);
-    if (Array.isArray(data)) {
-      data.forEach((id: string) => deletedSet.add(id));
-    }
-  } catch (e) {
-    console.error("Failed to read deleted_ids.json", e);
-  }
-  return deletedSet;
-}
-
-function recordDeletedId(id: string) {
-  ensureDataDir();
-  const set = readDeletedIdsStore();
-  set.add(id);
-  fs.writeFileSync(DELETED_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
 }
 
 function decodeUnicodeEscapes(str: any): any {
@@ -193,76 +160,6 @@ function saveVehiclesStore(vehicles: any[]) {
   return normalized;
 }
 
-function readLeadsStore() {
-  ensureDataDir();
-  if (!fs.existsSync(LEADS_FILE)) {
-    return [];
-  }
-  try {
-    const raw = fs.readFileSync(LEADS_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveLeadsStore(leads: any[]) {
-  ensureDataDir();
-  fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), "utf-8");
-}
-
-function readInquiriesStore() {
-  ensureDataDir();
-  if (!fs.existsSync(INQUIRIES_FILE)) {
-    return [];
-  }
-  try {
-    const raw = fs.readFileSync(INQUIRIES_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveInquiriesStore(inquiries: any[]) {
-  ensureDataDir();
-  fs.writeFileSync(INQUIRIES_FILE, JSON.stringify(inquiries, null, 2), "utf-8");
-}
-
-const BUSINESS_SETTINGS_FILE = path.join(DATA_DIR, "business_settings.json");
-const EDITORIAL_POSTS_FILE = path.join(DATA_DIR, "editorial_posts.json");
-
-function readBusinessSettingsStore(): Record<string, any> | null {
-  ensureDataDir();
-  if (!fs.existsSync(BUSINESS_SETTINGS_FILE)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(BUSINESS_SETTINGS_FILE, "utf-8"));
-  } catch {
-    return null;
-  }
-}
-
-function saveBusinessSettingsStore(settings: Record<string, any>) {
-  ensureDataDir();
-  fs.writeFileSync(BUSINESS_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
-}
-
-function readEditorialStore(): any[] | null {
-  ensureDataDir();
-  if (!fs.existsSync(EDITORIAL_POSTS_FILE)) return null;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(EDITORIAL_POSTS_FILE, "utf-8"));
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveEditorialStore(posts: any[]) {
-  ensureDataDir();
-  fs.writeFileSync(EDITORIAL_POSTS_FILE, JSON.stringify(posts, null, 2), "utf-8");
-}
-
 // API Anti-Cache Middleware
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/")) {
@@ -294,11 +191,6 @@ app.get("/api/resolve-image", async (req, res) => {
   } catch {
     return res.json({ resolvedUrl: targetUrl });
   }
-});
-
-app.get("/api/vehicles", (_req, res) => {
-  const vehicles = readVehiclesStore();
-  res.json(vehicles);
 });
 
 app.get("/api/download-android-project", (_req, res) => {
@@ -346,10 +238,18 @@ app.post("/api/upload-vehicle-image", requireVerifiedAdmin, (req, res) => {
     const targetFilePath = path.join(vehicleUploadsDir, uniqueName);
     fs.writeFileSync(targetFilePath, buffer);
 
-    const relativeUrl = `/uploads/vehicles/${cleanVehicleId}/${uniqueName}`;
+    // Return portable data URI when <= 750KB so photos uploaded in AI Studio also sync to Vercel
+    const portableDataUrl = base64Data.startsWith("data:")
+      ? base64Data
+      : `data:${mimeType};base64,${rawData}`;
+    const resolvedUrl =
+      buffer.length <= 750 * 1024
+        ? portableDataUrl
+        : `/uploads/vehicles/${cleanVehicleId}/${uniqueName}`;
+
     return res.json({
       success: true,
-      url: relativeUrl,
+      url: resolvedUrl,
       size: buffer.length,
       mimeType,
     });
@@ -357,6 +257,12 @@ app.post("/api/upload-vehicle-image", requireVerifiedAdmin, (req, res) => {
     console.error("Upload error:", err);
     return res.status(500).json({ error: "Failed to save uploaded image: " + err.message });
   }
+});
+
+// Unified Cloud Firestore + Local Mirror API Routes (exact parity with Vercel api/data.js)
+app.get("/api/vehicles", async (req, res) => {
+  req.query = { ...req.query, resource: "vehicles", action: "" };
+  return dataHandler(req, res);
 });
 
 app.post("/api/vehicles", requireVerifiedAdmin, (req, res) => {
@@ -368,140 +274,64 @@ app.post("/api/vehicles", requireVerifiedAdmin, (req, res) => {
   res.json({ success: true, count: saved.length, vehicles: saved });
 });
 
-app.post("/api/vehicles/upsert", requireVerifiedAdmin, (req, res) => {
-  const incoming = req.body;
-  if (!incoming || typeof incoming !== "object" || !incoming.id) {
-    return res.status(400).json({ error: "Valid vehicle object with id is required." });
+app.post("/api/vehicles/upsert", async (req, res) => {
+  req.query = { ...req.query, resource: "vehicles", action: "upsert" };
+  return dataHandler(req, res);
+});
+
+app.delete("/api/vehicles/:id", async (req, res) => {
+  req.query = { ...req.query, resource: "vehicles", action: req.params.id };
+  return dataHandler(req, res);
+});
+
+app.post("/api/vehicles/delete", async (req, res) => {
+  req.query = { ...req.query, resource: "vehicles", action: "delete" };
+  return dataHandler(req, res);
+});
+
+app.post("/api/vehicles/reset", requireVerifiedAdmin, async (_req, res) => {
+  try {
+    const fsVehicles = await firestoreQueryCollection("vehicles");
+    saveVehiclesStore(fsVehicles);
+    return res.json({ success: true, vehicles: fsVehicles });
+  } catch {
+    const current = readVehiclesStore();
+    return res.json({ success: true, vehicles: current });
   }
-  const normalized = normalizeVehicle(incoming);
-  const current = readVehiclesStore();
-  const filtered = current.filter((v: any) => v.id !== normalized.id);
-  const next = [normalized, ...filtered];
-  saveVehiclesStore(next);
-  res.json({ success: true, vehicle: normalized });
 });
 
-app.delete("/api/vehicles/:id", requireVerifiedAdmin, (req, res) => {
-  const vehicleId = req.params.id;
-  if (!vehicleId) {
-    return res.status(400).json({ error: "Missing vehicle id" });
-  }
-  recordDeletedId(vehicleId);
-  const current = readVehiclesStore();
-  const filtered = current.filter((v: any) => v.id !== vehicleId);
-  saveVehiclesStore(filtered);
-  res.json({ success: true, deletedId: vehicleId, remaining: filtered.length });
+app.all("/api/leads", async (req, res) => {
+  req.query = { ...req.query, resource: "leads", action: "" };
+  return dataHandler(req, res);
 });
 
-app.post("/api/vehicles/delete", requireVerifiedAdmin, (req, res) => {
-  const { id } = req.body || {};
-  if (!id) {
-    return res.status(400).json({ error: "Missing vehicle id" });
-  }
-  recordDeletedId(id);
-  const current = readVehiclesStore();
-  const filtered = current.filter((v: any) => v.id !== id);
-  saveVehiclesStore(filtered);
-  res.json({ success: true, deletedId: id, remaining: filtered.length });
+app.all("/api/leads/:action", async (req, res) => {
+  req.query = { ...req.query, resource: "leads", action: req.params.action };
+  return dataHandler(req, res);
 });
 
-app.post("/api/vehicles/reset", requireVerifiedAdmin, (_req, res) => {
-  const current = readVehiclesStore();
-  res.json({ success: true, vehicles: current });
+app.all("/api/inquiries", async (req, res) => {
+  req.query = { ...req.query, resource: "inquiries", action: "" };
+  return dataHandler(req, res);
 });
 
-app.get("/api/leads", requireVerifiedAdmin, (_req, res) => {
-  const leads = readLeadsStore();
-  res.json(leads);
+app.all("/api/inquiries/:action", async (req, res) => {
+  req.query = { ...req.query, resource: "inquiries", action: req.params.action };
+  return dataHandler(req, res);
 });
 
-app.post("/api/leads", requireVerifiedAdmin, (req, res) => {
-  const leads = req.body;
-  if (Array.isArray(leads)) {
-    saveLeadsStore(leads);
-  }
-  res.json({ success: true });
+app.all("/api/business-settings", async (req, res) => {
+  req.query = { ...req.query, resource: "business-settings", action: "" };
+  return dataHandler(req, res);
 });
 
-app.post("/api/leads/submit", (req, res) => {
-  const lead = req.body;
-  if (!lead || typeof lead !== "object" || !lead.name || !lead.phone) {
-    return res.status(400).json({ error: "Valid lead name and phone are required." });
-  }
-  const current = readLeadsStore();
-  const next = [lead, ...current.filter((l: any) => l.id !== lead.id)].slice(0, 500);
-  saveLeadsStore(next);
-  res.json({ success: true });
+app.all("/api/editorial-posts", async (req, res) => {
+  req.query = { ...req.query, resource: "editorial-posts", action: "" };
+  return dataHandler(req, res);
 });
 
-app.post("/api/leads/status", requireVerifiedAdmin, (req, res) => {
-  const { id, status } = req.body || {};
-  if (!id || !status) return res.status(400).json({ error: "Missing lead id or status" });
-  const current = readLeadsStore();
-  const updated = current.map((l: any) => (l.id === id ? { ...l, status, updatedAt: new Date().toISOString() } : l));
-  saveLeadsStore(updated);
-  res.json({ success: true });
-});
-
-app.get("/api/inquiries", requireVerifiedAdmin, (_req, res) => {
-  const inquiries = readInquiriesStore();
-  res.json(inquiries);
-});
-
-app.post("/api/inquiries", requireVerifiedAdmin, (req, res) => {
-  const inquiries = req.body;
-  if (Array.isArray(inquiries)) {
-    saveInquiriesStore(inquiries);
-  }
-  res.json({ success: true });
-});
-
-app.post("/api/inquiries/submit", (req, res) => {
-  const inquiry = req.body;
-  if (!inquiry || typeof inquiry !== "object" || !inquiry.name || !inquiry.phone) {
-    return res.status(400).json({ error: "Valid inquiry name and phone are required." });
-  }
-  const current = readInquiriesStore();
-  const next = [inquiry, ...current.filter((i: any) => i.id !== inquiry.id)].slice(0, 500);
-  saveInquiriesStore(next);
-  res.json({ success: true });
-});
-
-app.post("/api/inquiries/status", requireVerifiedAdmin, (req, res) => {
-  const { id, status } = req.body || {};
-  if (!id || !status) return res.status(400).json({ error: "Missing inquiry id or status" });
-  const current = readInquiriesStore();
-  const updated = current.map((i: any) => (i.id === id ? { ...i, status, updatedAt: new Date().toISOString() } : i));
-  saveInquiriesStore(updated);
-  res.json({ success: true });
-});
-
-app.get("/api/business-settings", (_req, res) => {
-  const settings = readBusinessSettingsStore();
-  res.json({ settings });
-});
-
-app.post("/api/business-settings", requireVerifiedAdmin, (req, res) => {
-  const settings = req.body;
-  if (!settings || typeof settings !== "object") {
-    return res.status(400).json({ error: "Invalid settings payload" });
-  }
-  saveBusinessSettingsStore(settings);
-  res.json({ success: true, settings });
-});
-
-app.get("/api/editorial-posts", (_req, res) => {
-  const posts = readEditorialStore();
-  res.json({ posts });
-});
-
-app.post("/api/editorial-posts", requireVerifiedAdmin, (req, res) => {
-  const posts = req.body?.posts;
-  if (!Array.isArray(posts)) {
-    return res.status(400).json({ error: "Expected posts array" });
-  }
-  saveEditorialStore(posts);
-  res.json({ success: true, posts });
+app.all("/api/data", async (req, res) => {
+  return dataHandler(req, res);
 });
 
 // Unified Administrator Authentication & Security Verification Routes (matches vercel.json)
@@ -512,6 +342,20 @@ app.all("/api/admin-auth", async (req, res) => {
 app.all("/api/admin/auth/:action", async (req, res) => {
   req.query = { ...req.query, action: req.params.action };
   return adminAuthHandler(req, res);
+});
+
+app.all("/api/cloudinary", async (req, res) => {
+  return cloudinaryHandler(req, res);
+});
+
+app.all("/api/cloudinary-sign", async (req, res) => {
+  req.query = { ...req.query, action: "sign" };
+  return cloudinaryHandler(req, res);
+});
+
+app.all("/api/cloudinary-delete", async (req, res) => {
+  req.query = { ...req.query, action: "delete" };
+  return cloudinaryHandler(req, res);
 });
 
 app.post(["/api/ai/consultant", "/api/ai-consultant"], async (_req, res) => {

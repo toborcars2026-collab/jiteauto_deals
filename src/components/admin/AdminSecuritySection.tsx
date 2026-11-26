@@ -75,6 +75,9 @@ export default function AdminSecuritySection({
     ['password'];
   const hasPasswordLinked = isServerCredsMode ? true : providerIds.includes('password');
   const hasGoogleLinked = !isServerCredsMode && providerIds.includes('google.com');
+  const canManageAdmins = !isServerCredsMode || Boolean(adminProfile?.firebaseSynced);
+  const activeUid = user?.uid || adminProfile?.uid || currentUser?.uid || '';
+  const activeEmail = user?.email || adminProfile?.email || currentUser?.email || '';
 
   // Section A: Administrator Profile
   const [displayNameInput, setDisplayNameInput] = useState(
@@ -159,10 +162,11 @@ export default function AdminSecuritySection({
   }, [loadAccessRegistry, refreshDiagnostics]);
 
   useEffect(() => {
-    if (adminProfile?.displayName) {
-      setDisplayNameInput(adminProfile.displayName);
+    const nextName = adminProfile?.displayName || currentUser?.displayName || '';
+    if (nextName) {
+      setDisplayNameInput(nextName);
     }
-  }, [adminProfile?.displayName]);
+  }, [adminProfile?.displayName, currentUser?.displayName]);
 
   useEffect(() => {
     if (inactivityTimeoutMinutes) {
@@ -279,7 +283,7 @@ export default function AdminSecuritySection({
   };
 
   const handleSendPasswordReset = async () => {
-    const email = user?.email || currentUser?.email;
+    const email = activeEmail;
     if (!email) {
       showError('No email address is associated with this session.');
       return;
@@ -456,7 +460,7 @@ export default function AdminSecuritySection({
                   {adminProfile?.active !== false ? 'Authorized & Active' : 'Suspended'}
                 </span>
                 <span className="font-mono text-[11px] text-slate-500">
-                  UID: {user?.uid?.slice(0, 10) || '—'}
+                  UID: {activeUid ? activeUid.slice(0, 12) : '—'}
                 </span>
               </div>
             </div>
@@ -487,12 +491,18 @@ export default function AdminSecuritySection({
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-bold text-slate-900 truncate">
-                    {user?.email || currentUser?.email || adminProfile?.email || 'Authenticated Session'}
+                    {activeEmail || 'Authenticated Session'}
                   </span>
                   {isServerCredsMode ? (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-bold">
-                      Server Auth
-                    </span>
+                    adminProfile?.firebaseSynced ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                        Cloud Synced
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-bold">
+                        Server Auth
+                      </span>
+                    )
                   ) : user?.emailVerified ? (
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
                       Verified
@@ -550,13 +560,24 @@ export default function AdminSecuritySection({
                   </div>
                 )}
               </div>
-              <div className="flex justify-end">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-500">
+                  {isServerCredsMode
+                    ? 'Updates your login email immediately across both the live website and workspace.'
+                    : 'Sends a confirmation link to your new email address before applying the change.'}
+                </p>
                 <button
                   type="submit"
                   disabled={savingEmail}
-                  className="px-5 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  {savingEmail ? 'Sending Verification...' : 'Send Email Change Verification'}
+                  {savingEmail
+                    ? isServerCredsMode
+                      ? 'Updating Email...'
+                      : 'Sending Verification...'
+                    : isServerCredsMode
+                    ? 'Update Login Email'
+                    : 'Send Email Change Verification'}
                 </button>
               </div>
             </form>
@@ -849,13 +870,13 @@ export default function AdminSecuritySection({
               <h3 className="text-sm font-bold text-slate-900">C. Administrator Access</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {isServerCredsMode
-                ? 'Active primary administrator session authenticated via standalone server credentials (decoupled from Firestore).'
-                : 'Authorized accounts, role permissions, invitations, and safe access revocation. Primary owners are protected from accidental removal.'}
+              {canManageAdmins
+                ? 'Cloud-synchronized administrator accounts, role permissions, invitations, and safe access revocation. Primary owners are protected from accidental removal.'
+                : 'Active primary administrator session authenticated locally.'}
             </p>
           </div>
 
-          {!isServerCredsMode && (
+          {canManageAdmins && (
             <button
               type="button"
               onClick={() => setShowAddAdmin(!showAddAdmin)}
@@ -867,7 +888,7 @@ export default function AdminSecuritySection({
           )}
         </div>
 
-        {!isServerCredsMode && showAddAdmin && (
+        {canManageAdmins && showAddAdmin && (
           <form
             onSubmit={handleAddAuthorizedAdmin}
             className="bg-white p-4 rounded-xl border border-amber-300 space-y-3"
@@ -932,7 +953,10 @@ export default function AdminSecuritySection({
               <div className="divide-y divide-slate-200 bg-white rounded-xl border border-slate-200 overflow-hidden">
                 {authorizedAdmins.map((admin) => {
                   const isSelf = Boolean(
-                    admin.uid && (admin.uid === user?.uid || admin.uid === adminProfile?.uid)
+                    (admin.uid && (admin.uid === activeUid || admin.uid === adminProfile?.uid)) ||
+                      (admin.email &&
+                        activeEmail &&
+                        admin.email.toLowerCase() === activeEmail.toLowerCase())
                   );
                   const isOwner = admin.role === 'owner';
                   return (

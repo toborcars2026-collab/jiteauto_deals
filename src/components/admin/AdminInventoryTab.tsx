@@ -30,8 +30,9 @@ import {
   saveVehicleSlideshow,
   deleteVehicleFromFirestore,
   deleteVehicle,
+  deleteVehicleCloudinaryAssets,
   getVehicleShareUrl,
-  getImageUrl,
+  getOptimizedImageUrl,
 } from '../../utils';
 
 interface AdminInventoryTabProps {
@@ -62,12 +63,20 @@ export default function AdminInventoryTab({
   const [updatingFeaturedId, setUpdatingFeaturedId] = useState<string | null>(null);
   const [updatingSlideshowId, setUpdatingSlideshowId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteCar, setConfirmDeleteCar] = useState<Vehicle | null>(null);
+  const [cleanupCloudinaryOnDelete, setCleanupCloudinaryOnDelete] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   const showFeedback = (msg: string) => {
+    setErrorBanner(null);
     setFeedbackMessage(msg);
-    setTimeout(() => setFeedbackMessage(null), 3500);
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
+  const showError = (msg: string) => {
+    setErrorBanner(msg);
   };
 
   // Quick Copy URL
@@ -110,7 +119,7 @@ export default function AdminInventoryTab({
       );
       showFeedback(`Status for ${car.year} ${car.make} ${car.model} changed to "${newStatus}".`);
     } catch (err: any) {
-      alert(`Failed to update status: ${err?.message || err}`);
+      showError(`Failed to update status: ${err?.message || err}`);
     } finally {
       setUpdatingStatusId(null);
     }
@@ -122,7 +131,7 @@ export default function AdminInventoryTab({
     if (rawVal === undefined) return;
     const numPrice = Number(rawVal.replace(/[^0-9]/g, ''));
     if (!numPrice || numPrice <= 0) {
-      alert('Please enter a valid positive price in Naira.');
+      showError('Please enter a valid positive price in Naira.');
       return;
     }
 
@@ -144,7 +153,7 @@ export default function AdminInventoryTab({
       });
       showFeedback(`Price updated to ${formatCurrency(numPrice)} for ${car.make} ${car.model}.`);
     } catch (err: any) {
-      alert(`Failed to update price: ${err?.message || err}`);
+      showError(`Failed to update price: ${err?.message || err}`);
     } finally {
       setUpdatingPriceId(null);
     }
@@ -159,9 +168,9 @@ export default function AdminInventoryTab({
       setVehicles((prev) =>
         prev.map((v) => (v.id === car.id ? { ...v, isFeatured: newFeatured, updatedAt: new Date().toISOString() } : v))
       );
-      showFeedback(`${car.make} ${car.model} is now ${newFeatured ? 'Featured ⭐' : 'Unfeatured'}.`);
+      showFeedback(`${car.make} ${car.model} is now ${newFeatured ? 'Featured' : 'Unfeatured'}.`);
     } catch (err: any) {
-      alert(`Failed to update featured state: ${err?.message || err}`);
+      showError(`Failed to update featured state: ${err?.message || err}`);
     } finally {
       setUpdatingFeaturedId(null);
     }
@@ -178,30 +187,56 @@ export default function AdminInventoryTab({
       );
       showFeedback(`${car.make} ${car.model} ${newSlideshow ? 'added to' : 'removed from'} Homepage Slideshow.`);
     } catch (err: any) {
-      alert(`Failed to update slideshow state: ${err?.message || err}`);
+      showError(`Failed to update slideshow state: ${err?.message || err}`);
     } finally {
       setUpdatingSlideshowId(null);
     }
   };
 
-  // Delete Vehicle
-  const handleDeleteCar = async (car: Vehicle) => {
-    if (!confirm(`Are you sure you want to permanently delete "${car.year} ${car.make} ${car.model}" from Cloud Firestore?`)) {
-      return;
-    }
+  // Open Inline Delete Confirmation Modal
+  const handleRequestDeleteCar = (car: Vehicle) => {
+    setCleanupCloudinaryOnDelete(true);
+    setConfirmDeleteCar(car);
+  };
+
+  // Execute Permanent Vehicle Deletion (+ safe unshared Cloudinary cleanup if selected)
+  const handleConfirmDeleteCar = async () => {
+    const car = confirmDeleteCar;
+    if (!car) return;
     setDeletingId(car.id);
     try {
       await deleteVehicleFromFirestore(car.id);
+
+      let cleanupSummary = '';
+      if (cleanupCloudinaryOnDelete && (car.images?.length || car.imageMetadata?.length)) {
+        try {
+          const publicIds = (car.imageMetadata || [])
+            .map((m) => m.publicId)
+            .filter((pid): pid is string => Boolean(pid && !pid.startsWith('external_')));
+          const cleanupRes = await deleteVehicleCloudinaryAssets({
+            vehicleId: car.id,
+            publicIds,
+            imageUrls: car.images || [],
+          });
+          if (cleanupRes.deleted?.length) {
+            cleanupSummary = ` Cleaned up ${cleanupRes.deleted.length} unshared Cloudinary image(s).`;
+          }
+        } catch {
+          // Vehicle record was deleted cleanly; non-blocking if Cloudinary cleanup skipped
+        }
+      }
+
       await recordAdminAuditLog({
         action: 'VEHICLE_DELETED',
         status: 'warning',
-        details: `Deleted listing "${car.year} ${car.make} ${car.model}" (${car.id}).`,
+        details: `Deleted listing "${car.year} ${car.make} ${car.model}" (${car.id}).${cleanupSummary}`,
       });
       setVehicles((prev) => prev.filter((v) => v.id !== car.id));
       deleteVehicle(car.id);
-      showFeedback(`Listing "${car.make} ${car.model}" deleted successfully from Cloud Firestore.`);
+      setConfirmDeleteCar(null);
+      showFeedback(`Listing "${car.make} ${car.model}" deleted from Cloud Firestore.${cleanupSummary}`);
     } catch (err: any) {
-      alert(`Failed to delete vehicle: ${err?.message || err}`);
+      showError(`Failed to delete vehicle: ${err?.message || err}`);
     } finally {
       setDeletingId(null);
     }
@@ -261,6 +296,22 @@ export default function AdminInventoryTab({
         <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
           <span>{feedbackMessage}</span>
+        </div>
+      )}
+
+      {errorBanner && (
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center justify-between gap-2 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-rose-600 shrink-0" />
+            <span>{errorBanner}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorBanner(null)}
+            className="text-rose-600 hover:text-rose-900 text-xs font-bold cursor-pointer"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -342,7 +393,7 @@ export default function AdminInventoryTab({
                 <div className="flex gap-4 items-start">
                   <div className="relative h-24 w-32 rounded-xl overflow-hidden bg-slate-900 shrink-0 border border-slate-100 shadow-2xs">
                     <img
-                      src={getImageUrl(car.images[0])}
+                      src={getOptimizedImageUrl(car.images[0], 'thumb')}
                       alt={car.model}
                       className="h-full w-full object-cover"
                       style={{ imageRendering: '-webkit-optimize-contrast' }}
@@ -533,7 +584,7 @@ export default function AdminInventoryTab({
                     <button
                       type="button"
                       disabled={isDeleting}
-                      onClick={() => handleDeleteCar(car)}
+                      onClick={() => handleRequestDeleteCar(car)}
                       className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1.5 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       title="Delete Listing permanently from Firestore"
                     >
@@ -544,6 +595,64 @@ export default function AdminInventoryTab({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Permanent Vehicle Deletion & Safe Cloudinary Cleanup Confirmation Modal */}
+      {confirmDeleteCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-950 font-display">
+                  Permanently Delete Listing?
+                </h3>
+                <p className="text-xs text-slate-600 mt-1">
+                  This removes <strong>{confirmDeleteCar.year} {confirmDeleteCar.make} {confirmDeleteCar.model}</strong> from Cloud Firestore and your live Jite Auto Deals website.
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={cleanupCloudinaryOnDelete}
+                onChange={(e) => setCleanupCloudinaryOnDelete(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded text-amber-500 focus:ring-amber-400"
+              />
+              <span className="text-xs text-slate-700 leading-relaxed">
+                <strong className="block text-slate-900">Clean up unshared Cloudinary photos</strong>
+                Safely removes photos stored specifically for this vehicle while automatically protecting any shared photos used by other listings.
+              </span>
+            </label>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={deletingId === confirmDeleteCar.id}
+                onClick={() => setConfirmDeleteCar(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingId === confirmDeleteCar.id}
+                onClick={handleConfirmDeleteCar}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold cursor-pointer flex items-center gap-1.5"
+              >
+                {deletingId === confirmDeleteCar.id ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                <span>Confirm Permanent Delete</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
