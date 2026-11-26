@@ -3,16 +3,14 @@ import { MessageSquare } from 'lucide-react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ProblemSolution from './components/ProblemSolution';
-import FeaturedShowcase from './components/FeaturedShowcase';
 import ThreePaths from './components/ThreePaths';
 import FeaturedVehicles from './components/FeaturedVehicles';
 import WhyChooseUs from './components/WhyChooseUs';
 import HowItWorks from './components/HowItWorks';
-import EditorialContentSection from './components/EditorialContentSection';
 import AboutFounder from './components/AboutFounder';
 import VehicleDetailsModal from './components/VehicleDetailsModal';
 import Footer from './components/Footer';
-import { Vehicle, NavigationTab, BusinessSettings, EditorialPost } from './types';
+import { Vehicle, NavigationTab, BusinessSettings } from './types';
 import {
   getVehicles,
   fetchVehicles,
@@ -21,9 +19,6 @@ import {
   getBusinessSettings,
   fetchBusinessSettings,
   subscribeToBusinessSettings,
-  getEditorialPosts,
-  fetchEditorialPosts,
-  subscribeToEditorialPosts,
   getWhatsAppLink,
   getGeneralConsultationMessage,
   findVehicleBySlugOrId,
@@ -79,7 +74,6 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('home');
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => initialVehiclesList);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => getBusinessSettings());
-  const [editorialPosts, setEditorialPosts] = useState<EditorialPost[]>(() => getEditorialPosts());
 
   // Modal states - instantly initialized from URL if a vehicle link was tapped
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(() => {
@@ -409,22 +403,9 @@ export default function App() {
       }
     });
 
-    fetchEditorialPosts().then((loadedPosts) => {
-      if (loadedPosts && loadedPosts.length > 0) {
-        setEditorialPosts(loadedPosts);
-      }
-    });
-
-    const unsubscribeEditorial = subscribeToEditorialPosts((updatedPosts) => {
-      if (updatedPosts && updatedPosts.length > 0) {
-        setEditorialPosts(updatedPosts);
-      }
-    });
-
     return () => {
       unsubscribeVehicles();
       unsubscribeSettings();
-      unsubscribeEditorial();
     };
   }, []);
 
@@ -508,13 +489,6 @@ export default function App() {
               onViewVehicleDetails={handleViewDetails}
             />
 
-            <FeaturedShowcase
-              vehicles={vehicles}
-              onViewDetails={handleViewDetails}
-              onBookInspection={handleOpenInspection}
-              onBrowseAll={() => handleTabChange('browse')}
-            />
-
             <ProblemSolution
               onTalkToConsultant={() => handleOpenConsultant(null)}
               onFindMyCar={() => handleTabChange('find-car')}
@@ -541,11 +515,6 @@ export default function App() {
             <HowItWorks
               onLearnMore={() => handleTabChange('how-it-works')}
               onOpenConsultant={() => handleOpenConsultant(null)}
-            />
-
-            <EditorialContentSection
-              posts={editorialPosts}
-              onTalkToConsultant={() => handleOpenConsultant(null)}
             />
 
             <AboutFounder

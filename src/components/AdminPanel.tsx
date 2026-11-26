@@ -692,8 +692,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 <span>Continue with Google</span>
               </button>
 
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
-                {onCancel && (
+              {onCancel && (
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                   <button
                     type="button"
                     onClick={onCancel}
@@ -701,20 +701,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   >
                     Return to Website
                   </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthNotice(null);
-                    setAuthView('setup');
-                  }}
-                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer py-1 ml-auto"
-                >
-                  First-time administrator setup
-                </button>
-              </div>
+                </div>
+              )}
             </>
           )}
 
@@ -786,8 +774,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
             </>
           )}
 
-          {/* View: Controlled First-Time Administrator Setup (All fields blank by default) */}
-          {authView === 'setup' && (
+          {/* View: Controlled First-Time Administrator Setup (Only when unconfigured) */}
+          {authView === 'setup' && !bootstrapStatus.bootstrapped && (
             <>
               <div className="text-center space-y-2">
                 <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-950/80 border border-amber-500/35 flex items-center justify-center text-amber-400">
