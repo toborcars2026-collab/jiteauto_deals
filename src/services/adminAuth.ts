@@ -34,18 +34,14 @@ import {
   handleFirestoreError,
   testFirestoreConnection,
 } from '../firebase';
-import {
-  isSupabaseClientConfigured,
-  setSupabaseClientSession,
-  clearSupabaseClientSession,
-} from '../lib/supabase';
+import { isSupabaseClientConfigured } from '../lib/supabase';
 import { AdminInvite, AdminProfile, SecurityDiagnosticStatus } from '../types';
 import { recordAdminAuditLog } from './adminAudit';
 
 export interface AdminBootstrapStatus {
   bootstrapped: boolean;
   configured?: boolean;
-  backend?: 'supabase' | 'firebase';
+  backend?: 'server-credentials' | 'firebase';
   supabaseConfigured?: boolean;
   envManaged?: boolean;
   envOverridden?: boolean;
@@ -57,9 +53,6 @@ export interface AdminBootstrapStatus {
 export interface ServerAdminSession {
   token: string;
   expiresAt: number;
-  supabaseAccessToken?: string;
-  supabaseRefreshToken?: string;
-  supabaseExpiresAt?: number;
   firebaseIdToken?: string;
   firebaseRefreshToken?: string;
   firebaseExpiresAt?: number;
@@ -75,7 +68,7 @@ export interface AdminVerificationResult {
   invited?: boolean;
   signInProvider?: string;
   bootstrapped?: boolean;
-  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
+  authMode?: 'server-credentials' | 'google-firebase';
   error?: string;
   code?: string;
 }
@@ -117,14 +110,9 @@ export function getCurrentServerAdminSession(): ServerAdminSession | null {
   if (!activeServerSession) return null;
   const maxExp = Math.max(
     activeServerSession.expiresAt || 0,
-    activeServerSession.supabaseExpiresAt || 0,
     activeServerSession.firebaseExpiresAt || 0
   );
-  if (
-    Date.now() >= maxExp &&
-    !activeServerSession.supabaseRefreshToken &&
-    !activeServerSession.firebaseRefreshToken
-  ) {
+  if (Date.now() >= maxExp && !activeServerSession.firebaseRefreshToken) {
     activeServerSession = null;
     return null;
   }
@@ -137,64 +125,6 @@ async function refreshServerTokenIfNeeded(): Promise<string | null> {
 
   const bufferMs = 4 * 60 * 1000;
 
-  // 1. Supabase Auth session refresh
-  if (srv.supabaseAccessToken || srv.supabaseRefreshToken) {
-    if (
-      srv.supabaseAccessToken &&
-      (!srv.supabaseExpiresAt || Date.now() < srv.supabaseExpiresAt - bufferMs)
-    ) {
-      return srv.supabaseAccessToken;
-    }
-
-    if (!srv.supabaseRefreshToken) {
-      return srv.supabaseAccessToken || srv.token || null;
-    }
-
-    if (inflightRefreshPromise) {
-      return inflightRefreshPromise;
-    }
-
-    inflightRefreshPromise = (async () => {
-      try {
-        const res = await fetch('/api/admin-auth?action=refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            refreshToken: srv.supabaseRefreshToken,
-            provider: 'supabase',
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.success && (data?.supabaseAccessToken || data?.token) && activeServerSession) {
-          const nextAccess = String(data.supabaseAccessToken || data.token);
-          const nextRefresh = String(
-            data.supabaseRefreshToken || activeServerSession.supabaseRefreshToken || ''
-          );
-          const nextExpires =
-            Number(data.supabaseExpiresAt || data.expiresAt) || Date.now() + 55 * 60 * 1000;
-          activeServerSession = {
-            ...activeServerSession,
-            token: nextAccess,
-            expiresAt: nextExpires,
-            supabaseAccessToken: nextAccess,
-            supabaseRefreshToken: nextRefresh,
-            supabaseExpiresAt: nextExpires,
-          };
-          await setSupabaseClientSession(nextAccess, nextRefresh);
-          return nextAccess;
-        }
-      } catch {
-        // Non-blocking fallback
-      } finally {
-        inflightRefreshPromise = null;
-      }
-      return activeServerSession?.supabaseAccessToken || activeServerSession?.token || null;
-    })();
-
-    return inflightRefreshPromise;
-  }
-
-  // 2. Legacy Firebase Auth session refresh
   if (
     srv.firebaseIdToken &&
     (!srv.firebaseExpiresAt || Date.now() < srv.firebaseExpiresAt - bufferMs)
@@ -248,12 +178,7 @@ async function refreshServerTokenIfNeeded(): Promise<string | null> {
 export async function getActiveAdminBearerToken(): Promise<string | null> {
   const srv = getCurrentServerAdminSession();
   if (srv) {
-    if (
-      srv.supabaseAccessToken ||
-      srv.supabaseRefreshToken ||
-      srv.firebaseIdToken ||
-      srv.firebaseRefreshToken
-    ) {
+    if (srv.firebaseIdToken || srv.firebaseRefreshToken) {
       const refreshed = await refreshServerTokenIfNeeded();
       if (refreshed) return refreshed;
     }
@@ -261,7 +186,7 @@ export async function getActiveAdminBearerToken(): Promise<string | null> {
       return srv.token;
     }
   }
-  if (!isSupabaseClientConfigured() && auth.currentUser) {
+  if (auth.currentUser) {
     try {
       return await auth.currentUser.getIdToken();
     } catch {
@@ -473,24 +398,21 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
     if (res.ok) {
       const data = await res.json();
       const configured = Boolean(data.configured ?? data.bootstrapped);
-      const supabaseConfigured = Boolean(data.supabaseConfigured ?? data.backend === 'supabase');
-      const backend: 'supabase' | 'firebase' =
-        data.backend === 'supabase' || supabaseConfigured ? 'supabase' : 'firebase';
+      const backend: 'server-credentials' | 'firebase' =
+        data.backend === 'firebase' ? 'firebase' : 'server-credentials';
       return {
         bootstrapped: configured,
         configured,
         backend,
-        supabaseConfigured,
+        supabaseConfigured: Boolean(data.supabaseConfigured ?? clientSbConfigured),
         envManaged: Boolean(data.envManaged),
         envOverridden: Boolean(data.envOverridden),
         setupSecretRequired: Boolean(data.setupSecretRequired),
-        firebaseAuthConfigured: Boolean(
-          data.firebaseAuthConfigured ?? (backend === 'firebase' && !clientSbConfigured)
-        ),
+        firebaseAuthConfigured: Boolean(data.firebaseAuthConfigured ?? true),
         passwordLoginAvailable:
           typeof data.passwordLoginAvailable === 'boolean'
             ? data.passwordLoginAvailable
-            : backend === 'supabase' || Boolean(data.envManaged || data.configured),
+            : Boolean(data.envManaged || data.configured),
       };
     }
   } catch {
@@ -500,13 +422,13 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
   return {
     bootstrapped: false,
     configured: false,
-    backend: clientSbConfigured ? 'supabase' : 'firebase',
+    backend: 'server-credentials',
     supabaseConfigured: clientSbConfigured,
     envManaged: false,
     envOverridden: false,
     setupSecretRequired: false,
-    firebaseAuthConfigured: !clientSbConfigured,
-    passwordLoginAvailable: clientSbConfigured,
+    firebaseAuthConfigured: true,
+    passwordLoginAvailable: false,
   };
 }
 
@@ -724,8 +646,6 @@ export async function signInAdminWithEmailPassword(
     }
 
     const nowIso = new Date().toISOString();
-    const resolvedAuthMode: AdminProfile['authMode'] =
-      data.admin.authMode === 'supabase' ? 'supabase' : 'server-credentials';
     const profile: AdminProfile = {
       uid: String(data.admin.uid || 'server_admin_owner'),
       email: String(data.admin.email || trimmedEmail),
@@ -737,8 +657,7 @@ export async function signInAdminWithEmailPassword(
       lastLoginAt: data.admin.lastLoginAt || nowIso,
       createdAt: data.admin.createdAt,
       updatedAt: data.admin.updatedAt,
-      authMode: resolvedAuthMode,
-      supabaseSynced: Boolean(data.admin.supabaseSynced),
+      authMode: 'server-credentials',
       firebaseSynced: Boolean(data.admin.firebaseSynced),
       envManaged: Boolean(data.admin.envManaged),
     };
@@ -746,9 +665,6 @@ export async function signInAdminWithEmailPassword(
     const session: ServerAdminSession = {
       token: String(data.token),
       expiresAt: Number(data.expiresAt) || Date.now() + 8 * 60 * 60 * 1000,
-      supabaseAccessToken: data.supabaseAccessToken ? String(data.supabaseAccessToken) : undefined,
-      supabaseRefreshToken: data.supabaseRefreshToken ? String(data.supabaseRefreshToken) : undefined,
-      supabaseExpiresAt: data.supabaseExpiresAt ? Number(data.supabaseExpiresAt) : undefined,
       firebaseIdToken: data.firebaseIdToken ? String(data.firebaseIdToken) : undefined,
       firebaseRefreshToken: data.firebaseRefreshToken ? String(data.firebaseRefreshToken) : undefined,
       firebaseExpiresAt: data.firebaseExpiresAt ? Number(data.firebaseExpiresAt) : undefined,
@@ -756,9 +672,6 @@ export async function signInAdminWithEmailPassword(
     };
 
     activeServerSession = session;
-    if (session.supabaseAccessToken) {
-      await setSupabaseClientSession(session.supabaseAccessToken, session.supabaseRefreshToken);
-    }
     touchAdminActivity(profile.inactivityTimeoutMinutes);
 
     return {
@@ -950,8 +863,6 @@ export async function completeFirstTimeSetup(params: {
     }
 
     const nowIso = new Date().toISOString();
-    const resolvedAuthMode: AdminProfile['authMode'] =
-      data.admin.authMode === 'supabase' ? 'supabase' : 'server-credentials';
     const profile: AdminProfile = {
       uid: String(data.admin.uid || 'server_admin_owner'),
       email: String(data.admin.email || email),
@@ -962,24 +873,17 @@ export async function completeFirstTimeSetup(params: {
       inactivityTimeoutMinutes: Number(data.admin.inactivityTimeoutMinutes) || 30,
       lastLoginAt: nowIso,
       createdAt: nowIso,
-      authMode: resolvedAuthMode,
-      supabaseSynced: Boolean(data.admin.supabaseSynced),
+      authMode: 'server-credentials',
       envManaged: Boolean(data.admin.envManaged),
     };
 
     const session: ServerAdminSession = {
       token: String(data.token),
       expiresAt: Number(data.expiresAt) || Date.now() + 8 * 60 * 60 * 1000,
-      supabaseAccessToken: data.supabaseAccessToken ? String(data.supabaseAccessToken) : undefined,
-      supabaseRefreshToken: data.supabaseRefreshToken ? String(data.supabaseRefreshToken) : undefined,
-      supabaseExpiresAt: data.supabaseExpiresAt ? Number(data.supabaseExpiresAt) : undefined,
       profile,
     };
 
     activeServerSession = session;
-    if (session.supabaseAccessToken) {
-      await setSupabaseClientSession(session.supabaseAccessToken, session.supabaseRefreshToken);
-    }
     touchAdminActivity(profile.inactivityTimeoutMinutes);
 
     return { success: true, serverSession: session, profile };
@@ -1200,7 +1104,6 @@ export async function changeAdminPassword(params: {
         body: JSON.stringify({
           currentPassword: params.currentPassword || '',
           newPassword: params.newPassword,
-          supabaseRefreshToken: srv.supabaseRefreshToken || '',
           firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
@@ -1214,9 +1117,7 @@ export async function changeAdminPassword(params: {
         uid: data.admin?.uid || srv.profile.uid,
         email: data.admin?.email || srv.profile.email,
         displayName: data.admin?.displayName || srv.profile.displayName,
-        authMode:
-          data.admin?.authMode === 'supabase' ? 'supabase' : srv.profile.authMode,
-        supabaseSynced: Boolean(data.admin?.supabaseSynced ?? srv.profile.supabaseSynced),
+        authMode: 'server-credentials',
         firebaseSynced: Boolean(data.admin?.firebaseSynced ?? srv.profile.firebaseSynced),
         envManaged: false,
         updatedAt: data.admin?.updatedAt || new Date().toISOString(),
@@ -1224,20 +1125,11 @@ export async function changeAdminPassword(params: {
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
-        supabaseAccessToken: data.supabaseAccessToken || srv.supabaseAccessToken,
-        supabaseRefreshToken: data.supabaseRefreshToken || srv.supabaseRefreshToken,
-        supabaseExpiresAt: Number(data.supabaseExpiresAt) || srv.supabaseExpiresAt,
         firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
         firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
         firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
         profile: updatedProfile,
       };
-      if (activeServerSession.supabaseAccessToken) {
-        await setSupabaseClientSession(
-          activeServerSession.supabaseAccessToken,
-          activeServerSession.supabaseRefreshToken
-        );
-      }
       return {
         success: true,
         profile: updatedProfile,
@@ -1323,7 +1215,6 @@ export async function changeAdminEmail(params: {
         body: JSON.stringify({
           currentPassword: params.currentPassword || '',
           newEmail: trimmed,
-          supabaseRefreshToken: srv.supabaseRefreshToken || '',
           firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
@@ -1337,9 +1228,7 @@ export async function changeAdminEmail(params: {
         uid: data.admin?.uid || srv.profile.uid,
         email: data.admin?.email || trimmed,
         displayName: data.admin?.displayName || srv.profile.displayName,
-        authMode:
-          data.admin?.authMode === 'supabase' ? 'supabase' : srv.profile.authMode,
-        supabaseSynced: Boolean(data.admin?.supabaseSynced ?? srv.profile.supabaseSynced),
+        authMode: 'server-credentials',
         firebaseSynced: Boolean(data.admin?.firebaseSynced ?? srv.profile.firebaseSynced),
         envManaged: false,
         updatedAt: data.admin?.updatedAt || new Date().toISOString(),
@@ -1347,20 +1236,11 @@ export async function changeAdminEmail(params: {
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
-        supabaseAccessToken: data.supabaseAccessToken || srv.supabaseAccessToken,
-        supabaseRefreshToken: data.supabaseRefreshToken || srv.supabaseRefreshToken,
-        supabaseExpiresAt: Number(data.supabaseExpiresAt) || srv.supabaseExpiresAt,
         firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
         firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
         firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
         profile: updatedProfile,
       };
-      if (activeServerSession.supabaseAccessToken) {
-        await setSupabaseClientSession(
-          activeServerSession.supabaseAccessToken,
-          activeServerSession.supabaseRefreshToken
-        );
-      }
       return {
         success: true,
         profile: updatedProfile,
@@ -1416,7 +1296,6 @@ export async function updateAdminProfileSettings(params: {
         body: JSON.stringify({
           fullName: cleanName,
           inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
-          supabaseRefreshToken: srv.supabaseRefreshToken || '',
           firebaseRefreshToken: srv.firebaseRefreshToken || '',
         }),
       });
@@ -1435,9 +1314,6 @@ export async function updateAdminProfileSettings(params: {
       activeServerSession = {
         token: data.token || srv.token,
         expiresAt: Number(data.expiresAt) || srv.expiresAt,
-        supabaseAccessToken: data.supabaseAccessToken || srv.supabaseAccessToken,
-        supabaseRefreshToken: data.supabaseRefreshToken || srv.supabaseRefreshToken,
-        supabaseExpiresAt: Number(data.supabaseExpiresAt) || srv.supabaseExpiresAt,
         firebaseIdToken: data.firebaseIdToken || srv.firebaseIdToken,
         firebaseRefreshToken: data.firebaseRefreshToken || srv.firebaseRefreshToken,
         firebaseExpiresAt: Number(data.firebaseExpiresAt) || srv.firebaseExpiresAt,
@@ -1468,7 +1344,7 @@ export async function updateAdminProfileSettings(params: {
 }
 
 export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
-  if (isSupabaseClientConfigured() || !auth.currentUser) {
+  if (!auth.currentUser) {
     const token = await getActiveAdminBearerToken();
     const srv = getCurrentServerAdminSession();
     if (token) {
@@ -1516,7 +1392,7 @@ export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
 }
 
 export async function listAdminInvites(): Promise<AdminInvite[]> {
-  if (isSupabaseClientConfigured() || !auth.currentUser) {
+  if (!auth.currentUser) {
     const token = await getActiveAdminBearerToken();
     if (token) {
       try {
@@ -1575,7 +1451,7 @@ export async function registerAuthorizedAdmin(input: {
     return { success: false, error: 'Administrator full name is required.' };
   }
 
-  if (isSupabaseClientConfigured() || !auth.currentUser) {
+  if (!auth.currentUser) {
     const token = await getActiveAdminBearerToken();
     if (!token) {
       return { success: false, error: 'Active administrator session required.' };
@@ -1649,7 +1525,7 @@ export async function registerAuthorizedAdmin(input: {
 }
 
 export async function removeAdminInvite(email: string): Promise<{ success: boolean; error?: string }> {
-  if (isSupabaseClientConfigured() || !auth.currentUser) {
+  if (!auth.currentUser) {
     const token = await getActiveAdminBearerToken();
     if (!token) return { success: false, error: 'Active administrator session required.' };
     try {
@@ -1683,7 +1559,7 @@ export async function setAuthorizedAdminActive(
   active: boolean,
   targetRole?: 'owner' | 'admin'
 ): Promise<{ success: boolean; error?: string }> {
-  if (isSupabaseClientConfigured() || !auth.currentUser) {
+  if (!auth.currentUser) {
     const srv = getCurrentServerAdminSession();
     const token = await getActiveAdminBearerToken();
     if (!token || !srv) {
@@ -1731,29 +1607,27 @@ export async function setAuthorizedAdminActive(
 
 export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus> {
   const srv = getCurrentServerAdminSession();
-  const useSupabaseMode =
-    isSupabaseClientConfigured() || srv?.profile?.authMode === 'supabase';
-  const user = useSupabaseMode ? null : auth.currentUser;
+  const user = auth.currentUser;
   const warnings: string[] = [];
 
   let databaseConnected = false;
   let databaseSummary = '';
 
-  if (useSupabaseMode) {
+  if (isSupabaseClientConfigured()) {
     try {
       const dbRes = await fetch('/api/vehicles', { method: 'GET', cache: 'no-store' });
       databaseConnected = dbRes.ok;
       databaseSummary = databaseConnected
         ? 'Supabase PostgreSQL reachable and synchronized across live storefront & admin.'
-        : `Supabase database endpoint returned HTTP ${dbRes.status}.`;
+        : `Database endpoint returned HTTP ${dbRes.status}.`;
     } catch {
       databaseConnected = false;
-      databaseSummary = 'Unable to reach Supabase backend API cleanly.';
+      databaseSummary = 'Unable to reach database backend API cleanly.';
     }
   } else {
     databaseConnected = await testFirestoreConnection();
     databaseSummary = databaseConnected
-      ? 'Cloud Firestore reachable and synchronized between Vercel and Workspace.'
+      ? 'Database reachable and synchronized.'
       : 'Unable to reach Cloud Firestore server cleanly.';
   }
 
@@ -1761,9 +1635,7 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
 
   let authorizationOk = false;
   let authorizationSummary: string = AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT;
-  let supabaseSynced = Boolean(srv?.supabaseAccessToken);
   let firebaseSynced = Boolean(user || srv?.firebaseIdToken);
-  let backendType: 'supabase' | 'firebase' = useSupabaseMode ? 'supabase' : 'firebase';
 
   if (token) {
     try {
@@ -1775,18 +1647,12 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
       if (diagRes.ok) {
         const diagData = await diagRes.json();
         authorizationOk = Boolean(diagData.success);
-        backendType = diagData.backend === 'supabase' ? 'supabase' : backendType;
-        supabaseSynced = Boolean(diagData.supabaseSynced ?? supabaseSynced);
         firebaseSynced = Boolean(diagData.firebaseSynced ?? firebaseSynced);
-        if (backendType === 'supabase') {
-          authorizationSummary = supabaseSynced
-            ? 'Supabase Auth & PostgreSQL Row-Level Security permissions verified.'
-            : 'Administrator session verified with Supabase backend.';
-        } else {
-          authorizationSummary = firebaseSynced
-            ? 'Dashboard credentials & Cloud Firestore admin permissions verified globally.'
-            : 'Server administrator session verified locally.';
-        }
+        authorizationSummary = diagData.envManaged
+          ? 'Authenticated via server environment variables (ADMIN_EMAIL / ADMIN_PASSWORD).'
+          : firebaseSynced
+          ? 'Dashboard credentials & Cloud Firestore admin permissions verified globally.'
+          : 'Server administrator session verified cleanly.';
       } else {
         authorizationSummary = `Backend verification returned HTTP ${diagRes.status}.`;
       }
@@ -1795,24 +1661,15 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
     }
   }
 
-  const authMode: 'server-credentials' | 'google-firebase' | 'supabase' =
-    backendType === 'supabase' || srv?.profile?.authMode === 'supabase'
-      ? 'supabase'
-      : srv
-      ? 'server-credentials'
-      : 'google-firebase';
+  const authMode: 'server-credentials' | 'google-firebase' =
+    srv ? 'server-credentials' : 'google-firebase';
 
   const firebaseAuthOk = srv ? true : Boolean(user);
-  const firebaseAuthSummary =
-    authMode === 'supabase'
-      ? 'Email & Password authenticated via Supabase Auth.'
-      : srv
-      ? firebaseSynced
-        ? 'Email & Password authenticated and synced with Firebase Cloud.'
-        : 'Authenticated via local server credentials.'
-      : user
-      ? 'Authenticated via Google Sign-In.'
-      : 'No active administrator session.';
+  const firebaseAuthSummary = srv
+    ? 'Email & Password authenticated via server credentials.'
+    : user
+    ? 'Authenticated via Google Sign-In.'
+    : 'No active administrator session.';
 
   return {
     checkedAt: new Date().toISOString(),
@@ -1838,7 +1695,6 @@ export async function logoutAdminSession(reason: 'manual' | 'timeout' = 'manual'
   }).catch(() => {});
 
   clearAdminActivityState();
-  await clearSupabaseClientSession();
 
   try {
     await fetch('/api/admin-auth?action=logout', {

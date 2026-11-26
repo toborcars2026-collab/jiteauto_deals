@@ -282,8 +282,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     fetchBusinessSettings().then(setBusinessSettings);
     fetchAdminAuditLogs(8).then(setRecentAuditLogs).catch(() => {});
 
-    const useSupabaseRealtime =
-      bootstrapStatus.backend === 'supabase' || Boolean(bootstrapStatus.supabaseConfigured);
+    const useSupabaseRealtime = Boolean(bootstrapStatus.supabaseConfigured);
     const unsubLeads =
       useSupabaseRealtime || auth.currentUser ? subscribeToLeads(setLeads) : () => {};
     const unsubInquiries =
@@ -307,7 +306,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       unsubSettings();
       if (pollInterval) window.clearInterval(pollInterval);
     };
-  }, [isAuthenticated, setVehicles, bootstrapStatus.backend, bootstrapStatus.supabaseConfigured]);
+  }, [isAuthenticated, setVehicles, bootstrapStatus.supabaseConfigured]);
 
   // Refresh leads, inquiries, or audit logs when opening those tabs
   useEffect(() => {
@@ -529,7 +528,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
       setVehicles(fresh);
       setSyncNotice(
         `Synced ${fresh.length} live vehicles from ${
-          bootstrapStatus.backend === 'supabase' ? 'Supabase' : 'database'
+          bootstrapStatus.supabaseConfigured ? 'Supabase' : 'database'
         }.`
       );
       setTimeout(() => setSyncNotice(null), 4000);
@@ -605,20 +604,17 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 </div>
               </div>
 
-              {bootstrapStatus.backend !== 'supabase' &&
-                bootstrapStatus.passwordLoginAvailable === false &&
-                !authError && (
-                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-100 text-xs flex items-start gap-2.5">
-                    <ShieldAlert size={16} className="shrink-0 text-amber-400 mt-0.5" />
-                    <span className="leading-relaxed">
-                      Email/password login is not configured on this deployment host yet. Add{' '}
-                      <code className="font-mono text-amber-300">ADMIN_EMAIL</code> and{' '}
-                      <code className="font-mono text-amber-300">ADMIN_PASSWORD</code> (or Supabase
-                      Auth keys) in this host&apos;s environment variables, or use Google Sign-In
-                      below.
-                    </span>
-                  </div>
-                )}
+              {bootstrapStatus.passwordLoginAvailable === false && !authError && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-100 text-xs flex items-start gap-2.5">
+                  <ShieldAlert size={16} className="shrink-0 text-amber-400 mt-0.5" />
+                  <span className="leading-relaxed">
+                    Email/password login is not configured on this deployment host yet. Add{' '}
+                    <code className="font-mono text-amber-300">ADMIN_EMAIL</code> and{' '}
+                    <code className="font-mono text-amber-300">ADMIN_PASSWORD</code> in this
+                    host&apos;s environment variables, or complete First-Time Setup.
+                  </span>
+                </div>
+              )}
 
               {authError && (
                 <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2.5">
@@ -718,7 +714,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 </button>
               </form>
 
-              {bootstrapStatus.backend !== 'supabase' && bootstrapStatus.firebaseAuthConfigured && (
+              {bootstrapStatus.firebaseAuthConfigured && (
                 <>
                   <div className="relative flex py-1 items-center">
                     <div className="flex-grow border-t border-slate-800" />
@@ -1002,7 +998,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   {isSubmitting ? 'Creating Administrator Account...' : 'Create Administrator & Enter Dashboard'}
                 </button>
 
-                {bootstrapStatus.backend !== 'supabase' && bootstrapStatus.firebaseAuthConfigured && (
+                {bootstrapStatus.firebaseAuthConfigured && (
                   <button
                     type="button"
                     onClick={handleGoogleBootstrap}
@@ -1224,7 +1220,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
           <div className="flex items-center gap-2.5 text-xs">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>{bootstrapStatus.backend === 'supabase' ? 'Supabase Live Sync' : 'Live Database Sync'}</span>
+              <span>{bootstrapStatus.supabaseConfigured ? 'Supabase Live Sync' : 'Live Database Sync'}</span>
             </span>
             <span className="hidden sm:inline text-slate-500 font-mono">
               Session timeout: {timeoutMinutes}m
@@ -1526,11 +1522,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   <AdminSecuritySection
                     authMode={
                       adminProfile?.authMode ||
-                      (bootstrapStatus.backend === 'supabase'
-                        ? 'supabase'
-                        : currentAdminUser
-                        ? 'google-firebase'
-                        : 'server-credentials')
+                      (currentAdminUser ? 'google-firebase' : 'server-credentials')
                     }
                     currentUser={
                       currentAdminUser

@@ -17,13 +17,6 @@ import {
   isSupabaseServerConfigured,
   hasSupabaseServiceRole,
   supabaseRest,
-  supabaseAuthSignIn,
-  supabaseAuthRefreshToken,
-  supabaseAuthGetUser,
-  supabaseAuthUpdateSelf,
-  supabaseSendPasswordReset,
-  supabaseAdminCreateUser,
-  supabaseAdminUpdateUser,
 } from '../lib/supabase-rest.js';
 import { applyCorsHeaders } from '../lib/cors.js';
 
@@ -621,85 +614,6 @@ export function extractBearerToken(req) {
   return null;
 }
 
-async function fetchSupabaseBootstrapSafe() {
-  if (!isSupabaseServerConfigured()) return null;
-  try {
-    const rows = await supabaseRest('admin_bootstrap?id=eq.true&select=*');
-    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-  } catch {
-    return null;
-  }
-}
-
-async function checkSupabaseAdminAuthorization(accessToken, sbUser) {
-  if (!sbUser?.id) {
-    return { authorized: false, revoked: false, role: null, profile: null };
-  }
-  const useSvc = hasSupabaseServiceRole();
-  try {
-    const profiles = await supabaseRest(
-      `admin_profiles?id=eq.${encodeURIComponent(sbUser.id)}&select=*`,
-      { accessToken, useServiceRole: useSvc }
-    );
-    const profile = Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null;
-    if (profile) {
-      const isActive = profile.active !== false;
-      const role = profile.role === 'owner' ? 'owner' : 'admin';
-      return {
-        authorized: isActive,
-        revoked: !isActive,
-        role,
-        profile,
-        hasProfile: true,
-        invited: false,
-      };
-    }
-  } catch {
-    // Continue checking bootstrap/invites
-  }
-
-  try {
-    const bootstrap = await fetchSupabaseBootstrapSafe();
-    if (bootstrap && bootstrap.primary_admin_id === sbUser.id) {
-      return {
-        authorized: true,
-        revoked: false,
-        role: 'owner',
-        profile: null,
-        hasProfile: false,
-        invited: false,
-      };
-    }
-  } catch {
-    // Ignore
-  }
-
-  const emailLower = String(sbUser.email || '').trim().toLowerCase();
-  if (emailLower && sbUser.email_confirmed_at) {
-    try {
-      const invites = await supabaseRest(
-        `admin_invites?email_lower=eq.${encodeURIComponent(emailLower)}&active=eq.true&select=*`,
-        { accessToken, useServiceRole: useSvc }
-      );
-      if (Array.isArray(invites) && invites.length > 0) {
-        return {
-          authorized: true,
-          revoked: false,
-          role: 'admin',
-          profile: null,
-          hasProfile: false,
-          invited: true,
-          invite: invites[0],
-        };
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  return { authorized: false, revoked: false, role: null, profile: null };
-}
-
 async function writeSupabaseAuditSafe({ action, actorUid, actorEmail, status, details, authMethod }) {
   if (!isSupabaseServerConfigured()) return;
   try {
@@ -725,10 +639,6 @@ export async function verifyRequestAdmin(req) {
     typeof req.headers?.['x-firebase-id-token'] === 'string'
       ? req.headers['x-firebase-id-token'].trim()
       : '';
-  const sidecarSupabaseToken =
-    typeof req.headers?.['x-supabase-access-token'] === 'string'
-      ? req.headers['x-supabase-access-token'].trim()
-      : '';
 
   const token = bearerToken;
   if (!token) {
@@ -741,21 +651,8 @@ export async function verifyRequestAdmin(req) {
       return { authorized: false, error: 'Session expired or invalid. Please sign in again.' };
     }
 
-    let attachedSupabaseToken = null;
-    if (sidecarSupabaseToken && isSupabaseServerConfigured()) {
-      try {
-        const sbUser = await supabaseAuthGetUser(sidecarSupabaseToken);
-        const sbAuth = await checkSupabaseAdminAuthorization(sidecarSupabaseToken, sbUser);
-        if (sbAuth.authorized) {
-          attachedSupabaseToken = sidecarSupabaseToken;
-        }
-      } catch {
-        // Non-blocking
-      }
-    }
-
     let attachedFirebaseToken = null;
-    if (!attachedSupabaseToken && sidecarFirebaseToken && !sidecarFirebaseToken.startsWith('srv.')) {
+    if (sidecarFirebaseToken && !sidecarFirebaseToken.startsWith('srv.')) {
       try {
         const fbDecoded = await verifyFirebaseIdToken(sidecarFirebaseToken);
         const fsAuth = await checkFirestoreAdminAuthorization(sidecarFirebaseToken, fbDecoded);
@@ -774,51 +671,11 @@ export async function verifyRequestAdmin(req) {
       fullName: verified.fullName,
       emailVerified: true,
       role: verified.role || 'owner',
-      authMode: attachedSupabaseToken ? 'supabase' : 'server-credentials',
+      authMode: 'server-credentials',
       envManaged: Boolean(verified.envManaged),
       signInProvider: 'password',
-      supabaseAccessToken: attachedSupabaseToken,
       firebaseIdToken: attachedFirebaseToken,
     };
-  }
-
-  // Prefer Supabase JWT verification whenever Supabase backend is configured
-  if (isSupabaseServerConfigured()) {
-    try {
-      const sbUser = await supabaseAuthGetUser(token);
-      if (sbUser) {
-        const sbAuth = await checkSupabaseAdminAuthorization(token, sbUser);
-        if (!sbAuth.authorized) {
-          return {
-            authorized: false,
-            error: sbAuth.revoked
-              ? 'This administrator account has been revoked.'
-              : 'This account does not have administrator access.',
-          };
-        }
-        return {
-          authorized: true,
-          uid: sbUser.id,
-          email: sbAuth.profile?.email || sbUser.email || '',
-          fullName:
-            sbAuth.profile?.full_name ||
-            sbUser.user_metadata?.full_name ||
-            'Primary Administrator',
-          emailVerified: Boolean(sbUser.email_confirmed_at),
-          role: sbAuth.role || 'owner',
-          authMode: 'supabase',
-          signInProvider: 'password',
-          inactivityTimeoutMinutes:
-            typeof sbAuth.profile?.inactivity_timeout_minutes === 'number'
-              ? sbAuth.profile.inactivity_timeout_minutes
-              : 30,
-          supabaseAccessToken: token,
-          firebaseIdToken: null,
-        };
-      }
-    } catch {
-      // Fall through to Firebase check only if token is a Firebase RS256 token during migration
-    }
   }
 
   try {
@@ -888,18 +745,9 @@ function setSecurityHeaders(req, res) {
   applyCorsHeaders(req, res, {
     isPrivate: true,
     methods: 'GET, POST, OPTIONS',
-    allowHeaders:
-      'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token, x-supabase-access-token',
+    allowHeaders: 'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token',
     extraNoSniff: true,
   });
-}
-
-async function fetchBootstrapDocSafe() {
-  try {
-    return await firestoreGetDocument('settings/admin_bootstrap');
-  } catch {
-    return null;
-  }
 }
 
 async function writeFirestoreAuditSafe(idToken, { action, actorUid, actorEmail, status, details, authMethod }) {
@@ -938,62 +786,25 @@ export default async function handler(req, res) {
   try {
     // ------------------------------------------------------------------------
     // 1. GET /api/admin-auth?action=status
-    //    Detects live configuration across Supabase, Firebase, local store & env
+    //    Reports live server credential configuration (env vars + local store)
     // ------------------------------------------------------------------------
     if (action === 'status' && req.method === 'GET') {
-      const supabaseActive = isSupabaseServerConfigured();
-      if (supabaseActive) {
-        const sbBootstrap = await fetchSupabaseBootstrapSafe();
-        let hasOwnerRow = false;
-        if (hasSupabaseServiceRole()) {
-          try {
-            const owners = await supabaseRest(
-              'admin_profiles?role=eq.owner&active=eq.true&select=id&limit=1'
-            );
-            hasOwnerRow = Array.isArray(owners) && owners.length > 0;
-          } catch {
-            hasOwnerRow = false;
-          }
-        }
-        const setupSecretRequired = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
-        const isBootstrapped = Boolean(sbBootstrap?.setup_completed || hasOwnerRow);
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            configured: isBootstrapped,
-            bootstrapped: isBootstrapped,
-            backend: 'supabase',
-            supabaseConfigured: true,
-            envManaged: false,
-            envOverridden: Boolean(sbBootstrap?.dashboard_override),
-            setupSecretRequired,
-            firebaseAuthConfigured: false,
-            passwordLoginAvailable: true,
-          })
-        );
-        return;
-      }
-
       const cfg = resolveConfiguredServerCredentials();
       const stored = readServerCredentialStore();
-      const bootstrapDoc = await fetchBootstrapDocSafe();
       const setupSecretRequired = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
-      const isBootstrapped = Boolean(
-        cfg.configured || stored.bootstrapped || bootstrapDoc?.setupCompleted
-      );
+      const isBootstrapped = Boolean(cfg.configured || stored.bootstrapped);
 
       res.statusCode = 200;
       res.end(
         JSON.stringify({
           configured: isBootstrapped,
           bootstrapped: isBootstrapped,
-          backend: 'firebase',
-          supabaseConfigured: false,
+          backend: 'server-credentials',
+          supabaseConfigured: isSupabaseServerConfigured(),
           envManaged: Boolean(cfg.envManaged),
-          envOverridden: Boolean(cfg.envOverridden || bootstrapDoc?.dashboardOverride),
+          envOverridden: Boolean(cfg.envOverridden),
           setupSecretRequired,
-          firebaseAuthConfigured: true,
+          firebaseAuthConfigured: Boolean(loadFirebaseRuntimeConfig().apiKey),
           passwordLoginAvailable: Boolean(cfg.configured),
         })
       );
@@ -1002,7 +813,7 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 2. POST /api/admin-auth?action=setup
-    //    One-time initial owner setup (locked once bootstrapped)
+    //    One-time initial owner setup (locked once env vars or store configured)
     // ------------------------------------------------------------------------
     if (action === 'setup' && req.method === 'POST') {
       const body = await readJsonBody(req);
@@ -1012,155 +823,9 @@ export default async function handler(req, res) {
       const hasValidSetupSecret =
         Boolean(configuredSecret) && safeTimingEqual(String(providedSecret), configuredSecret);
 
-      const supabaseActive = isSupabaseServerConfigured();
-      if (supabaseActive) {
-        const sbBootstrap = await fetchSupabaseBootstrapSafe();
-        let hasOwnerRow = false;
-        if (hasSupabaseServiceRole()) {
-          try {
-            const owners = await supabaseRest(
-              'admin_profiles?role=eq.owner&active=eq.true&select=id&limit=1'
-            );
-            hasOwnerRow = Array.isArray(owners) && owners.length > 0;
-          } catch {
-            hasOwnerRow = false;
-          }
-        }
-        const alreadyBootstrapped = Boolean(sbBootstrap?.setup_completed || hasOwnerRow);
-        if (alreadyBootstrapped && !hasValidSetupSecret) {
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              code: 'ALREADY_CONFIGURED',
-              error:
-                'Administrator credentials are already configured. Please sign in with your email and password or manage credentials inside Security Settings.',
-            })
-          );
-          return;
-        }
-        if (configuredSecret && !hasValidSetupSecret) {
-          recordFailedAttempt(clientIp);
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              code: 'INVALID_SETUP_SECRET',
-              error: 'Setup authorization secret is invalid or missing.',
-            })
-          );
-          return;
-        }
-
-        const fullName = String(body?.fullName || '').trim() || 'Primary Administrator';
-        const email = String(body?.email || '').trim();
-        const password = String(body?.password || '');
-
-        if (!email || !email.includes('@')) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Please enter a valid email address.' }));
-          return;
-        }
-        const pwCheck = validatePasswordPolicy(password);
-        if (!pwCheck.valid) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: pwCheck.error }));
-          return;
-        }
-        if (!hasSupabaseServiceRole()) {
-          res.statusCode = 500;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: 'SUPABASE_SERVICE_ROLE_KEY is required on the server to complete initial owner setup.',
-            })
-          );
-          return;
-        }
-
-        const nowIso = new Date().toISOString();
-        const createdUser = await supabaseAdminCreateUser({
-          email,
-          password,
-          emailConfirm: true,
-          userMetadata: { full_name: fullName },
-          appMetadata: { role: 'owner' },
-        });
-
-        await supabaseRest('admin_profiles', {
-          method: 'POST',
-          headers: { Prefer: 'resolution=merge-duplicates' },
-          body: {
-            id: createdUser.id,
-            email,
-            full_name: fullName,
-            role: 'owner',
-            active: true,
-            inactivity_timeout_minutes: 30,
-            auth_methods: ['password'],
-            last_login_at: nowIso,
-            created_at: nowIso,
-            updated_at: nowIso,
-          },
-        });
-
-        await supabaseRest('admin_bootstrap', {
-          method: 'POST',
-          headers: { Prefer: 'resolution=merge-duplicates' },
-          body: {
-            id: true,
-            setup_completed: true,
-            primary_admin_id: createdUser.id,
-            dashboard_override: true,
-            setup_completed_at: nowIso,
-            password_updated_at: nowIso,
-            updated_at: nowIso,
-          },
-        });
-
-        const session = await supabaseAuthSignIn(email, password);
-        await writeSupabaseAuditSafe({
-          action: 'ADMIN_OWNER_SETUP_COMPLETED',
-          actorUid: createdUser.id,
-          actorEmail: email,
-          status: 'success',
-          details: 'Primary owner administrator account created in Supabase Auth.',
-          authMethod: 'password',
-        });
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: session.accessToken,
-            expiresAt: session.expiresAt,
-            supabaseAccessToken: session.accessToken,
-            supabaseRefreshToken: session.refreshToken,
-            supabaseExpiresAt: session.expiresAt,
-            admin: {
-              uid: createdUser.id,
-              email,
-              displayName: fullName,
-              role: 'owner',
-              authMode: 'supabase',
-              supabaseSynced: true,
-              envManaged: false,
-              inactivityTimeoutMinutes: 30,
-              createdAt: nowIso,
-              updatedAt: nowIso,
-            },
-          })
-        );
-        return;
-      }
-
       const cfg = resolveConfiguredServerCredentials();
       const stored = readServerCredentialStore();
-      const bootstrapDoc = await fetchBootstrapDocSafe();
-
-      const alreadyBootstrapped = Boolean(
-        cfg.configured || stored.bootstrapped || bootstrapDoc?.setupCompleted
-      );
+      const alreadyBootstrapped = Boolean(cfg.configured || stored.bootstrapped);
 
       if (alreadyBootstrapped && !hasValidSetupSecret) {
         res.statusCode = 403;
@@ -1270,7 +935,8 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 3. POST /api/admin-auth?action=login
-    //    Unified Email + Password login synced with Firebase Auth + Dashboard Override
+    //    Verifies Email + Password directly against ADMIN_EMAIL/ADMIN_PASSWORD
+    //    env vars or server credential store (zero Supabase Auth dependency)
     // ------------------------------------------------------------------------
     if (action === 'login' && req.method === 'POST') {
       const rateCheck = checkRateLimit(clientIp);
@@ -1302,308 +968,14 @@ export default async function handler(req, res) {
         return;
       }
 
-      if (isSupabaseServerConfigured()) {
-        try {
-          const sbLogin = await supabaseAuthSignIn(email, password);
-          const sbAuth = await checkSupabaseAdminAuthorization(sbLogin.accessToken, sbLogin.user);
-          if (!sbAuth.authorized) {
-            const attempts = recordFailedAttempt(clientIp);
-            pushSecurityEvent({
-              action: 'UNAUTHORIZED_ADMIN_LOGIN',
-              status: attempts >= 5 ? 'warning' : 'failure',
-              actorEmailMasked: maskEmailForAudit(email),
-              ipTag: hashIpForAudit(clientIp),
-              details: 'Signed in Supabase account does not belong to an authorized administrator.',
-            });
-            res.statusCode = 403;
-            res.end(
-              JSON.stringify({
-                success: false,
-                code: 'ACCESS_DENIED',
-                error: sbAuth.revoked
-                  ? 'This administrator account has been revoked.'
-                  : 'This account does not have administrator access.',
-              })
-            );
-            return;
-          }
-
-          clearRateLimit(clientIp);
-          const nowIso = new Date().toISOString();
-          const resolvedName =
-            sbAuth.profile?.full_name ||
-            sbAuth.invite?.display_name ||
-            sbLogin.user?.user_metadata?.full_name ||
-            'Primary Administrator';
-          const resolvedTimeout =
-            typeof sbAuth.profile?.inactivity_timeout_minutes === 'number'
-              ? sbAuth.profile.inactivity_timeout_minutes
-              : 30;
-          const resolvedRole = sbAuth.role || 'owner';
-          const resolvedEmail = sbLogin.user.email || email;
-
-          if (hasSupabaseServiceRole()) {
-            supabaseRest('admin_profiles', {
-              method: 'POST',
-              headers: { Prefer: 'resolution=merge-duplicates' },
-              body: {
-                id: sbLogin.user.id,
-                email: resolvedEmail,
-                full_name: resolvedName,
-                role: resolvedRole,
-                active: true,
-                inactivity_timeout_minutes: resolvedTimeout,
-                auth_methods: Array.from(
-                  new Set([
-                    ...(Array.isArray(sbAuth.profile?.auth_methods) ? sbAuth.profile.auth_methods : []),
-                    'password',
-                  ])
-                ),
-                last_login_at: nowIso,
-                created_at: sbAuth.profile?.created_at || nowIso,
-                updated_at: nowIso,
-              },
-            }).catch(() => {});
-          }
-
-          pushSecurityEvent({
-            action: 'LOGIN_SUCCESS',
-            status: 'success',
-            actorEmailMasked: maskEmailForAudit(resolvedEmail),
-            ipTag: hashIpForAudit(clientIp),
-            details: 'Administrator signed in via Supabase Auth.',
-          });
-
-          await writeSupabaseAuditSafe({
-            action: 'LOGIN_SUCCESS',
-            actorUid: sbLogin.user.id,
-            actorEmail: resolvedEmail,
-            status: 'success',
-            details: 'Administrator signed in with Email and Password (Supabase Auth).',
-            authMethod: 'password',
-          });
-
-          res.statusCode = 200;
-          res.end(
-            JSON.stringify({
-              success: true,
-              token: sbLogin.accessToken,
-              expiresAt: sbLogin.expiresAt,
-              supabaseAccessToken: sbLogin.accessToken,
-              supabaseRefreshToken: sbLogin.refreshToken,
-              supabaseExpiresAt: sbLogin.expiresAt,
-              admin: {
-                uid: sbLogin.user.id,
-                email: resolvedEmail,
-                displayName: resolvedName,
-                role: resolvedRole,
-                authMode: 'supabase',
-                supabaseSynced: true,
-                envManaged: false,
-                inactivityTimeoutMinutes: resolvedTimeout,
-                createdAt: sbAuth.profile?.created_at || nowIso,
-                updatedAt: sbAuth.profile?.updated_at || nowIso,
-                lastLoginAt: nowIso,
-              },
-            })
-          );
-          return;
-        } catch (sbErr) {
-          const attempts = recordFailedAttempt(clientIp);
-          const sbErrMsg = String(sbErr?.code || sbErr?.message || 'INVALID_CREDENTIALS');
-          pushSecurityEvent({
-            action: 'LOGIN_FAILED',
-            status: attempts >= 5 ? 'warning' : 'failure',
-            actorEmailMasked: maskEmailForAudit(email),
-            ipTag: hashIpForAudit(clientIp),
-            details:
-              attempts >= 5
-                ? 'Repeated invalid password attempts triggered 5-minute cooldown.'
-                : `Supabase sign-in rejected (${sbErrMsg}).`,
-          });
-          const updatedRate = checkRateLimit(clientIp);
-          res.statusCode = updatedRate.allowed ? 401 : 429;
-          res.end(
-            JSON.stringify({
-              success: false,
-              code: updatedRate.allowed ? 'INVALID_CREDENTIALS' : 'RATE_LIMITED',
-              error: updatedRate.allowed
-                ? 'The email or password you entered is incorrect. Please try again.'
-                : `Too many failed attempts. Please wait ${updatedRate.waitSeconds} seconds.`,
-            })
-          );
-          return;
-        }
-      }
-
-      const bootstrapDoc = await fetchBootstrapDocSafe();
       const stored = readServerCredentialStore();
       const envCfg = readEnvCredentials();
       const hasDashboardOverride = Boolean(
-        bootstrapDoc?.dashboardOverride ||
-          bootstrapDoc?.passwordUpdatedAt ||
-          stored.credentials?.dashboardOverride
+        stored.configured && stored.credentials?.dashboardOverride
       );
 
-      // Step A: Attempt real Firebase Auth Identity Toolkit Sign-In (works everywhere: AI Studio + Vercel)
-      let fbLogin = null;
-      let fbErrorCode = '';
-      try {
-        fbLogin = await firebaseAuthSignInWithPassword(email, password);
-      } catch (err) {
-        fbErrorCode = String(err?.code || err?.message || 'AUTH_FAILED');
-      }
-
-      if (fbLogin?.idToken) {
-        let decoded;
-        try {
-          decoded = await verifyFirebaseIdToken(fbLogin.idToken);
-        } catch (verifyErr) {
-          res.statusCode = 401;
-          res.end(
-            JSON.stringify({
-              success: false,
-              error: verifyErr?.message || 'Unable to verify Firebase authentication token.',
-            })
-          );
-          return;
-        }
-
-        const fsAuth = await checkFirestoreAdminAuthorization(fbLogin.idToken, decoded);
-        if (!fsAuth.authorized) {
-          const attempts = recordFailedAttempt(clientIp);
-          pushSecurityEvent({
-            action: 'UNAUTHORIZED_ADMIN_LOGIN',
-            status: attempts >= 5 ? 'warning' : 'failure',
-            actorEmailMasked: maskEmailForAudit(email),
-            ipTag: hashIpForAudit(clientIp),
-            details: 'Signed in credentials do not belong to an authorized administrator.',
-          });
-          res.statusCode = 403;
-          res.end(
-            JSON.stringify({
-              success: false,
-              code: 'ACCESS_DENIED',
-              error: 'This account does not have administrator access.',
-            })
-          );
-          return;
-        }
-
-        clearRateLimit(clientIp);
-        const nowIso = new Date().toISOString();
-        const resolvedName =
-          fsAuth.profile?.displayName ||
-          fbLogin.displayName ||
-          stored.credentials?.fullName ||
-          'Primary Administrator';
-        const resolvedTimeout =
-          typeof fsAuth.profile?.inactivityTimeoutMinutes === 'number'
-            ? fsAuth.profile.inactivityTimeoutMinutes
-            : stored.inactivityTimeoutMinutes || 30;
-        const resolvedRole = fsAuth.role || 'owner';
-
-        // Sync fresh scrypt verifier into local/tmp store so offline/local state tracks latest dashboard creds
-        const salt = crypto.randomBytes(16).toString('hex');
-        const passwordHash = hashPasswordScrypt(password, salt);
-        writeServerCredentialStore({
-          primaryAdminUid: decoded.uid,
-          inactivityTimeoutMinutes: resolvedTimeout,
-          credentials: {
-            firebaseUid: decoded.uid,
-            fullName: resolvedName,
-            email: fbLogin.email || email,
-            emailLower: (fbLogin.email || email).toLowerCase(),
-            salt,
-            passwordHash,
-            dashboardOverride: hasDashboardOverride,
-            createdAt: stored.credentials?.createdAt || nowIso,
-            updatedAt: nowIso,
-          },
-        });
-
-        // Update admin doc lastLoginAt in Firestore asynchronously/cleanly
-        firestorePatchDocument(
-          `admins/${decoded.uid}`,
-          {
-            uid: decoded.uid,
-            email: fbLogin.email || email,
-            displayName: resolvedName,
-            role: resolvedRole,
-            active: true,
-            inactivityTimeoutMinutes: resolvedTimeout,
-            authMethods: Array.from(
-              new Set([...(Array.isArray(fsAuth.profile?.authMethods) ? fsAuth.profile.authMethods : []), 'password'])
-            ),
-            lastLoginAt: nowIso,
-            updatedAt: nowIso,
-            ...(fsAuth.profile?.createdAt ? {} : { createdAt: nowIso }),
-          },
-          fbLogin.idToken,
-          ['uid', 'email', 'displayName', 'role', 'active', 'inactivityTimeoutMinutes', 'authMethods', 'lastLoginAt', 'updatedAt', ...(fsAuth.profile?.createdAt ? [] : ['createdAt'])]
-        ).catch(() => {});
-
-        const signed = signServerSessionToken({
-          sub: decoded.uid,
-          email: fbLogin.email || email,
-          fullName: resolvedName,
-          role: resolvedRole,
-          envManaged: false,
-          firebaseSynced: true,
-        });
-
-        pushSecurityEvent({
-          action: 'LOGIN_SUCCESS',
-          status: 'success',
-          actorEmailMasked: maskEmailForAudit(fbLogin.email || email),
-          ipTag: hashIpForAudit(clientIp),
-          details: 'Administrator signed in (synced across Cloud Firestore & Firebase Auth).',
-        });
-
-        await writeFirestoreAuditSafe(fbLogin.idToken, {
-          action: 'LOGIN_SUCCESS',
-          actorUid: decoded.uid,
-          actorEmail: fbLogin.email || email,
-          status: 'success',
-          details: 'Administrator signed in with Email and Password.',
-          authMethod: 'password',
-        });
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: signed.token,
-            expiresAt: signed.expiresAt,
-            firebaseIdToken: fbLogin.idToken,
-            firebaseRefreshToken: fbLogin.refreshToken,
-            firebaseExpiresAt: fbLogin.expiresAt,
-            admin: {
-              uid: decoded.uid,
-              email: fbLogin.email || email,
-              displayName: resolvedName,
-              role: resolvedRole,
-              authMode: 'server-credentials',
-              firebaseSynced: true,
-              envManaged: false,
-              inactivityTimeoutMinutes: resolvedTimeout,
-              createdAt: fsAuth.profile?.createdAt || stored.credentials?.createdAt || nowIso,
-              updatedAt: fsAuth.profile?.updatedAt || nowIso,
-              lastLoginAt: nowIso,
-            },
-          })
-        );
-        return;
-      }
-
-      // Step B: Fallback to local credential store ONLY if it isn't stale compared to Firestore bootstrap passwordUpdatedAt
-      const bootstrapPwMs = Date.parse(bootstrapDoc?.passwordUpdatedAt || '') || 0;
-      const localCredMs =
-        Date.parse(stored.credentials?.updatedAt || stored.updatedAt || '') || 0;
-      const isLocalStale = bootstrapPwMs > 0 && localCredMs + 5000 < bootstrapPwMs;
-
+      // Step A: Verify against active local/dashboard credential store (if present)
       if (
-        !isLocalStale &&
         stored.configured &&
         stored.credentials &&
         verifyPasswordWithResolvedConfig(email, password, {
@@ -1630,7 +1002,16 @@ export default async function handler(req, res) {
           status: 'success',
           actorEmailMasked: maskEmailForAudit(stored.credentials.email),
           ipTag: hashIpForAudit(clientIp),
-          details: 'Administrator signed in via local server store.',
+          details: 'Administrator signed in via server credentials store.',
+        });
+
+        await writeSupabaseAuditSafe({
+          action: 'LOGIN_SUCCESS',
+          actorUid: signed.payload.sub,
+          actorEmail: stored.credentials.email,
+          status: 'success',
+          details: 'Administrator signed in with Email and Password.',
+          authMethod: 'password',
         });
 
         res.statusCode = 200;
@@ -1654,7 +1035,7 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Step C: Fallback to Env vars ONLY if dashboard has NEVER overridden credentials
+      // Step B: Verify against ADMIN_EMAIL + ADMIN_PASSWORD (or ADMIN_PASSWORD_HASH) env variables
       if (!hasDashboardOverride && envCfg && verifyPasswordWithResolvedConfig(email, password, envCfg)) {
         clearRateLimit(clientIp);
         const signed = signServerSessionToken({
@@ -1671,7 +1052,16 @@ export default async function handler(req, res) {
           status: 'success',
           actorEmailMasked: maskEmailForAudit(envCfg.email),
           ipTag: hashIpForAudit(clientIp),
-          details: 'Administrator signed in with hosting environment credentials.',
+          details: 'Administrator signed in with environment variables (ADMIN_EMAIL / ADMIN_PASSWORD).',
+        });
+
+        await writeSupabaseAuditSafe({
+          action: 'LOGIN_SUCCESS',
+          actorUid: signed.payload.sub,
+          actorEmail: envCfg.email,
+          status: 'success',
+          details: 'Administrator signed in with configured server environment variables.',
+          authMethod: 'password',
         });
 
         res.statusCode = 200;
@@ -1695,14 +1085,14 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Missing server credentials diagnostic (prevents misleading "incorrect password" when a host lacks env vars & Firebase password login is disabled)
-      if (!stored.configured && !envCfg && !fbLogin) {
+      // Missing server credentials diagnostic
+      if (!stored.configured && !envCfg) {
         pushSecurityEvent({
           action: 'LOGIN_FAILED_NO_CREDENTIALS',
           status: 'warning',
           actorEmailMasked: maskEmailForAudit(email),
           ipTag: hashIpForAudit(clientIp),
-          details: `Deployment host lacks ADMIN_EMAIL/ADMIN_PASSWORD and Firebase password login returned ${fbErrorCode || 'UNAVAILABLE'}.`,
+          details: 'Server lacks ADMIN_EMAIL/ADMIN_PASSWORD and no local credential file exists.',
         });
         res.statusCode = 401;
         res.end(
@@ -1710,7 +1100,7 @@ export default async function handler(req, res) {
             success: false,
             code: 'SERVER_CREDENTIALS_MISSING',
             error:
-              'No email/password credentials are configured on this deployed host (ADMIN_EMAIL / ADMIN_PASSWORD or Supabase Auth keys are missing on this server). Configure them in this deployment environment and redeploy, or sign in with an authorized Google account.',
+              'No email/password credentials are configured on this server (set ADMIN_EMAIL and ADMIN_PASSWORD environment variables, or complete First-Time Administrator Setup).',
           })
         );
         return;
@@ -1726,7 +1116,7 @@ export default async function handler(req, res) {
         details:
           attempts >= 5
             ? 'Repeated invalid password attempts triggered 5-minute cooldown.'
-            : `Incorrect administrator email or password (${fbErrorCode || 'MISMATCH'}).`,
+            : 'Incorrect administrator email or password.',
       });
       const updatedRate = checkRateLimit(clientIp);
       res.statusCode = updatedRate.allowed ? 401 : 429;
@@ -1753,34 +1143,6 @@ export default async function handler(req, res) {
         res.statusCode = 400;
         res.end(JSON.stringify({ success: false, error: 'Missing refresh token.' }));
         return;
-      }
-
-      if (isSupabaseServerConfigured() && body?.provider !== 'firebase') {
-        try {
-          const refreshed = await supabaseAuthRefreshToken(refreshToken);
-          const sbAuth = await checkSupabaseAdminAuthorization(refreshed.accessToken, refreshed.user);
-          if (!sbAuth.authorized) {
-            res.statusCode = 403;
-            res.end(JSON.stringify({ success: false, error: 'Administrator access revoked.' }));
-            return;
-          }
-          res.statusCode = 200;
-          res.end(
-            JSON.stringify({
-              success: true,
-              token: refreshed.accessToken,
-              expiresAt: refreshed.expiresAt,
-              supabaseAccessToken: refreshed.accessToken,
-              supabaseRefreshToken: refreshed.refreshToken,
-              supabaseExpiresAt: refreshed.expiresAt,
-            })
-          );
-          return;
-        } catch (err) {
-          res.statusCode = 401;
-          res.end(JSON.stringify({ success: false, error: err?.message || 'Session refresh failed.' }));
-          return;
-        }
       }
 
       try {
@@ -1856,170 +1218,6 @@ export default async function handler(req, res) {
         }
       }
 
-      if (isSupabaseServerConfigured() && (adminCheck.authMode === 'supabase' || adminCheck.supabaseAccessToken)) {
-        const activeUid = adminCheck.uid;
-        const currentEmail = adminCheck.email || '';
-        let nextAccessToken = adminCheck.supabaseAccessToken || '';
-        let nextRefreshToken = String(body?.supabaseRefreshToken || '').trim();
-        let nextExpiresAt = 0;
-
-        if (wantsPasswordChange || wantsEmailChange) {
-          const currentPassword = String(body?.currentPassword || '');
-          if (!currentPassword) {
-            res.statusCode = 403;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Please enter your current password to verify your identity.',
-              })
-            );
-            return;
-          }
-          try {
-            const reauth = await supabaseAuthSignIn(currentEmail, currentPassword);
-            nextAccessToken = reauth.accessToken;
-            nextRefreshToken = reauth.refreshToken;
-            nextExpiresAt = reauth.expiresAt;
-          } catch {
-            res.statusCode = 403;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Your current password could not be verified. Please try again.',
-              })
-            );
-            return;
-          }
-        }
-
-        const nextEmail = wantsEmailChange ? body.newEmail.trim() : currentEmail;
-        const nextFullName =
-          (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2
-            ? body.fullName.trim()
-            : adminCheck.fullName) || 'Primary Administrator';
-        const nextTimeout =
-          typeof body?.inactivityTimeoutMinutes === 'number' &&
-          body.inactivityTimeoutMinutes >= 5 &&
-          body.inactivityTimeoutMinutes <= 180
-            ? body.inactivityTimeoutMinutes
-            : adminCheck.inactivityTimeoutMinutes || 30;
-
-        const authUpdates = {};
-        if (wantsPasswordChange) authUpdates.password = body.newPassword;
-        if (wantsEmailChange) {
-          authUpdates.email = nextEmail;
-          if (hasSupabaseServiceRole()) authUpdates.email_confirm = true;
-        }
-        if (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2) {
-          authUpdates.user_metadata = { full_name: nextFullName };
-        }
-
-        if (Object.keys(authUpdates).length > 0) {
-          try {
-            if (hasSupabaseServiceRole()) {
-              await supabaseAdminUpdateUser(activeUid, authUpdates);
-            } else {
-              await supabaseAuthUpdateSelf(nextAccessToken, {
-                ...(wantsPasswordChange ? { password: body.newPassword } : {}),
-                ...(wantsEmailChange ? { email: nextEmail } : {}),
-                ...(authUpdates.user_metadata ? { data: authUpdates.user_metadata } : {}),
-              });
-            }
-          } catch (updErr) {
-            const msg = String(updErr?.message || 'Failed to update Supabase credentials.');
-            res.statusCode = updErr?.status === 422 || msg.toLowerCase().includes('exists') ? 409 : 400;
-            res.end(JSON.stringify({ success: false, error: msg }));
-            return;
-          }
-        }
-
-        // Re-sign in automatically when password or email changed so caller gets a valid fresh token
-        if (wantsPasswordChange || wantsEmailChange) {
-          const passwordForSession = wantsPasswordChange ? body.newPassword : String(body?.currentPassword || '');
-          try {
-            const freshSession = await supabaseAuthSignIn(nextEmail, passwordForSession);
-            nextAccessToken = freshSession.accessToken;
-            nextRefreshToken = freshSession.refreshToken;
-            nextExpiresAt = freshSession.expiresAt;
-          } catch {
-            // Keep existing token if Supabase requires email confirmation before sign-in
-          }
-        }
-
-        const nowIso = new Date().toISOString();
-        await Promise.allSettled([
-          supabaseRest(`admin_profiles?id=eq.${encodeURIComponent(activeUid)}`, {
-            method: 'PATCH',
-            accessToken: nextAccessToken,
-            useServiceRole: hasSupabaseServiceRole(),
-            body: {
-              email: nextEmail,
-              full_name: nextFullName,
-              inactivity_timeout_minutes: nextTimeout,
-              updated_at: nowIso,
-            },
-          }),
-          ...(hasSupabaseServiceRole()
-            ? [
-                supabaseRest('admin_bootstrap?id=eq.true', {
-                  method: 'PATCH',
-                  body: {
-                    setup_completed: true,
-                    primary_admin_id: activeUid,
-                    dashboard_override: true,
-                    updated_at: nowIso,
-                    ...(wantsPasswordChange ? { password_updated_at: nowIso } : {}),
-                  },
-                }),
-              ]
-            : []),
-        ]);
-
-        const actionLabel = wantsPasswordChange
-          ? 'PASSWORD_CHANGED'
-          : wantsEmailChange
-          ? 'EMAIL_CHANGED'
-          : 'PROFILE_UPDATED';
-        const actionDetail = wantsPasswordChange
-          ? 'Administrator password updated cleanly in Supabase Auth.'
-          : wantsEmailChange
-          ? `Administrator login email updated to ${nextEmail} in Supabase Auth.`
-          : `Updated administrator profile ("${nextFullName}", timeout ${nextTimeout} min).`;
-
-        await writeSupabaseAuditSafe({
-          action: actionLabel,
-          actorUid: activeUid,
-          actorEmail: nextEmail,
-          status: 'success',
-          details: actionDetail,
-          authMethod: 'password',
-        });
-
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            token: nextAccessToken,
-            expiresAt: nextExpiresAt || Date.now() + 3600 * 1000,
-            supabaseAccessToken: nextAccessToken,
-            supabaseRefreshToken: nextRefreshToken,
-            ...(nextExpiresAt ? { supabaseExpiresAt: nextExpiresAt } : {}),
-            admin: {
-              uid: activeUid,
-              email: nextEmail,
-              displayName: nextFullName,
-              role: adminCheck.role || 'owner',
-              authMode: 'supabase',
-              supabaseSynced: true,
-              envManaged: false,
-              inactivityTimeoutMinutes: nextTimeout,
-              updatedAt: nowIso,
-            },
-          })
-        );
-        return;
-      }
-
       let activeFirebaseIdToken = adminCheck.firebaseIdToken || '';
       let activeFirebaseRefreshToken = String(body?.firebaseRefreshToken || '').trim();
       let activeFirebaseExpiresAt = 0;
@@ -2040,32 +1238,29 @@ export default async function handler(req, res) {
           return;
         }
 
-        let verifiedViaFirebase = false;
-        if (currentEmail) {
+        let verified = verifyPasswordWithResolvedConfig(currentEmail, currentPassword, cfg);
+        if (!verified && currentEmail && activeFirebaseIdToken) {
           try {
             const reauth = await firebaseAuthSignInWithPassword(currentEmail, currentPassword);
             activeFirebaseIdToken = reauth.idToken;
             activeFirebaseRefreshToken = reauth.refreshToken;
             activeFirebaseExpiresAt = reauth.expiresAt;
             activeUid = reauth.uid || activeUid;
-            verifiedViaFirebase = true;
+            verified = true;
           } catch {
-            verifiedViaFirebase = false;
+            verified = false;
           }
         }
 
-        if (!verifiedViaFirebase) {
-          const fallbackMatch = verifyPasswordWithResolvedConfig(currentEmail, currentPassword, cfg);
-          if (!fallbackMatch) {
-            res.statusCode = 403;
-            res.end(
-              JSON.stringify({
-                success: false,
-                error: 'Your current password could not be verified. Please try again.',
-              })
-            );
-            return;
-          }
+        if (!verified) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'Your current password could not be verified. Please try again.',
+            })
+          );
+          return;
         }
       }
 
@@ -2310,25 +1505,6 @@ export default async function handler(req, res) {
       }
 
       try {
-        if (isSupabaseServerConfigured()) {
-          await supabaseSendPasswordReset(email);
-          pushSecurityEvent({
-            action: 'PASSWORD_RESET_DISPATCHED',
-            status: 'success',
-            actorEmailMasked: maskEmailForAudit(email),
-            ipTag: hashIpForAudit(clientIp),
-            details: 'Password recovery email dispatched via Supabase Authentication.',
-          });
-          res.statusCode = 200;
-          res.end(
-            JSON.stringify({
-              success: true,
-              message: `If an administrator account exists for ${email}, a password reset link has been sent. Check your inbox (and spam folder).`,
-            })
-          );
-          return;
-        }
-
         await firebaseAuthSendPasswordReset(email);
         pushSecurityEvent({
           action: 'PASSWORD_RESET_DISPATCHED',
@@ -2395,7 +1571,7 @@ export default async function handler(req, res) {
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           signInProvider: adminCheck.signInProvider,
-          supabaseSynced: Boolean(adminCheck.supabaseAccessToken),
+          supabaseSynced: false,
           firebaseSynced: Boolean(adminCheck.firebaseIdToken),
           bootstrapped: true,
         })
@@ -2460,13 +1636,12 @@ export default async function handler(req, res) {
       const maxEntries = Math.min(100, Math.max(5, Number(urlObj.searchParams.get('limit')) || 50));
       const entries = [];
 
-      if (isSupabaseServerConfigured()) {
+      if (isSupabaseServerConfigured() && hasSupabaseServiceRole()) {
         try {
           const rows = await supabaseRest(
             `admin_audit_logs?select=*&order=created_at.desc&limit=${maxEntries}`,
             {
-              accessToken: adminCheck.supabaseAccessToken || '',
-              useServiceRole: hasSupabaseServiceRole(),
+              useServiceRole: true,
             }
           );
           if (Array.isArray(rows)) {
@@ -2547,16 +1722,13 @@ export default async function handler(req, res) {
       let admins = [];
       let invites = [];
 
-      if (isSupabaseServerConfigured()) {
-        const useSvc = hasSupabaseServiceRole();
+      if (isSupabaseServerConfigured() && hasSupabaseServiceRole()) {
         const [sbAdmins, sbInvites] = await Promise.all([
           supabaseRest('admin_profiles?select=*', {
-            accessToken: adminCheck.supabaseAccessToken || '',
-            useServiceRole: useSvc,
+            useServiceRole: true,
           }).catch(() => []),
           supabaseRest('admin_invites?select=*', {
-            accessToken: adminCheck.supabaseAccessToken || '',
-            useServiceRole: useSvc,
+            useServiceRole: true,
           }).catch(() => []),
         ]);
         if (Array.isArray(sbAdmins)) {
@@ -2675,14 +1847,12 @@ export default async function handler(req, res) {
       }
 
       const nowIso = new Date().toISOString();
-      if (isSupabaseServerConfigured()) {
-        const useSvc = hasSupabaseServiceRole();
+      if (isSupabaseServerConfigured() && hasSupabaseServiceRole()) {
         if (cleanUid) {
           await supabaseRest('admin_profiles', {
             method: 'POST',
             headers: { Prefer: 'resolution=merge-duplicates' },
-            accessToken: adminCheck.supabaseAccessToken || '',
-            useServiceRole: useSvc,
+            useServiceRole: true,
             body: {
               id: cleanUid,
               email: cleanEmail,
@@ -2703,8 +1873,7 @@ export default async function handler(req, res) {
         await supabaseRest('admin_invites', {
           method: 'POST',
           headers: { Prefer: 'resolution=merge-duplicates' },
-          accessToken: adminCheck.supabaseAccessToken || '',
-          useServiceRole: useSvc,
+          useServiceRole: true,
           body: {
             email_lower: emailLower,
             email: cleanEmail,
@@ -2819,11 +1988,10 @@ export default async function handler(req, res) {
         return;
       }
 
-      if (isSupabaseServerConfigured()) {
+      if (isSupabaseServerConfigured() && hasSupabaseServiceRole()) {
         await supabaseRest(`admin_profiles?id=eq.${encodeURIComponent(targetUid)}`, {
           method: 'PATCH',
-          accessToken: adminCheck.supabaseAccessToken || '',
-          useServiceRole: hasSupabaseServiceRole(),
+          useServiceRole: true,
           body: { active, updated_at: new Date().toISOString() },
         });
         res.statusCode = 200;
@@ -2867,11 +2035,10 @@ export default async function handler(req, res) {
         res.end(JSON.stringify({ success: false, error: 'Missing invitation email.' }));
         return;
       }
-      if (isSupabaseServerConfigured()) {
+      if (isSupabaseServerConfigured() && hasSupabaseServiceRole()) {
         await supabaseRest(`admin_invites?email_lower=eq.${encodeURIComponent(emailLower)}`, {
           method: 'DELETE',
-          accessToken: adminCheck.supabaseAccessToken || '',
-          useServiceRole: hasSupabaseServiceRole(),
+          useServiceRole: true,
         });
         res.statusCode = 200;
         res.end(JSON.stringify({ success: true }));
@@ -2963,46 +2130,23 @@ export default async function handler(req, res) {
         return;
       }
 
-      if (isSupabaseServerConfigured()) {
-        const sbBootstrap = await fetchSupabaseBootstrapSafe();
-        const setupSecretConfigured = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
-            success: true,
-            backend: 'supabase',
-            uid: adminCheck.uid,
-            role: adminCheck.role,
-            authMode: adminCheck.authMode,
-            emailVerified: adminCheck.emailVerified,
-            supabaseSynced: Boolean(adminCheck.supabaseAccessToken),
-            firebaseSynced: false,
-            dashboardOverrideActive: Boolean(sbBootstrap?.dashboard_override),
-            serverCredentialsConfigured: Boolean(sbBootstrap?.setup_completed),
-            envManaged: false,
-            setupSecretConfigured,
-          })
-        );
-        return;
-      }
-
       const cfg = resolveConfiguredServerCredentials();
-      const bootstrapDoc = await fetchBootstrapDocSafe();
       const setupSecretConfigured = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
 
       res.statusCode = 200;
       res.end(
         JSON.stringify({
           success: true,
-          backend: 'firebase',
+          backend: 'server-credentials',
+          supabaseConfigured: isSupabaseServerConfigured(),
           uid: adminCheck.uid,
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           emailVerified: adminCheck.emailVerified,
           supabaseSynced: false,
           firebaseSynced: Boolean(adminCheck.firebaseIdToken),
-          dashboardOverrideActive: Boolean(bootstrapDoc?.dashboardOverride || cfg.dashboardOverride),
-          serverCredentialsConfigured: cfg.configured || Boolean(bootstrapDoc?.setupCompleted),
+          dashboardOverrideActive: Boolean(cfg.dashboardOverride),
+          serverCredentialsConfigured: Boolean(cfg.configured),
           envManaged: Boolean(cfg.envManaged),
           setupSecretConfigured,
         })
@@ -3033,24 +2177,14 @@ export default async function handler(req, res) {
 }
 
 export async function getAdminAuthConfig() {
-  if (isSupabaseServerConfigured()) {
-    const sbBootstrap = await fetchSupabaseBootstrapSafe();
-    const isBootstrapped = Boolean(sbBootstrap?.setup_completed);
-    return {
-      bootstrapped: isBootstrapped,
-      configured: isBootstrapped,
-      envManaged: false,
-      backend: 'supabase',
-    };
-  }
   const cfg = resolveConfiguredServerCredentials();
-  const bootstrapDoc = await fetchBootstrapDocSafe();
-  const isBootstrapped = Boolean(cfg.configured || bootstrapDoc?.setupCompleted);
+  const stored = readServerCredentialStore();
+  const isBootstrapped = Boolean(cfg.configured || stored.bootstrapped);
   return {
     bootstrapped: isBootstrapped,
     configured: isBootstrapped,
     envManaged: Boolean(cfg.envManaged),
-    backend: 'firebase',
+    backend: 'server-credentials',
   };
 }
 

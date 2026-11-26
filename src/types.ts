@@ -182,9 +182,8 @@ export interface AdminProfile {
   lastLoginAt?: string;
   createdAt?: string;
   updatedAt?: string;
-  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
+  authMode?: 'server-credentials' | 'google-firebase';
   firebaseSynced?: boolean;
-  supabaseSynced?: boolean;
   envManaged?: boolean;
 }
 
@@ -212,7 +211,7 @@ export interface AdminInvite {
 
 export interface SecurityDiagnosticStatus {
   checkedAt: string;
-  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
+  authMode?: 'server-credentials' | 'google-firebase';
   firebaseAuthOk: boolean;
   firebaseAuthSummary: string;
   databaseConnected: boolean;
