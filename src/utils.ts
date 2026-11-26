@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, limit, orderBy, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, uploadBytesResumable, uploadString, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage, OperationType, handleFirestoreError } from './firebase';
+import { getActiveAdminBearerToken } from './services/adminAuth';
 import { Vehicle, Lead, Inquiry, BusinessSettings, VehicleStatus, LeadStatus, EditorialPost } from './types';
 import { INITIAL_VEHICLES } from './data';
 import {
@@ -828,18 +829,41 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const vehiclesCol = collection(db, 'vehicles');
-    const snapshot = await getDocs(vehiclesCol);
+    const [snapshot, serverVehicles] = await Promise.all([
+      getDocs(vehiclesCol),
+      fetch('/api/vehicles', { cache: 'no-store' })
+        .then((r) => (r.ok ? (r.json() as Promise<Vehicle[]>) : []))
+        .catch(() => [] as Vehicle[]),
+    ]);
 
-    const list: Vehicle[] = [];
+    const byId = new Map<string, Vehicle>();
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as Vehicle;
       const normalized = normalizeVehicleData({
         ...data,
         id: docSnap.id || data.id,
       });
-      list.push(normalized);
+      byId.set(normalized.id, normalized);
     });
 
+    if (Array.isArray(serverVehicles)) {
+      serverVehicles.forEach((srvCar) => {
+        if (!srvCar?.id) return;
+        const normalizedSrv = normalizeVehicleData(srvCar);
+        const existing = byId.get(normalizedSrv.id);
+        if (!existing) {
+          byId.set(normalizedSrv.id, normalizedSrv);
+        } else {
+          const fsTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+          const srvTime = new Date(normalizedSrv.updatedAt || normalizedSrv.createdAt || 0).getTime();
+          if (srvTime > fsTime) {
+            byId.set(normalizedSrv.id, normalizedSrv);
+          }
+        }
+      });
+    }
+
+    const list = Array.from(byId.values());
     activeVehiclesCache = list;
     try {
       localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
@@ -1582,8 +1606,8 @@ export async function uploadVehicleImageFile(
     onProgress(5, 0, uploadBlob.size, optimizedResult.statusNote);
   }
 
-  // Step 2: Check if Firebase Storage bucket is actively usable
-  const isStorageReady = await isFirebaseStorageReachable();
+  // Step 2: Check if Firebase Storage bucket is actively usable AND Firebase user is signed in
+  const isStorageReady = auth.currentUser ? await isFirebaseStorageReachable() : false;
 
   if (isStorageReady) {
     try {
@@ -1620,7 +1644,7 @@ export async function uploadVehicleImageFile(
 
   // Step 3: Resilient high-speed upload fallback using robust arrayBuffer data URL conversion
   const base64Data = await readBlobAsDataUrl(uploadBlob);
-  const bearerToken = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+  const bearerToken = await getActiveAdminBearerToken();
 
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -1783,38 +1807,69 @@ export async function runConcurrentQueue<T, R>(
  */
 export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle> {
   const normalized = normalizeVehicleData(vehicle);
-  try {
-    const docRef = doc(db, 'vehicles', normalized.id);
-    const payload = cleanFirestoreData(normalized);
-    await setDoc(docRef, payload);
+  const bearerToken = await getActiveAdminBearerToken();
 
-    // Verify document write directly on Firestore
-    const verifySnap = await getDoc(docRef);
-    if (!verifySnap.exists()) {
-      throw new Error(`Firestore document write verification failed for vehicle ${normalized.id}`);
-    }
-
-    const confirmedData = normalizeVehicleData({
-      ...verifySnap.data() as Vehicle,
-      id: verifySnap.id
-    });
-
-    // Update local cache immediately
-    const current = getVehicles().filter(v => v.id !== confirmedData.id);
-    current.unshift(confirmedData);
+  if (bearerToken) {
     try {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
-    } catch {}
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+      await fetch('/api/vehicles/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(normalized),
+      });
+    } catch {
+      // Non-blocking server mirror
     }
-
-    return confirmedData;
-  } catch (error) {
-    console.error('[Firestore] Save Vehicle Error:', error);
-    handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
   }
+
+  if (auth.currentUser) {
+    try {
+      const docRef = doc(db, 'vehicles', normalized.id);
+      const payload = cleanFirestoreData(normalized);
+      await setDoc(docRef, payload);
+
+      const verifySnap = await getDoc(docRef);
+      if (!verifySnap.exists()) {
+        throw new Error(`Firestore document write verification failed for vehicle ${normalized.id}`);
+      }
+
+      const confirmedData = normalizeVehicleData({
+        ...(verifySnap.data() as Vehicle),
+        id: verifySnap.id,
+      });
+
+      const current = getVehicles().filter((v) => v.id !== confirmedData.id);
+      current.unshift(confirmedData);
+      try {
+        localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+      } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+      }
+
+      return confirmedData;
+    } catch (error) {
+      console.error('[Firestore] Save Vehicle Error:', error);
+      handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
+    }
+  }
+
+  // Standalone Server Email/Password session persistence
+  const current = getVehicles().filter((v) => v.id !== normalized.id);
+  current.unshift(normalized);
+  activeVehiclesCache = current;
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+  } catch {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+  }
+
+  return normalized;
 }
 
 /**
@@ -1858,20 +1913,38 @@ export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
  * Deletes a single vehicle directly from Cloud Firestore.
  */
 export async function deleteVehicleFromFirestore(id: string): Promise<void> {
-  try {
-    const docRef = doc(db, 'vehicles', id);
-    await deleteDoc(docRef);
+  const bearerToken = await getActiveAdminBearerToken();
 
-    const current = getVehicles().filter(v => v.id !== id);
+  if (bearerToken) {
     try {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
-    } catch {}
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+      await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+        },
+      });
+    } catch {
+      // Non-blocking server delete
     }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+  }
+
+  if (auth.currentUser) {
+    try {
+      const docRef = doc(db, 'vehicles', id);
+      await deleteDoc(docRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+    }
+  }
+
+  const current = getVehicles().filter((v) => v.id !== id);
+  activeVehiclesCache = current;
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
+  } catch {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
   }
 }
 
@@ -1972,6 +2045,31 @@ export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void 
  * Fetches all leads from Cloud Firestore.
  */
 export async function fetchLeads(): Promise<Lead[]> {
+  if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
+    if (token) {
+      try {
+        const res = await fetch('/api/leads', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            try {
+              localStorage.setItem(LEADS_KEY, JSON.stringify(data));
+            } catch {}
+            return data;
+          }
+        }
+      } catch {
+        // Fallback to local cache
+      }
+    }
+    return getLeads();
+  }
+
   try {
     const snapshot = await getDocs(collection(db, 'leads'));
     const list: Lead[] = [];
@@ -2036,6 +2134,13 @@ export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead 
   try {
     localStorage.setItem(LEADS_KEY, JSON.stringify(current));
   } catch {}
+
+  // Mirror to backend store so standalone server admin login also receives leads
+  fetch('/api/leads/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newLead),
+  }).catch(() => {});
 
   // Write to Cloud Firestore safely stripping undefined properties
   const payload = cleanFirestoreData(newLead);
@@ -2102,6 +2207,31 @@ export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): 
  * Fetches inquiries from Cloud Firestore.
  */
 export async function fetchInquiries(): Promise<Inquiry[]> {
+  if (!auth.currentUser) {
+    const token = await getActiveAdminBearerToken();
+    if (token) {
+      try {
+        const res = await fetch('/api/inquiries', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            try {
+              localStorage.setItem(INQUIRIES_KEY, JSON.stringify(data));
+            } catch {}
+            return data;
+          }
+        }
+      } catch {
+        // Fallback to local cache
+      }
+    }
+    return getInquiries();
+  }
+
   try {
     const snapshot = await getDocs(collection(db, 'inquiries'));
     const list: Inquiry[] = [];
@@ -2146,6 +2276,13 @@ export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'
   try {
     localStorage.setItem(INQUIRIES_KEY, JSON.stringify(current));
   } catch {}
+
+  // Mirror to backend store so standalone server admin login also receives inquiries
+  fetch('/api/inquiries/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newInquiry),
+  }).catch(() => {});
 
   // Write to Cloud Firestore safely stripping undefined properties
   const payload = cleanFirestoreData(newInquiry);
@@ -2283,13 +2420,31 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
   } catch {}
 
-  try {
-    const docRef = doc(db, 'settings', 'business');
-    const payload = cleanFirestoreData(updated);
-    await setDoc(docRef, payload, { merge: true });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'settings/business');
-    throw error;
+  const bearerToken = await getActiveAdminBearerToken();
+  if (bearerToken) {
+    try {
+      await fetch('/api/business-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(updated),
+      });
+    } catch {
+      // Non-blocking server save
+    }
+  }
+
+  if (auth.currentUser) {
+    try {
+      const docRef = doc(db, 'settings', 'business');
+      const payload = cleanFirestoreData(updated);
+      await setDoc(docRef, payload, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/business');
+      throw error;
+    }
   }
 
   return updated;
@@ -2416,32 +2571,76 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
     localStorage.setItem(EDITORIAL_KEY, JSON.stringify(sanitized));
   } catch {}
 
-  try {
-    const docRef = doc(db, 'settings', 'editorial');
-    await setDoc(
-      docRef,
-      {
-        posts: sanitized,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
-    throw error;
+  const bearerToken = await getActiveAdminBearerToken();
+  if (bearerToken) {
+    try {
+      await fetch('/api/editorial-posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify({ posts: sanitized }),
+      });
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  if (auth.currentUser) {
+    try {
+      const docRef = doc(db, 'settings', 'editorial');
+      await setDoc(
+        docRef,
+        {
+          posts: sanitized,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
+      throw error;
+    }
   }
 
   return sanitized;
 }
 
 // ============================================================================
-// DIRECT VEHICLE QUICK-UPDATE HELPERS (FIRESTORE FIRST)
+// DIRECT VEHICLE QUICK-UPDATE HELPERS
 // ============================================================================
 
+async function mirrorVehicleQuickPatch(vehicleId: string, updates: Partial<Vehicle>): Promise<void> {
+  const currentVehicles = getVehicles();
+  const existing = currentVehicles.find((v) => v.id === vehicleId);
+  if (existing) {
+    const merged = normalizeVehicleData({ ...existing, ...updates, updatedAt: new Date().toISOString() });
+    const next = currentVehicles.map((v) => (v.id === vehicleId ? merged : v));
+    activeVehiclesCache = next;
+    try {
+      localStorage.setItem(VEHICLES_KEY, JSON.stringify(next));
+    } catch {}
+    const bearerToken = await getActiveAdminBearerToken();
+    if (bearerToken) {
+      await fetch('/api/vehicles/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(merged),
+      }).catch(() => {});
+    }
+  }
+}
+
 /**
- * Updates a vehicle's status (Available, Reserved, Sold, Hidden) in Firestore.
+ * Updates a vehicle's status (Available, Reserved, Sold, Hidden).
  */
 export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus): Promise<void> {
+  await mirrorVehicleQuickPatch(vehicleId, { status });
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
@@ -2455,13 +2654,16 @@ export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus
 }
 
 /**
- * Updates a vehicle's price directly in Firestore.
+ * Updates a vehicle's price directly.
  */
 export async function saveVehiclePrice(vehicleId: string, newPrice: number): Promise<void> {
+  const price = Number(newPrice) || 0;
+  await mirrorVehicleQuickPatch(vehicleId, { price });
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
-      price: Number(newPrice) || 0,
+      price,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
@@ -2471,9 +2673,11 @@ export async function saveVehiclePrice(vehicleId: string, newPrice: number): Pro
 }
 
 /**
- * Updates a vehicle's featured flag directly in Firestore.
+ * Updates a vehicle's featured flag directly.
  */
 export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean): Promise<void> {
+  await mirrorVehicleQuickPatch(vehicleId, { isFeatured });
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(docRef, {
@@ -2487,9 +2691,14 @@ export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean
 }
 
 /**
- * Updates a vehicle's homepage slideshow flag and order directly in Firestore.
+ * Updates a vehicle's homepage slideshow flag and order directly.
  */
 export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boolean, slideshowOrder?: number): Promise<void> {
+  await mirrorVehicleQuickPatch(
+    vehicleId,
+    typeof slideshowOrder === 'number' ? { inSlideshow, slideshowOrder } : { inSlideshow }
+  );
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'vehicles', vehicleId);
     const updates: any = {
@@ -2507,9 +2716,21 @@ export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boole
 }
 
 /**
- * Updates lead status in Firestore.
+ * Updates lead status cleanly.
  */
 export async function saveLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  const bearerToken = await getActiveAdminBearerToken();
+  if (bearerToken) {
+    await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({ id: leadId, status }),
+    }).catch(() => {});
+  }
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'leads', leadId);
     await updateDoc(docRef, {
@@ -2523,9 +2744,21 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
 }
 
 /**
- * Updates inquiry status in Firestore.
+ * Updates inquiry status cleanly.
  */
 export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): Promise<void> {
+  const bearerToken = await getActiveAdminBearerToken();
+  if (bearerToken) {
+    await fetch('/api/inquiries/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({ id: inquiryId, status }),
+    }).catch(() => {});
+  }
+  if (!auth.currentUser) return;
   try {
     const docRef = doc(db, 'inquiries', inquiryId);
     await updateDoc(docRef, {

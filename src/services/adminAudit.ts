@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { AdminAuditLogEntry } from '../types';
+import { getActiveAdminBearerToken } from './adminAuth';
 
 export interface RecordAuditInput {
   action: string;
@@ -19,8 +20,8 @@ export interface RecordAuditInput {
 }
 
 /**
- * Writes an immutable administrator security or operational audit event to Firestore.
- * Uses serverTimestamp() as required by firestore.rules.
+ * Writes an immutable administrator security or operational audit event to Firestore
+ * when a Firebase Admin user is active. Skips silently in standalone server auth mode.
  */
 export async function recordAdminAuditLog(input: RecordAuditInput): Promise<void> {
   const user = auth.currentUser;
@@ -42,51 +43,52 @@ export async function recordAdminAuditLog(input: RecordAuditInput): Promise<void
 }
 
 /**
- * Fetches immutable Firestore audit logs + server-recorded failed login attempts.
+ * Fetches server security logs and (when Firebase Auth is active) Firestore audit logs.
  */
 export async function fetchAdminAuditLogs(maxEntries = 50): Promise<AdminAuditLogEntry[]> {
   const results: AdminAuditLogEntry[] = [];
 
-  try {
-    const q = query(
-      collection(db, 'admin_audit_logs'),
-      orderBy('timestamp', 'desc'),
-      limit(maxEntries)
-    );
-    const snap = await getDocs(q);
-    snap.forEach((docSnap) => {
-      const data = docSnap.data();
-      let isoTime = new Date().toISOString();
-      if (data.timestamp instanceof Timestamp) {
-        isoTime = data.timestamp.toDate().toISOString();
-      } else if (typeof data.timestamp === 'string') {
-        isoTime = data.timestamp;
-      }
+  if (auth.currentUser) {
+    try {
+      const q = query(
+        collection(db, 'admin_audit_logs'),
+        orderBy('timestamp', 'desc'),
+        limit(maxEntries)
+      );
+      const snap = await getDocs(q);
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        let isoTime = new Date().toISOString();
+        if (data.timestamp instanceof Timestamp) {
+          isoTime = data.timestamp.toDate().toISOString();
+        } else if (typeof data.timestamp === 'string') {
+          isoTime = data.timestamp;
+        }
 
-      results.push({
-        id: docSnap.id,
-        action: String(data.action || 'ADMIN_EVENT'),
-        actorUid: String(data.actorUid || ''),
-        actorEmail: typeof data.actorEmail === 'string' ? data.actorEmail : undefined,
-        status: (data.status as AdminAuditLogEntry['status']) || 'success',
-        details: String(data.details || ''),
-        authMethod: typeof data.authMethod === 'string' ? data.authMethod : undefined,
-        timestamp: isoTime,
-        source: 'firestore',
+        results.push({
+          id: docSnap.id,
+          action: String(data.action || 'ADMIN_EVENT'),
+          actorUid: String(data.actorUid || ''),
+          actorEmail: typeof data.actorEmail === 'string' ? data.actorEmail : undefined,
+          status: (data.status as AdminAuditLogEntry['status']) || 'success',
+          details: String(data.details || ''),
+          authMethod: typeof data.authMethod === 'string' ? data.authMethod : undefined,
+          timestamp: isoTime,
+          source: 'firestore',
+        });
       });
-    });
-  } catch (err) {
-    console.warn('[Fetch Audit Logs Notice]:', err instanceof Error ? err.message : String(err));
+    } catch {
+      // Non-blocking fallback
+    }
   }
 
-  // Merge server security ring-buffer events (failed/rate-limited anonymous attempts)
   try {
-    const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-    if (idToken) {
+    const token = await getActiveAdminBearerToken();
+    if (token) {
       const res = await fetch('/api/admin-auth?action=security-events', {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${token}`,
         },
         cache: 'no-store',
       });

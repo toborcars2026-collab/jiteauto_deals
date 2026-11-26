@@ -31,6 +31,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
   getAdminAuthStatus,
+  getCurrentServerAdminSession,
   verifyCurrentAdminSession,
   syncAdminProfileInFirestore,
   signInAdminWithEmailPassword,
@@ -188,9 +189,34 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!mounted) return;
 
+      const srvSession = getCurrentServerAdminSession();
       if (!user) {
         await bootstrapPromise;
         if (!mounted) return;
+
+        if (srvSession) {
+          if (isAdminSessionTimedOut(srvSession.profile.inactivityTimeoutMinutes || 30)) {
+            await logoutAdminSession('timeout');
+            if (!mounted) return;
+            setCurrentAdminUser(null);
+            setAdminProfile(null);
+            setIsAuthenticated(false);
+            setIsVerifyingSession(false);
+            setAuthError('Your administrator session timed out due to inactivity. Please sign in again.');
+            return;
+          }
+
+          const activeTimeout = srvSession.profile.inactivityTimeoutMinutes || 30;
+          setCurrentAdminUser(null);
+          setAdminProfile(srvSession.profile);
+          setTimeoutMinutes(activeTimeout);
+          touchAdminActivity(activeTimeout);
+          lastActivityRef.current = Date.now();
+          setIsAuthenticated(true);
+          setIsVerifyingSession(false);
+          return;
+        }
+
         setCurrentAdminUser(null);
         setAdminProfile(null);
         setIsAuthenticated(false);
@@ -245,7 +271,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     };
   }, []);
 
-  // 2. Real-time Firestore Synchronization while Authenticated
+  // 2. Real-time Synchronization while Authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -254,8 +280,8 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
     fetchBusinessSettings().then(setBusinessSettings);
     fetchAdminAuditLogs(8).then(setRecentAuditLogs).catch(() => {});
 
-    const unsubLeads = subscribeToLeads(setLeads);
-    const unsubInquiries = subscribeToInquiries(setInquiries);
+    const unsubLeads = auth.currentUser ? subscribeToLeads(setLeads) : () => {};
+    const unsubInquiries = auth.currentUser ? subscribeToInquiries(setInquiries) : () => {};
     const unsubVehicles = subscribeToVehicles(setVehicles);
     const unsubSettings = subscribeToBusinessSettings(setBusinessSettings);
 
@@ -332,12 +358,12 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
     try {
       const res = await signInAdminWithEmailPassword(emailInput, passwordInput);
-      if (!res.success || !res.user) {
+      if (!res.success || !res.serverSession) {
         setAuthError(res.error || AUTH_MESSAGES.INVALID_PASSWORD);
         return;
       }
-      setCurrentAdminUser(res.user);
-      setAdminProfile(res.profile || null);
+      setCurrentAdminUser(null);
+      setAdminProfile(res.profile || res.serverSession.profile);
       const mins = res.profile?.inactivityTimeoutMinutes || 30;
       setTimeoutMinutes(mins);
       touchAdminActivity(mins);
@@ -401,14 +427,14 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
         setupSecret,
       });
 
-      if (!res.success || !res.user) {
+      if (!res.success || !res.serverSession) {
         setAuthError(res.error || 'Setup could not be completed.');
         return;
       }
 
-      setBootstrapStatus((prev) => ({ ...prev, bootstrapped: true }));
-      setCurrentAdminUser(res.user);
-      setAdminProfile(res.profile || null);
+      setBootstrapStatus((prev) => ({ ...prev, bootstrapped: true, configured: true }));
+      setCurrentAdminUser(null);
+      setAdminProfile(res.profile || res.serverSession.profile);
       setSetupPassword('');
       setSetupConfirmPassword('');
       setDashboardBanner(AUTH_MESSAGES.SETUP_READY_BANNER);
@@ -677,19 +703,17 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   </button>
                 )}
 
-                {!bootstrapStatus.bootstrapped && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthNotice(null);
-                      setAuthView('setup');
-                    }}
-                    className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer py-1 ml-auto"
-                  >
-                    First-time administrator setup
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthNotice(null);
+                    setAuthView('setup');
+                  }}
+                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer py-1 ml-auto"
+                >
+                  First-time administrator setup
+                </button>
               </div>
             </>
           )}
@@ -763,7 +787,7 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
           )}
 
           {/* View: Controlled First-Time Administrator Setup (All fields blank by default) */}
-          {authView === 'setup' && !bootstrapStatus.bootstrapped && (
+          {authView === 'setup' && (
             <>
               <div className="text-center space-y-2">
                 <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-950/80 border border-amber-500/35 flex items-center justify-center text-amber-400">
@@ -776,9 +800,29 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                   First-Time Administrator Setup
                 </h1>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Configure your permanent administrator email and password. Once completed, initial setup locks permanently.
+                  Configure your permanent administrator email and password directly on the server (independent of Firestore).
                 </p>
               </div>
+
+              {bootstrapStatus.envManaged && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-200 text-xs flex items-start gap-2">
+                  <ShieldAlert size={16} className="shrink-0 text-amber-400 mt-0.5" />
+                  <span className="leading-relaxed">
+                    Server environment variables (ADMIN_EMAIL / ADMIN_PASSWORD) are currently active in this runtime. Update or clear them in your hosting environment settings if you want to claim credentials through this form.
+                  </span>
+                </div>
+              )}
+
+              {!bootstrapStatus.envManaged && bootstrapStatus.bootstrapped && (
+                <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-400/35 text-blue-100 text-xs flex items-start gap-2">
+                  <ShieldCheck size={16} className="shrink-0 text-amber-400 mt-0.5" />
+                  <span className="leading-relaxed">
+                    {bootstrapStatus.setupSecretRequired
+                      ? 'Administrator credentials are already configured. Enter your Setup Authorization Secret below to reset them, or return to Sign In.'
+                      : 'Administrator credentials are already configured on this server. Sign in and visit Security & Account Settings to change your email or password.'}
+                  </span>
+                </div>
+              )}
 
               {authError && (
                 <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2">
@@ -1430,7 +1474,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                 {activeTab === 'business' && (
                   <AdminSettingsTab
                     profileOnly
-                    currentUser={currentAdminUser ? { email: currentAdminUser.email } : null}
+                    currentUser={
+                      currentAdminUser
+                        ? { email: currentAdminUser.email }
+                        : adminProfile
+                        ? { email: adminProfile.email }
+                        : null
+                    }
                     onSignOut={() => handleSignOut('manual')}
                     onSettingsSaved={setBusinessSettings}
                   />
@@ -1440,6 +1490,10 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
 
                 {activeTab === 'security' && (
                   <AdminSecuritySection
+                    authMode={
+                      adminProfile?.authMode ||
+                      (currentAdminUser ? 'google-firebase' : 'server-credentials')
+                    }
                     currentUser={
                       currentAdminUser
                         ? {
@@ -1449,6 +1503,13 @@ export default function AdminPanel({ vehicles, setVehicles, onCancel }: AdminPan
                             providerIds: currentAdminUser.providerData
                               .map((p) => p.providerId)
                               .filter(Boolean),
+                          }
+                        : adminProfile
+                        ? {
+                            uid: adminProfile.uid,
+                            email: adminProfile.email,
+                            displayName: adminProfile.displayName,
+                            providerIds: adminProfile.authMethods || ['password'],
                           }
                         : null
                     }

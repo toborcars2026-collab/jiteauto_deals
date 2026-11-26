@@ -229,6 +229,40 @@ function saveInquiriesStore(inquiries: any[]) {
   fs.writeFileSync(INQUIRIES_FILE, JSON.stringify(inquiries, null, 2), "utf-8");
 }
 
+const BUSINESS_SETTINGS_FILE = path.join(DATA_DIR, "business_settings.json");
+const EDITORIAL_POSTS_FILE = path.join(DATA_DIR, "editorial_posts.json");
+
+function readBusinessSettingsStore(): Record<string, any> | null {
+  ensureDataDir();
+  if (!fs.existsSync(BUSINESS_SETTINGS_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(BUSINESS_SETTINGS_FILE, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function saveBusinessSettingsStore(settings: Record<string, any>) {
+  ensureDataDir();
+  fs.writeFileSync(BUSINESS_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+}
+
+function readEditorialStore(): any[] | null {
+  ensureDataDir();
+  if (!fs.existsSync(EDITORIAL_POSTS_FILE)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(EDITORIAL_POSTS_FILE, "utf-8"));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveEditorialStore(posts: any[]) {
+  ensureDataDir();
+  fs.writeFileSync(EDITORIAL_POSTS_FILE, JSON.stringify(posts, null, 2), "utf-8");
+}
+
 // API Anti-Cache Middleware
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/")) {
@@ -334,6 +368,19 @@ app.post("/api/vehicles", requireVerifiedAdmin, (req, res) => {
   res.json({ success: true, count: saved.length, vehicles: saved });
 });
 
+app.post("/api/vehicles/upsert", requireVerifiedAdmin, (req, res) => {
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== "object" || !incoming.id) {
+    return res.status(400).json({ error: "Valid vehicle object with id is required." });
+  }
+  const normalized = normalizeVehicle(incoming);
+  const current = readVehiclesStore();
+  const filtered = current.filter((v: any) => v.id !== normalized.id);
+  const next = [normalized, ...filtered];
+  saveVehiclesStore(next);
+  res.json({ success: true, vehicle: normalized });
+});
+
 app.delete("/api/vehicles/:id", requireVerifiedAdmin, (req, res) => {
   const vehicleId = req.params.id;
   if (!vehicleId) {
@@ -368,11 +415,31 @@ app.get("/api/leads", requireVerifiedAdmin, (_req, res) => {
   res.json(leads);
 });
 
-app.post("/api/leads", (req, res) => {
+app.post("/api/leads", requireVerifiedAdmin, (req, res) => {
   const leads = req.body;
   if (Array.isArray(leads)) {
     saveLeadsStore(leads);
   }
+  res.json({ success: true });
+});
+
+app.post("/api/leads/submit", (req, res) => {
+  const lead = req.body;
+  if (!lead || typeof lead !== "object" || !lead.name || !lead.phone) {
+    return res.status(400).json({ error: "Valid lead name and phone are required." });
+  }
+  const current = readLeadsStore();
+  const next = [lead, ...current.filter((l: any) => l.id !== lead.id)].slice(0, 500);
+  saveLeadsStore(next);
+  res.json({ success: true });
+});
+
+app.post("/api/leads/status", requireVerifiedAdmin, (req, res) => {
+  const { id, status } = req.body || {};
+  if (!id || !status) return res.status(400).json({ error: "Missing lead id or status" });
+  const current = readLeadsStore();
+  const updated = current.map((l: any) => (l.id === id ? { ...l, status, updatedAt: new Date().toISOString() } : l));
+  saveLeadsStore(updated);
   res.json({ success: true });
 });
 
@@ -381,12 +448,60 @@ app.get("/api/inquiries", requireVerifiedAdmin, (_req, res) => {
   res.json(inquiries);
 });
 
-app.post("/api/inquiries", (req, res) => {
+app.post("/api/inquiries", requireVerifiedAdmin, (req, res) => {
   const inquiries = req.body;
   if (Array.isArray(inquiries)) {
     saveInquiriesStore(inquiries);
   }
   res.json({ success: true });
+});
+
+app.post("/api/inquiries/submit", (req, res) => {
+  const inquiry = req.body;
+  if (!inquiry || typeof inquiry !== "object" || !inquiry.name || !inquiry.phone) {
+    return res.status(400).json({ error: "Valid inquiry name and phone are required." });
+  }
+  const current = readInquiriesStore();
+  const next = [inquiry, ...current.filter((i: any) => i.id !== inquiry.id)].slice(0, 500);
+  saveInquiriesStore(next);
+  res.json({ success: true });
+});
+
+app.post("/api/inquiries/status", requireVerifiedAdmin, (req, res) => {
+  const { id, status } = req.body || {};
+  if (!id || !status) return res.status(400).json({ error: "Missing inquiry id or status" });
+  const current = readInquiriesStore();
+  const updated = current.map((i: any) => (i.id === id ? { ...i, status, updatedAt: new Date().toISOString() } : i));
+  saveInquiriesStore(updated);
+  res.json({ success: true });
+});
+
+app.get("/api/business-settings", (_req, res) => {
+  const settings = readBusinessSettingsStore();
+  res.json({ settings });
+});
+
+app.post("/api/business-settings", requireVerifiedAdmin, (req, res) => {
+  const settings = req.body;
+  if (!settings || typeof settings !== "object") {
+    return res.status(400).json({ error: "Invalid settings payload" });
+  }
+  saveBusinessSettingsStore(settings);
+  res.json({ success: true, settings });
+});
+
+app.get("/api/editorial-posts", (_req, res) => {
+  const posts = readEditorialStore();
+  res.json({ posts });
+});
+
+app.post("/api/editorial-posts", requireVerifiedAdmin, (req, res) => {
+  const posts = req.body?.posts;
+  if (!Array.isArray(posts)) {
+    return res.status(400).json({ error: "Expected posts array" });
+  }
+  saveEditorialStore(posts);
+  res.json({ success: true, posts });
 });
 
 // Unified Administrator Authentication & Security Verification Routes (matches vercel.json)

@@ -4,10 +4,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  sendEmailVerification,
   updateProfile,
   updatePassword,
   verifyBeforeUpdateEmail,
@@ -42,8 +39,16 @@ import { recordAdminAuditLog } from './adminAudit';
 
 export interface AdminBootstrapStatus {
   bootstrapped: boolean;
+  configured?: boolean;
+  envManaged?: boolean;
   setupSecretRequired: boolean;
   firebaseAuthConfigured: boolean;
+}
+
+export interface ServerAdminSession {
+  token: string;
+  expiresAt: number;
+  profile: AdminProfile;
 }
 
 export interface AdminVerificationResult {
@@ -55,6 +60,7 @@ export interface AdminVerificationResult {
   invited?: boolean;
   signInProvider?: string;
   bootstrapped?: boolean;
+  authMode?: 'server-credentials' | 'google-firebase';
   error?: string;
   code?: string;
 }
@@ -77,7 +83,7 @@ export const AUTH_MESSAGES = {
   SETUP_READY_BANNER:
     'Congratulations! Your Jite Auto Deals Administrator Account has been successfully configured. Your administration dashboard is now ready.',
   LOGIN_WELCOME: 'Welcome back! Your Jite Auto Deals dashboard is ready.',
-  INVALID_PASSWORD: 'The password you entered is incorrect. Please try again.',
+  INVALID_PASSWORD: 'The email or password you entered is incorrect. Please try again.',
   UNAUTHORIZED_ACCOUNT: 'This account does not have administrator access.',
   AUTH_CONFIG_ISSUE:
     'Authentication is not fully configured. Please check the administrator security configuration.',
@@ -87,6 +93,33 @@ export const AUTH_MESSAGES = {
 const LAST_ACTIVITY_KEY = 'jite_admin_last_activity_ms';
 const TIMEOUT_MINUTES_KEY = 'jite_admin_timeout_min';
 const CONFIG_ALERT_SESSION_KEY = 'jite_admin_auth_config_alert';
+
+// In-memory Bearer session for standalone server Email/Password auth (never stored in localStorage/sessionStorage)
+let activeServerSession: ServerAdminSession | null = null;
+
+export function getCurrentServerAdminSession(): ServerAdminSession | null {
+  if (!activeServerSession) return null;
+  if (Date.now() >= activeServerSession.expiresAt) {
+    activeServerSession = null;
+    return null;
+  }
+  return activeServerSession;
+}
+
+export async function getActiveAdminBearerToken(): Promise<string | null> {
+  const srv = getCurrentServerAdminSession();
+  if (srv?.token) {
+    return srv.token;
+  }
+  if (auth.currentUser) {
+    try {
+      return await auth.currentUser.getIdToken();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 function isRunningInsideIframe(): boolean {
   try {
@@ -125,6 +158,7 @@ export function isAdminSessionTimedOut(fallbackMinutes = 30): boolean {
 }
 
 export function clearAdminActivityState(): void {
+  activeServerSession = null;
   try {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(LAST_ACTIVITY_KEY);
@@ -145,7 +179,10 @@ function recordSessionConfigAlert(note: string): void {
   }
 }
 
-export function mapFirebaseAuthError(err: any, context: 'login' | 'setup' | 'link' | 'reset' = 'login'): {
+export function mapFirebaseAuthError(
+  err: any,
+  context: 'login' | 'setup' | 'link' | 'reset' = 'login'
+): {
   code: string;
   message: string;
 } {
@@ -159,8 +196,8 @@ export function mapFirebaseAuthError(err: any, context: 'login' | 'setup' | 'lin
   if (code === 'auth/operation-not-allowed' || code === 'auth/configuration-not-found') {
     const providerHint =
       context === 'link' || rawMsg.toLowerCase().includes('google')
-        ? 'Enable Google and Email/Password providers in Firebase Console > Authentication > Sign-in method.'
-        : 'Enable Email/Password sign-in in Firebase Console > Authentication > Sign-in method.';
+        ? 'Enable Google sign-in in Firebase Console > Authentication > Sign-in method.'
+        : 'Enable this sign-in provider in Firebase Console > Authentication > Sign-in method.';
     recordSessionConfigAlert(providerHint);
     return {
       code,
@@ -185,31 +222,18 @@ export function mapFirebaseAuthError(err: any, context: 'login' | 'setup' | 'lin
     };
   }
 
-  if (code === 'auth/user-not-found') {
-    return {
-      code,
-      message:
-        context === 'login'
-          ? 'No administrator account was found with that email address. Double-check the email or verify setup.'
-          : AUTH_MESSAGES.INVALID_PASSWORD,
-    };
-  }
-
   if (code === 'auth/user-mismatch') {
     return {
       code,
       message:
-        'The selected Google account does not match your currently signed-in administrator account. Please choose the Google account matching your current session.',
+        'The selected Google account does not match your currently signed-in administrator account.',
     };
   }
 
   if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
     return {
       code,
-      message:
-        context === 'link'
-          ? 'This Google account is already registered to another user profile. Sign out and sign in with that Google account if it is already authorized, or choose another Google account.'
-          : 'An account with this email address already exists. Sign in with your password or reset it if needed.',
+      message: 'This Google account is already registered to another user profile.',
     };
   }
 
@@ -223,7 +247,7 @@ export function mapFirebaseAuthError(err: any, context: 'login' | 'setup' | 'lin
   if (code === 'auth/requires-recent-login') {
     return {
       code,
-      message: 'For your security, please re-confirm your current password or sign in again before modifying credentials.',
+      message: 'For your security, please sign in again before modifying credentials.',
     };
   }
 
@@ -245,7 +269,7 @@ export function mapFirebaseAuthError(err: any, context: 'login' | 'setup' | 'lin
     return {
       code,
       message:
-        'Your browser blocked the authentication popup window. Allow popups for this site or try Sign in again.',
+        'Your browser blocked the authentication popup window. Allow popups for this site or try again.',
     };
   }
 
@@ -286,6 +310,9 @@ export function evaluatePasswordStrength(password: string): PasswordStrengthResu
   return { score, label, isValid, checks };
 }
 
+/**
+ * Queries ONLY the backend standalone auth service (zero Firestore reads).
+ */
 export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
   try {
     const res = await fetch('/api/admin-auth?action=status', {
@@ -294,55 +321,31 @@ export async function getAdminAuthStatus(): Promise<AdminBootstrapStatus> {
     });
     if (res.ok) {
       const data = await res.json();
+      const configured = Boolean(data.configured ?? data.bootstrapped);
       return {
-        bootstrapped: Boolean(data.bootstrapped),
+        bootstrapped: configured,
+        configured,
+        envManaged: Boolean(data.envManaged),
         setupSecretRequired: Boolean(data.setupSecretRequired),
         firebaseAuthConfigured: Boolean(data.firebaseAuthConfigured ?? true),
       };
     }
   } catch {
-    // Check Firestore bootstrap lock directly as resilient fallback if API unreachable
-  }
-
-  try {
-    const bootstrapSnap = await getDoc(doc(db, 'settings', 'admin_bootstrap'));
-    if (bootstrapSnap.exists() && bootstrapSnap.data()?.setupCompleted === true) {
-      return {
-        bootstrapped: true,
-        setupSecretRequired: false,
-        firebaseAuthConfigured: true,
-      };
-    }
-  } catch {
-    // Ignore
+    // Graceful network fallback
   }
 
   return {
     bootstrapped: false,
+    configured: false,
+    envManaged: false,
     setupSecretRequired: false,
     firebaseAuthConfigured: true,
   };
 }
 
-async function reportFailedAttemptToServer(emailHint?: string): Promise<{ rateLimited?: boolean; waitSeconds?: number }> {
-  try {
-    const res = await fetch('/api/admin-auth?action=record-security-event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailHint: emailHint || '' }),
-    });
-    const data = await res.json().catch(() => ({}));
-    return {
-      rateLimited: res.status === 429 || Boolean(data.rateLimited),
-      waitSeconds: data.waitSeconds,
-    };
-  } catch {
-    return {};
-  }
-}
-
 /**
- * Verifies a signed-in Firebase user against the backend RS256 certificate check + Firestore rules.
+ * Verifies a signed-in Firebase Google user against backend RS256 verification + Firestore registry.
+ * (Not called for standalone Email + Password sign-in.)
  */
 export async function verifyCurrentAdminSession(user: User): Promise<AdminVerificationResult> {
   try {
@@ -360,10 +363,7 @@ export async function verifyCurrentAdminSession(user: User): Promise<AdminVerifi
     if (!res.ok || !data.success) {
       return {
         authorized: false,
-        error:
-          data.code === 'RATE_LIMITED'
-            ? data.error
-            : AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT,
+        error: AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT,
         code: data.code,
       };
     }
@@ -376,7 +376,8 @@ export async function verifyCurrentAdminSession(user: User): Promise<AdminVerifi
       role: data.role === 'owner' ? 'owner' : 'admin',
       invited: Boolean(data.invited),
       signInProvider: data.signInProvider,
-      bootstrapped: Boolean(data.bootstrapped),
+      authMode: data.authMode || 'google-firebase',
+      bootstrapped: true,
     };
   } catch (err: any) {
     return {
@@ -389,7 +390,7 @@ export async function verifyCurrentAdminSession(user: User): Promise<AdminVerifi
 }
 
 /**
- * Synchronizes the verified administrator profile in /admins/{uid} and redeems verified email invites cleanly.
+ * Synchronizes an optional Google-authenticated administrator profile in Firestore.
  */
 export async function syncAdminProfileInFirestore(
   user: User,
@@ -408,7 +409,6 @@ export async function syncAdminProfileInFirestore(
     let resolvedDisplayName =
       overrides?.displayName ?? existing?.displayName ?? user.displayName ?? 'Administrator';
 
-    // Check invite metadata when first redeeming a pre-authorized email invite
     if (!existing && user.email && user.emailVerified) {
       try {
         const inviteRef = doc(db, 'admin_invites', user.email.trim().toLowerCase());
@@ -421,7 +421,7 @@ export async function syncAdminProfileInFirestore(
           }
         }
       } catch {
-        // Ignore if no invite doc
+        // Ignore
       }
     }
 
@@ -430,13 +430,14 @@ export async function syncAdminProfileInFirestore(
       email: user.email || existing?.email || '',
       displayName: resolvedDisplayName,
       role: resolvedRole,
-      authMethods: providerList.length > 0 ? providerList : existing?.authMethods || ['password'],
+      authMethods: providerList.length > 0 ? providerList : existing?.authMethods || ['google.com'],
       active: existing?.active !== false,
       inactivityTimeoutMinutes:
         overrides?.inactivityTimeoutMinutes ?? existing?.inactivityTimeoutMinutes ?? 30,
       lastLoginAt: nowIso,
       createdAt: existing?.createdAt || nowIso,
       updatedAt: nowIso,
+      authMode: 'google-firebase',
     };
 
     await setDoc(adminRef, payload, { merge: true });
@@ -447,10 +448,6 @@ export async function syncAdminProfileInFirestore(
   }
 }
 
-/**
- * Atomic one-time initial owner claim in Firestore (writes /settings/admin_bootstrap + /admins/{uid} together)
- * and finalizes server bootstrap lock.
- */
 async function executeAtomicBootstrapClaim(user: User, fullName: string): Promise<AdminProfile> {
   const nowIso = new Date().toISOString();
   const providerList = Array.from(new Set(user.providerData.map((p) => p.providerId).filter(Boolean)));
@@ -459,12 +456,13 @@ async function executeAtomicBootstrapClaim(user: User, fullName: string): Promis
     email: user.email || '',
     displayName: fullName.trim() || user.displayName || 'Primary Administrator',
     role: 'owner',
-    authMethods: providerList.length > 0 ? providerList : ['password'],
+    authMethods: providerList.length > 0 ? providerList : ['google.com'],
     active: true,
     inactivityTimeoutMinutes: 30,
     lastLoginAt: nowIso,
     createdAt: nowIso,
     updatedAt: nowIso,
+    authMode: 'google-firebase',
   };
 
   try {
@@ -480,28 +478,10 @@ async function executeAtomicBootstrapClaim(user: User, fullName: string): Promis
     handleFirestoreError(err, OperationType.WRITE, `admins/${user.uid}`);
   }
 
-  // Finalize server-side lock after batch succeeds
-  try {
-    const freshToken = await user.getIdToken(true);
-    await fetch('/api/admin-auth?action=bootstrap-finalize', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${freshToken}`,
-      },
-      body: JSON.stringify({ idToken: freshToken }),
-    });
-  } catch {
-    // Non-blocking since Firestore lock document is already committed
-  }
-
   touchAdminActivity(profile.inactivityTimeoutMinutes);
   return profile;
 }
 
-/**
- * Picks up any mobile redirect sign-in or linking result on page mount.
- */
 export async function checkPendingGoogleRedirect(): Promise<{
   handled: boolean;
   success: boolean;
@@ -542,14 +522,15 @@ export async function checkPendingGoogleRedirect(): Promise<{
 }
 
 /**
- * Standard Email + Password Sign-In.
+ * Standalone Server Email + Password Sign-In.
+ * ZERO integration with Firestore (/admins, /settings/admin_bootstrap) or Firebase Auth.
  */
 export async function signInAdminWithEmailPassword(
   email: string,
   password: string
 ): Promise<{
   success: boolean;
-  user?: User;
+  serverSession?: ServerAdminSession;
   profile?: AdminProfile | null;
   error?: string;
   code?: string;
@@ -560,62 +541,62 @@ export async function signInAdminWithEmailPassword(
   }
 
   try {
-    await authPersistenceReady;
-    const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-    const verify = await verifyCurrentAdminSession(cred.user);
-
-    if (!verify.authorized) {
-      await signOut(auth).catch(() => {});
-      return {
-        success: false,
-        code: verify.code || 'ACCESS_DENIED',
-        error: AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT,
-      };
-    }
-
-    const profile = await syncAdminProfileInFirestore(cred.user);
-    await recordAdminAuditLog({
-      action: 'LOGIN_SUCCESS',
-      status: 'success',
-      details: 'Administrator signed in with Email and Password.',
-      authMethod: 'password',
+    const res = await fetch('/api/admin-auth?action=login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: trimmedEmail, password }),
     });
 
-    return { success: true, user: cred.user, profile };
-  } catch (err: any) {
-    const mapped = mapFirebaseAuthError(err, 'login');
-
-    if (
-      mapped.code === 'auth/operation-not-allowed' ||
-      mapped.code === 'NETWORK_ERROR' ||
-      mapped.code === 'auth/network-request-failed'
-    ) {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !data.token || !data.admin) {
       return {
         success: false,
-        code: mapped.code,
-        error: mapped.message,
+        code: data.code || 'INVALID_CREDENTIALS',
+        error: data.error || AUTH_MESSAGES.INVALID_PASSWORD,
       };
     }
 
-    const rate = await reportFailedAttemptToServer(trimmedEmail);
-    if (rate.rateLimited) {
-      return {
-        success: false,
-        code: 'RATE_LIMITED',
-        error: `Too many failed attempts. Please wait ${rate.waitSeconds || 300} seconds before trying again.`,
-      };
-    }
+    const nowIso = new Date().toISOString();
+    const profile: AdminProfile = {
+      uid: String(data.admin.uid || 'server_admin_owner'),
+      email: String(data.admin.email || trimmedEmail),
+      displayName: String(data.admin.displayName || 'Primary Administrator'),
+      role: 'owner',
+      authMethods: ['password'],
+      active: true,
+      inactivityTimeoutMinutes: Number(data.admin.inactivityTimeoutMinutes) || 30,
+      lastLoginAt: nowIso,
+      authMode: 'server-credentials',
+      envManaged: Boolean(data.admin.envManaged),
+    };
+
+    const session: ServerAdminSession = {
+      token: String(data.token),
+      expiresAt: Number(data.expiresAt) || Date.now() + 8 * 60 * 60 * 1000,
+      profile,
+    };
+
+    activeServerSession = session;
+    touchAdminActivity(profile.inactivityTimeoutMinutes);
 
     return {
+      success: true,
+      serverSession: session,
+      profile,
+    };
+  } catch (err: any) {
+    return {
       success: false,
-      code: mapped.code,
-      error: mapped.message,
+      code: 'NETWORK_ERROR',
+      error: err?.message?.toLowerCase().includes('fetch')
+        ? AUTH_MESSAGES.NETWORK_ISSUE
+        : err?.message || 'Unable to verify credentials right now.',
     };
   }
 }
 
 /**
- * Verified Google Sign-In with mobile popup fallback support.
+ * Optional Google Sign-In (secondary authentication method via Firebase + Firestore).
  */
 export async function signInAdminWithGoogle(): Promise<{
   success: boolean;
@@ -652,7 +633,6 @@ export async function signInAdminWithGoogle(): Promise<{
 
     return { success: true, user: cred.user, profile };
   } catch (err: any) {
-    // On mobile top-level browsers where popup is blocked, seamlessly use redirect sign-in
     if (err?.code === 'auth/popup-blocked' && !isRunningInsideIframe()) {
       try {
         const provider = new GoogleAuthProvider();
@@ -660,7 +640,7 @@ export async function signInAdminWithGoogle(): Promise<{
         await signInWithRedirect(auth, provider);
         return { success: false, redirecting: true };
       } catch {
-        // Fall through to mapped message
+        // Fall through
       }
     }
 
@@ -675,7 +655,7 @@ export async function signInAdminWithGoogle(): Promise<{
 }
 
 /**
- * Sends a Firebase password reset link without disclosing account enumeration details.
+ * Provides clear recovery guidance for standalone server credentials (no Firebase Auth email lookup).
  */
 export async function sendAdminPasswordReset(email: string): Promise<{
   success: boolean;
@@ -689,32 +669,29 @@ export async function sendAdminPasswordReset(email: string): Promise<{
     };
   }
 
-  try {
-    await sendPasswordResetEmail(auth, trimmed);
-  } catch (err: any) {
-    const mapped = mapFirebaseAuthError(err, 'reset');
-    if (
-      mapped.code === 'auth/operation-not-allowed' ||
-      mapped.code === 'NETWORK_ERROR' ||
-      mapped.code === 'auth/network-request-failed'
-    ) {
+  // If currently signed in with Google/Firebase Auth, Firebase password reset works
+  if (auth.currentUser) {
+    try {
+      await sendPasswordResetEmail(auth, trimmed);
       return {
-        success: false,
-        message: mapped.message,
+        success: true,
+        message: 'A password reset link has been sent to your email address.',
       };
+    } catch {
+      // Fall through to server credential message
     }
   }
 
   return {
     success: true,
     message:
-      'If an administrator account matches that email address, a password reset link has been sent to your inbox.',
+      'Administrator email and password login is managed directly on the server (independent of Firestore). To change credentials while signed in, open Security & Account Settings, or update ADMIN_EMAIL / ADMIN_PASSWORD in your hosting environment settings.',
   };
 }
 
 /**
- * Controlled One-Time Initial Administrator Setup with User-Chosen Email & Password.
- * Zero hardcoded emails. Locks permanently via atomic Firestore writeBatch + backend check.
+ * One-Time Initial Administrator Email + Password Setup on Standalone Backend Server.
+ * ZERO Firestore dependency.
  */
 export async function completeFirstTimeSetup(params: {
   fullName: string;
@@ -723,7 +700,7 @@ export async function completeFirstTimeSetup(params: {
   setupSecret?: string;
 }): Promise<{
   success: boolean;
-  user?: User;
+  serverSession?: ServerAdminSession;
   profile?: AdminProfile | null;
   error?: string;
   code?: string;
@@ -749,89 +726,62 @@ export async function completeFirstTimeSetup(params: {
   }
 
   try {
-    await authPersistenceReady;
-    let user: User;
-
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      user = cred.user;
-    } catch (createErr: any) {
-      if (createErr?.code === 'auth/email-already-in-use') {
-        try {
-          const signInCred = await signInWithEmailAndPassword(auth, email, password);
-          user = signInCred.user;
-        } catch (signInErr: any) {
-          const mappedSignIn = mapFirebaseAuthError(signInErr, 'login');
-          return {
-            success: false,
-            code: mappedSignIn.code,
-            error:
-              'An account with this email already exists. Enter that account’s existing password or use Google below if that account is linked to Google.',
-          };
-        }
-      } else {
-        const mappedCreate = mapFirebaseAuthError(createErr, 'setup');
-        return {
-          success: false,
-          code: mappedCreate.code,
-          error: mappedCreate.message,
-        };
-      }
-    }
-
-    if (user.displayName !== fullName) {
-      await updateProfile(user, { displayName: fullName }).catch(() => {});
-    }
-
-    const idToken = await user.getIdToken(true);
-    const preflightRes = await fetch('/api/admin-auth?action=bootstrap-complete', {
+    const res = await fetch('/api/admin-auth?action=setup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${idToken}`,
         ...(setupSecret ? { 'x-admin-setup-secret': setupSecret } : {}),
       },
-      body: JSON.stringify({ idToken, setupSecret }),
+      body: JSON.stringify({ fullName, email, password, setupSecret }),
     });
 
-    const preflightData = await preflightRes.json().catch(() => ({}));
-    if (!preflightRes.ok || !preflightData.success) {
-      await signOut(auth).catch(() => {});
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !data.token || !data.admin) {
       return {
         success: false,
-        code: preflightData.code,
-        error: preflightData.error || 'Could not authorize initial administrator setup.',
+        code: data.code,
+        error: data.error || 'Could not configure administrator credentials.',
       };
     }
 
-    const profile = await executeAtomicBootstrapClaim(user, fullName);
+    const nowIso = new Date().toISOString();
+    const profile: AdminProfile = {
+      uid: String(data.admin.uid || 'server_admin_owner'),
+      email: String(data.admin.email || email),
+      displayName: String(data.admin.displayName || fullName),
+      role: 'owner',
+      authMethods: ['password'],
+      active: true,
+      inactivityTimeoutMinutes: Number(data.admin.inactivityTimeoutMinutes) || 30,
+      lastLoginAt: nowIso,
+      createdAt: nowIso,
+      authMode: 'server-credentials',
+      envManaged: Boolean(data.admin.envManaged),
+    };
 
-    // Non-blocking verification email hint so user can verify their inbox anytime
-    if (!user.emailVerified) {
-      sendEmailVerification(user).catch(() => {});
-    }
+    const session: ServerAdminSession = {
+      token: String(data.token),
+      expiresAt: Number(data.expiresAt) || Date.now() + 8 * 60 * 60 * 1000,
+      profile,
+    };
 
-    await recordAdminAuditLog({
-      action: 'BOOTSTRAP_COMPLETED',
-      status: 'success',
-      details: `Initial administrator account "${fullName}" configured.`,
-      authMethod: 'password',
-    });
+    activeServerSession = session;
+    touchAdminActivity(profile.inactivityTimeoutMinutes);
 
-    return { success: true, user, profile };
+    return { success: true, serverSession: session, profile };
   } catch (err: any) {
-    await signOut(auth).catch(() => {});
-    const mapped = mapFirebaseAuthError(err, 'setup');
     return {
       success: false,
-      code: mapped.code,
-      error: mapped.message,
+      code: 'NETWORK_ERROR',
+      error: err?.message?.toLowerCase().includes('fetch')
+        ? AUTH_MESSAGES.NETWORK_ISSUE
+        : err?.message || 'Setup failed due to a connection error.',
     };
   }
 }
 
 /**
- * Optional Google-based One-Time Initial Administrator Setup.
+ * Optional Google-based setup (secondary).
  */
 export async function completeGoogleBootstrap(params: {
   fullName?: string;
@@ -848,27 +798,6 @@ export async function completeGoogleBootstrap(params: {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     const cred = await signInWithPopup(auth, provider);
-    const idToken = await cred.user.getIdToken(true);
-
-    const res = await fetch('/api/admin-auth?action=bootstrap-complete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${idToken}`,
-        ...(params.setupSecret ? { 'x-admin-setup-secret': params.setupSecret } : {}),
-      },
-      body: JSON.stringify({ idToken, setupSecret: params.setupSecret }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
-      await signOut(auth).catch(() => {});
-      return {
-        success: false,
-        code: data.code,
-        error: data.error || 'Setup authorization failed for this Google account.',
-      };
-    }
 
     const displayName = params.fullName?.trim() || cred.user.displayName || 'Primary Administrator';
     const profile = await executeAtomicBootstrapClaim(cred.user, displayName);
@@ -876,7 +805,7 @@ export async function completeGoogleBootstrap(params: {
     await recordAdminAuditLog({
       action: 'BOOTSTRAP_COMPLETED',
       status: 'success',
-      details: `Initial administrator account "${displayName}" configured via Google.`,
+      details: `Administrator account "${displayName}" signed in via Google.`,
       authMethod: 'google.com',
     });
 
@@ -892,9 +821,6 @@ export async function completeGoogleBootstrap(params: {
   }
 }
 
-/**
- * Safely reauthenticates the active administrator without causing unnecessary auth/user-mismatch errors.
- */
 async function reauthenticateCurrentAdmin(currentPassword?: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) {
@@ -932,9 +858,6 @@ async function reauthenticateCurrentAdmin(currentPassword?: string): Promise<voi
   }
 }
 
-/**
- * Links an Email/Password login method onto the current Google-authenticated Admin UID.
- */
 export async function linkEmailPasswordToCurrentAdmin(
   password: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -957,12 +880,6 @@ export async function linkEmailPasswordToCurrentAdmin(
     const cred = EmailAuthProvider.credential(user.email, password);
     await linkWithCredential(user, cred);
     await syncAdminProfileInFirestore(user);
-    await recordAdminAuditLog({
-      action: 'PASSWORD_CREDENTIAL_LINKED',
-      status: 'success',
-      details: 'Email and Password login method linked to administrator UID.',
-      authMethod: 'password',
-    });
     return { success: true };
   } catch (err: any) {
     return {
@@ -972,16 +889,12 @@ export async function linkEmailPasswordToCurrentAdmin(
   }
 }
 
-/**
- * Safely links a Google Sign-In account onto the current Email/Password-authenticated Admin UID.
- * Prevents duplicate accounts and resolves auth/user-mismatch & recent-login requirements cleanly.
- */
 export async function linkGoogleToCurrentAdmin(
   currentPassword?: string
 ): Promise<{ success: boolean; error?: string }> {
   const user = auth.currentUser;
   if (!user) {
-    return { success: false, error: 'You must be signed in first.' };
+    return { success: false, error: 'Google account linking is only available for Google/Firebase sessions.' };
   }
 
   const alreadyHasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
@@ -990,7 +903,6 @@ export async function linkGoogleToCurrentAdmin(
   }
 
   try {
-    // If password is provided, verify identity upfront so recent-login check succeeds seamlessly
     if (currentPassword && user.email) {
       const emailCred = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, emailCred);
@@ -1005,14 +917,6 @@ export async function linkGoogleToCurrentAdmin(
     await linkWithPopup(user, provider);
     await user.reload();
     await syncAdminProfileInFirestore(user);
-
-    await recordAdminAuditLog({
-      action: 'GOOGLE_CREDENTIAL_LINKED',
-      status: 'success',
-      details: `Google sign-in linked cleanly to administrator account (${user.email || user.uid}).`,
-      authMethod: 'google.com',
-    });
-
     return { success: true };
   } catch (err: any) {
     const mapped = mapFirebaseAuthError(err, 'link');
@@ -1023,9 +927,6 @@ export async function linkGoogleToCurrentAdmin(
   }
 }
 
-/**
- * Safely unlinks Google Sign-In ONLY if Email/Password login remains active (never locks admin out).
- */
 export async function unlinkGoogleFromCurrentAdmin(
   currentPassword?: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -1047,14 +948,6 @@ export async function unlinkGoogleFromCurrentAdmin(
     await unlink(user, 'google.com');
     await user.reload();
     await syncAdminProfileInFirestore(user);
-
-    await recordAdminAuditLog({
-      action: 'GOOGLE_CREDENTIAL_UNLINKED',
-      status: 'warning',
-      details: 'Google sign-in unlinked from administrator account.',
-      authMethod: 'password',
-    });
-
     return { success: true };
   } catch (err: any) {
     return {
@@ -1065,17 +958,12 @@ export async function unlinkGoogleFromCurrentAdmin(
 }
 
 /**
- * Updates the signed-in administrator's Firebase Authentication password.
+ * Updates administrator password cleanly on server store (standalone mode) or Firebase Auth (Google mode).
  */
 export async function changeAdminPassword(params: {
   currentPassword?: string;
   newPassword: string;
-}): Promise<{ success: boolean; error?: string; message?: string }> {
-  const user = auth.currentUser;
-  if (!user) {
-    return { success: false, error: 'Active administrator session required.' };
-  }
-
+}): Promise<{ success: boolean; error?: string; message?: string; profile?: AdminProfile }> {
   const strength = evaluatePasswordStrength(params.newPassword);
   if (!strength.isValid) {
     return {
@@ -1085,13 +973,58 @@ export async function changeAdminPassword(params: {
     };
   }
 
+  const srv = getCurrentServerAdminSession();
+  if (srv) {
+    try {
+      const res = await fetch('/api/admin-auth?action=update-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${srv.token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: params.currentPassword || '',
+          newPassword: params.newPassword,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Could not update password.' };
+      }
+
+      const updatedProfile: AdminProfile = {
+        ...srv.profile,
+        email: data.admin?.email || srv.profile.email,
+        displayName: data.admin?.displayName || srv.profile.displayName,
+        updatedAt: new Date().toISOString(),
+      };
+      activeServerSession = {
+        token: data.token || srv.token,
+        expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        profile: updatedProfile,
+      };
+      return {
+        success: true,
+        profile: updatedProfile,
+        message: 'Administrator password updated successfully.',
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update password.' };
+    }
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    return { success: false, error: 'Active administrator session required.' };
+  }
+
   const hasPasswordProvider = user.providerData.some((p) => p.providerId === 'password');
   if (!hasPasswordProvider) {
     const linkRes = await linkEmailPasswordToCurrentAdmin(params.newPassword);
     return {
       success: linkRes.success,
       error: linkRes.error,
-      message: linkRes.success ? 'Email & Password login enabled and password configured.' : undefined,
+      message: linkRes.success ? 'Email & Password login enabled.' : undefined,
     };
   }
 
@@ -1114,20 +1047,63 @@ export async function changeAdminPassword(params: {
 }
 
 /**
- * Updates administrator email using Firebase verifyBeforeUpdateEmail + recent reauthentication.
+ * Updates administrator email cleanly on server store (standalone mode) or Firebase Auth (Google mode).
  */
 export async function changeAdminEmail(params: {
   currentPassword?: string;
   newEmail: string;
-}): Promise<{ success: boolean; error?: string; message?: string }> {
-  const user = auth.currentUser;
-  if (!user) {
-    return { success: false, error: 'Active administrator session required.' };
-  }
-
+}): Promise<{ success: boolean; error?: string; message?: string; profile?: AdminProfile }> {
   const trimmed = params.newEmail.trim();
   if (!trimmed || !trimmed.includes('@')) {
     return { success: false, error: 'Please enter a valid new email address.' };
+  }
+
+  const srv = getCurrentServerAdminSession();
+  if (srv) {
+    if (srv.profile.email.toLowerCase() === trimmed.toLowerCase()) {
+      return { success: false, error: 'New email address must differ from the current email.' };
+    }
+    try {
+      const res = await fetch('/api/admin-auth?action=update-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${srv.token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: params.currentPassword || '',
+          newEmail: trimmed,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Could not update administrator email.' };
+      }
+
+      const updatedProfile: AdminProfile = {
+        ...srv.profile,
+        email: data.admin?.email || trimmed,
+        displayName: data.admin?.displayName || srv.profile.displayName,
+        updatedAt: new Date().toISOString(),
+      };
+      activeServerSession = {
+        token: data.token || srv.token,
+        expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        profile: updatedProfile,
+      };
+      return {
+        success: true,
+        profile: updatedProfile,
+        message: `Administrator login email updated to ${updatedProfile.email}.`,
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update administrator email.' };
+    }
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    return { success: false, error: 'Active administrator session required.' };
   }
   if (user.email?.toLowerCase() === trimmed.toLowerCase()) {
     return { success: false, error: 'New email address must differ from the current email.' };
@@ -1136,14 +1112,9 @@ export async function changeAdminEmail(params: {
   try {
     await reauthenticateCurrentAdmin(params.currentPassword);
     await verifyBeforeUpdateEmail(user, trimmed);
-    await recordAdminAuditLog({
-      action: 'EMAIL_CHANGE_VERIFICATION_SENT',
-      status: 'success',
-      details: `Verification link dispatched to update login email to ${trimmed}.`,
-    });
     return {
       success: true,
-      message: `A verification link has been sent to ${trimmed}. Click the link in that inbox to finalize updating your administrator email.`,
+      message: `A verification link has been sent to ${trimmed}. Click the link in that inbox to finalize updating your email.`,
     };
   } catch (err: any) {
     return {
@@ -1153,21 +1124,55 @@ export async function changeAdminEmail(params: {
   }
 }
 
-/**
- * Updates profile display name & inactivity auto-timeout preferences.
- */
 export async function updateAdminProfileSettings(params: {
   displayName: string;
   inactivityTimeoutMinutes: number;
 }): Promise<{ success: boolean; profile?: AdminProfile | null; error?: string }> {
-  const user = auth.currentUser;
-  if (!user) {
-    return { success: false, error: 'Active administrator session required.' };
-  }
-
   const cleanName = params.displayName.trim();
   if (!cleanName || cleanName.length < 2) {
     return { success: false, error: 'Administrator display name must be at least 2 characters.' };
+  }
+
+  const srv = getCurrentServerAdminSession();
+  if (srv) {
+    try {
+      const res = await fetch('/api/admin-auth?action=update-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${srv.token}`,
+        },
+        body: JSON.stringify({
+          fullName: cleanName,
+          inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Could not save preferences.' };
+      }
+
+      const updatedProfile: AdminProfile = {
+        ...srv.profile,
+        displayName: cleanName,
+        inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
+        updatedAt: new Date().toISOString(),
+      };
+      activeServerSession = {
+        token: data.token || srv.token,
+        expiresAt: Number(data.expiresAt) || srv.expiresAt,
+        profile: updatedProfile,
+      };
+      touchAdminActivity(params.inactivityTimeoutMinutes);
+      return { success: true, profile: updatedProfile };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update profile settings.' };
+    }
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    return { success: false, error: 'Active administrator session required.' };
   }
 
   try {
@@ -1176,21 +1181,18 @@ export async function updateAdminProfileSettings(params: {
       displayName: cleanName,
       inactivityTimeoutMinutes: params.inactivityTimeoutMinutes,
     });
-    await recordAdminAuditLog({
-      action: 'PROFILE_UPDATED',
-      status: 'success',
-      details: `Updated administrator profile ("${cleanName}", session timeout ${params.inactivityTimeoutMinutes} min).`,
-    });
     return { success: true, profile };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to update profile settings.' };
   }
 }
 
-/**
- * Lists authorized administrators from Firestore /admins collection.
- */
 export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
+  if (!auth.currentUser) {
+    const srv = getCurrentServerAdminSession();
+    return srv ? [srv.profile] : [];
+  }
+
   try {
     const snap = await getDocs(collection(db, 'admins'));
     const list: AdminProfile[] = [];
@@ -1211,15 +1213,14 @@ export async function listAuthorizedAdmins(): Promise<AdminProfile[]> {
       });
     });
     return list;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'admins');
+  } catch {
+    return [];
   }
 }
 
-/**
- * Lists email invitations stored in /admin_invites.
- */
 export async function listAdminInvites(): Promise<AdminInvite[]> {
+  if (!auth.currentUser) return [];
+
   try {
     const snap = await getDocs(collection(db, 'admin_invites'));
     const list: AdminInvite[] = [];
@@ -1241,15 +1242,19 @@ export async function listAdminInvites(): Promise<AdminInvite[]> {
   }
 }
 
-/**
- * Authorizes an additional administrator either by email invitation or direct Firebase Auth UID.
- */
 export async function registerAuthorizedAdmin(input: {
   uid?: string;
   email: string;
   displayName: string;
   role: 'owner' | 'admin';
 }): Promise<{ success: boolean; error?: string; mode?: 'uid' | 'invite' }> {
+  if (!auth.currentUser) {
+    return {
+      success: false,
+      error: 'Adding Firebase Google co-admins requires signing in with Google.',
+    };
+  }
+
   const cleanUid = (input.uid || '').trim();
   const cleanEmail = input.email.trim();
   const cleanName = input.displayName.trim();
@@ -1282,15 +1287,9 @@ export async function registerAuthorizedAdmin(input: {
         },
         { merge: true }
       );
-      await recordAdminAuditLog({
-        action: 'ADMIN_ACCESS_GRANTED',
-        status: 'success',
-        details: `Authorized ${input.role} access for ${cleanEmail} (UID: ${cleanUid}).`,
-      });
       return { success: true, mode: 'uid' };
     }
 
-    // Email-based authorization invite (redeemed automatically on verified Google sign-in)
     const emailLower = cleanEmail.toLowerCase();
     await setDoc(
       doc(db, 'admin_invites', emailLower),
@@ -1305,38 +1304,22 @@ export async function registerAuthorizedAdmin(input: {
       },
       { merge: true }
     );
-    await recordAdminAuditLog({
-      action: 'ADMIN_INVITE_CREATED',
-      status: 'success',
-      details: `Authorized email invitation created for ${cleanEmail}.`,
-    });
     return { success: true, mode: 'invite' };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Unable to authorize administrator record.' };
   }
 }
 
-/**
- * Revokes an email invitation cleanly.
- */
 export async function removeAdminInvite(email: string): Promise<{ success: boolean; error?: string }> {
+  if (!auth.currentUser) return { success: false, error: 'Google Firebase session required.' };
   try {
     await deleteDoc(doc(db, 'admin_invites', email.trim().toLowerCase()));
-    await recordAdminAuditLog({
-      action: 'ADMIN_INVITE_REMOVED',
-      status: 'warning',
-      details: `Removed administrator invitation for ${email}.`,
-    });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to remove administrator invitation.' };
   }
 }
 
-/**
- * Activates or revokes an authorized administrator account.
- * Primary owner accounts (role === 'owner') and active self session are strictly protected.
- */
 export async function setAuthorizedAdminActive(
   targetUid: string,
   active: boolean,
@@ -1344,7 +1327,7 @@ export async function setAuthorizedAdminActive(
 ): Promise<{ success: boolean; error?: string }> {
   const currentUid = auth.currentUser?.uid;
   if (!currentUid) {
-    return { success: false, error: 'Active session required.' };
+    return { success: false, error: 'Google Firebase session required.' };
   }
   if (targetUid === currentUid && !active) {
     return { success: false, error: 'You cannot revoke your own currently active administrator account.' };
@@ -1361,79 +1344,44 @@ export async function setAuthorizedAdminActive(
       active,
       updatedAt: new Date().toISOString(),
     });
-    await recordAdminAuditLog({
-      action: active ? 'ADMIN_ACCESS_RESTORED' : 'ADMIN_ACCESS_REVOKED',
-      status: active ? 'success' : 'warning',
-      details: `${active ? 'Restored' : 'Revoked'} administrator access for UID ${targetUid}.`,
-    });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to update administrator status.' };
   }
 }
 
-/**
- * Runs genuine live diagnostics for Section E (Security Status). Never fabricates green status.
- */
 export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus> {
+  const srv = getCurrentServerAdminSession();
   const user = auth.currentUser;
   const warnings: string[] = [];
 
-  const providers = user?.providerData?.map((p) => p.providerId).filter(Boolean) || [];
-  const hasPassword = providers.includes('password');
-  const hasGoogle = providers.includes('google.com');
-
-  const firebaseAuthOk = Boolean(user && providers.length > 0);
-  const firebaseAuthSummary = user
-    ? `Authenticated (${providers.map((p) => (p === 'google.com' ? 'Google' : 'Email/Password')).join(' + ')})`
-    : 'No active Firebase Authentication user.';
-
-  if (user && !user.emailVerified) {
-    warnings.push('Administrator email address is not yet verified in Firebase Auth.');
-  }
-  if (user && (!hasPassword || !hasGoogle)) {
-    warnings.push(
-      hasPassword && !hasGoogle
-        ? 'Only Email/Password sign-in is configured. Link a Google account as a secondary sign-in option if desired.'
-        : 'Only Google sign-in is configured. Set an Email & Password credential so you always have two recovery paths.'
-    );
-  }
-
-  try {
-    const storedAlert =
-      typeof window !== 'undefined' ? window.sessionStorage.getItem(CONFIG_ALERT_SESSION_KEY) : null;
-    if (storedAlert) {
-      warnings.push(storedAlert);
-    }
-  } catch {
-    // Ignore
-  }
-
   const databaseConnected = await testFirestoreConnection();
   const databaseSummary = databaseConnected
-    ? 'Cloud Firestore server reachable and verified.'
-    : 'Unable to reach Cloud Firestore server cleanly. Check internet or Firebase configuration.';
+    ? 'Cloud Firestore server reachable for vehicle catalog.'
+    : 'Unable to reach Cloud Firestore server cleanly.';
+
+  const token = await getActiveAdminBearerToken();
 
   let authorizationOk = false;
   let authorizationSummary: string = AUTH_MESSAGES.UNAUTHORIZED_ACCOUNT;
 
-  if (user) {
+  if (token) {
     try {
-      const idToken = await user.getIdToken();
       const diagRes = await fetch('/api/admin-auth?action=diagnostics', {
         method: 'GET',
-        headers: { Authorization: `Bearer ${idToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
       if (diagRes.ok) {
         const diagData = await diagRes.json();
         authorizationOk = Boolean(diagData.success);
-        authorizationSummary = authorizationOk
-          ? `Server RS256 & Firestore Rules verified (${diagData.role === 'owner' ? 'Primary Owner' : 'Administrator'}).`
-          : 'Server authorization could not be confirmed.';
-        if (!diagData.setupSecretConfigured) {
+        authorizationSummary =
+          diagData.authMode === 'server-credentials'
+            ? 'Standalone Server Email & Password verified (HMAC Bearer session, zero Firestore dependency).'
+            : 'Google Sign-In & Firestore permissions verified.';
+        if (diagData.authMode === 'server-credentials' && !diagData.envManaged) {
           warnings.push(
-            'Optional: Set ADMIN_SETUP_SECRET in your server environment variables for extra deployment protection.'
+            'Tip: For stateless Vercel deployments, you can optionally mirror ADMIN_EMAIL and ADMIN_PASSWORD in your Vercel Environment Variables.'
           );
         }
       } else {
@@ -1444,8 +1392,20 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
     }
   }
 
+  const authMode: 'server-credentials' | 'google-firebase' = srv
+    ? 'server-credentials'
+    : 'google-firebase';
+
+  const firebaseAuthOk = srv ? true : Boolean(user);
+  const firebaseAuthSummary = srv
+    ? 'Authenticated via Standalone Server Email & Password (decoupled from Firestore).'
+    : user
+    ? 'Authenticated via Google Sign-In.'
+    : 'No active administrator session.';
+
   return {
     checkedAt: new Date().toISOString(),
+    authMode,
     firebaseAuthOk,
     firebaseAuthSummary,
     databaseConnected,
@@ -1456,9 +1416,6 @@ export async function runSecurityDiagnostics(): Promise<SecurityDiagnosticStatus
   };
 }
 
-/**
- * Explicitly logs out administrator and clears session state cleanly.
- */
 export async function logoutAdminSession(reason: 'manual' | 'timeout' = 'manual'): Promise<void> {
   if (auth.currentUser) {
     await recordAdminAuditLog({
