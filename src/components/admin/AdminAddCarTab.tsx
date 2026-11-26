@@ -28,6 +28,9 @@ import { Vehicle, VehicleImageRecord } from '../../types';
 import { recordAdminAuditLog } from '../../services/adminAudit';
 import {
   saveVehicleToFirestore,
+  getSupabaseStorageStatus,
+  uploadVehicleImageToSupabase,
+  SupabaseStorageStatus,
   uploadVehicleImageToCloudinary,
   getCloudinaryUploadStatus,
   CloudinaryUploadStatus,
@@ -52,6 +55,8 @@ export interface PhotoCardItem {
   isExistingUrl?: boolean;
   uploadedUrl?: string;
   publicId?: string;
+  storageBucket?: string;
+  storagePath?: string;
   width?: number;
   height?: number;
   bytes?: number;
@@ -154,6 +159,8 @@ function buildInitialPhotoCards(editingCar: Partial<Vehicle> | null): PhotoCardI
       previewUrl: url,
       uploadedUrl: url,
       publicId: meta?.publicId,
+      storageBucket: meta?.storageBucket,
+      storagePath: meta?.storagePath,
       width: meta?.width,
       height: meta?.height,
       bytes: meta?.bytes,
@@ -213,6 +220,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
               previewUrl: p.uploadedUrl,
               uploadedUrl: p.uploadedUrl,
               publicId: p.publicId,
+              storageBucket: p.storageBucket,
+              storagePath: p.storagePath,
               width: p.width,
               height: p.height,
               bytes: p.bytes,
@@ -247,25 +256,36 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     }
   }, [editingCar?.id]);
 
-  // Cloudinary setup status
+  // Storage setup status (Supabase primary, Cloudinary fallback)
+  const [supabaseStorageStatus, setSupabaseStorageStatus] = useState<SupabaseStorageStatus | null>(null);
   const [cloudinaryStatus, setCloudinaryStatus] = useState<CloudinaryUploadStatus | null>(null);
-  const [isCheckingCloudinary, setIsCheckingCloudinary] = useState(true);
+  const [isCheckingStorage, setIsCheckingStorage] = useState(true);
+  const preferSupabaseStorageRef = useRef<boolean>(false);
 
-  const checkCloudinaryConnection = useCallback(async () => {
-    setIsCheckingCloudinary(true);
+  const checkStorageConnections = useCallback(async (forceRefresh = false) => {
+    setIsCheckingStorage(true);
     try {
-      const st = await getCloudinaryUploadStatus();
-      setCloudinaryStatus(st);
+      const [sbResult, clResult] = await Promise.allSettled([
+        getSupabaseStorageStatus(forceRefresh),
+        getCloudinaryUploadStatus(),
+      ]);
+      const sbStatus = sbResult.status === 'fulfilled' ? sbResult.value : null;
+      const clStatus = clResult.status === 'fulfilled' ? clResult.value : null;
+      setSupabaseStorageStatus(sbStatus);
+      setCloudinaryStatus(clStatus);
+      preferSupabaseStorageRef.current = Boolean(sbStatus?.configured);
     } catch {
+      setSupabaseStorageStatus(null);
       setCloudinaryStatus(null);
+      preferSupabaseStorageRef.current = false;
     } finally {
-      setIsCheckingCloudinary(false);
+      setIsCheckingStorage(false);
     }
   }, []);
 
   useEffect(() => {
-    checkCloudinaryConnection();
-  }, [checkCloudinaryConnection]);
+    checkStorageConnections();
+  }, [checkStorageConnections]);
 
   // Inputs & Drag-and-Drop Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -319,6 +339,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
         id: p.id,
         uploadedUrl: p.uploadedUrl,
         publicId: p.publicId,
+        storageBucket: p.storageBucket,
+        storagePath: p.storagePath,
         width: p.width,
         height: p.height,
         bytes: p.bytes,
@@ -385,7 +407,12 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
         )
       );
 
-      uploadVehicleImageToCloudinary({
+      const useSupabaseStorage = preferSupabaseStorageRef.current;
+      const uploadFn = useSupabaseStorage
+        ? uploadVehicleImageToSupabase
+        : uploadVehicleImageToCloudinary;
+
+      uploadFn({
         file: card.file,
         vehicleId: draftVehicleIdRef.current,
         slotIndex,
@@ -409,7 +436,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
           );
         },
       })
-        .then((result) => {
+        .then((result: any) => {
           abortControllersRef.current.delete(nextId);
           activeUploadIdsRef.current.delete(nextId);
 
@@ -422,6 +449,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                     progress: 100,
                     uploadedUrl: result.secureUrl,
                     publicId: result.publicId,
+                    storageBucket: result.storageBucket,
+                    storagePath: result.storagePath,
                     width: result.width,
                     height: result.height,
                     bytes: result.bytes,
@@ -614,6 +643,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
               isExistingUrl: false,
               uploadedUrl: undefined,
               publicId: undefined,
+              storageBucket: undefined,
+              storagePath: undefined,
               width: undefined,
               height: undefined,
               bytes: undefined,
@@ -870,7 +901,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
 
     if (activeCount > 0) {
       setErrorMsg(
-        `Please wait for the remaining ${activeCount} photograph${activeCount > 1 ? 's' : ''} to finish uploading to Cloudinary.`
+        `Please wait for the remaining ${activeCount} photograph${activeCount > 1 ? 's' : ''} to finish uploading.`
       );
       return;
     }
@@ -886,6 +917,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       finalImageMetadata.push({
         vehicleId: targetId,
         publicId: card.publicId || `external_${idx + 1}`,
+        ...(card.storageBucket ? { storageBucket: card.storageBucket } : {}),
+        ...(card.storagePath ? { storagePath: card.storagePath } : {}),
         secureUrl: url,
         position: idx + 1,
         isCover: idx === 0,
@@ -904,7 +937,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
     }
 
     setIsPublishing(true);
-    setPublishStatusText('Saving vehicle record & Cloudinary metadata to Cloud Firestore...');
+    setPublishStatusText('Saving vehicle record & photo metadata to database...');
 
     try {
       const payload: Vehicle = normalizeVehicleData({
@@ -952,8 +985,8 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
       console.error('[Publish Error]:', err);
       setErrorMsg(
         err?.message?.includes('permission') || err?.message?.includes('PERMISSION_DENIED')
-          ? 'Cloud Firestore permission error. Please ensure you are signed in with an active administrator account.'
-          : err?.message || 'Failed to publish vehicle. Your uploaded Cloudinary photos are safely preserved; please retry.'
+          ? 'Database permission error. Please ensure you are signed in with an active administrator account.'
+          : err?.message || 'Failed to publish vehicle. Your uploaded photos are safely preserved; please retry.'
       );
     } finally {
       setIsPublishing(false);
@@ -1040,7 +1073,7 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
               </span>
             </h2>
             <p className="text-slate-500 text-xs mt-1">
-              Upload photos directly from your phone or computer to Cloudinary, enter vehicle specifications, and publish live.
+              Upload photos directly from your phone or computer to cloud storage, enter vehicle specifications, and publish live.
             </p>
           </div>
 
@@ -1127,32 +1160,35 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
         </div>
       )}
 
-      {/* Cloudinary Configuration Status Banner */}
-      {!isCheckingCloudinary && cloudinaryStatus && !cloudinaryStatus.configured && (
-        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <ShieldAlert size={18} className="text-amber-700 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold text-slate-950">
-                  Cloudinary Direct Upload Needs Environment Keys
-                </p>
-                <p className="text-amber-900 leading-relaxed">
-                  Add <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{cloudinaryStatus.missing.join(', ')}</code> in your Vercel Project Environment Variables (or local environment) to enable direct photo uploads from your phone and computer.
-                </p>
+      {/* Cloud Storage Configuration Status Banner */}
+      {!isCheckingStorage &&
+        !supabaseStorageStatus?.configured &&
+        cloudinaryStatus &&
+        !cloudinaryStatus.configured && (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <ShieldAlert size={18} className="text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-950">
+                    Direct Image Upload Needs Environment Configuration
+                  </p>
+                  <p className="text-amber-900 leading-relaxed">
+                    Configure Supabase Storage (<code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY</code>) or Cloudinary (<code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{cloudinaryStatus.missing.join(', ')}</code>) in your environment variables to enable direct uploads.
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => checkStorageConnections(true)}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-400 font-bold text-[11px] shrink-0 flex items-center gap-1 cursor-pointer"
+              >
+                <RefreshCw size={12} />
+                <span>Re-check</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={checkCloudinaryConnection}
-              className="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-400 font-bold text-[11px] shrink-0 flex items-center gap-1 cursor-pointer"
-            >
-              <RefreshCw size={12} />
-              <span>Re-check</span>
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Alerts */}
       {errorMsg && (
@@ -1200,14 +1236,18 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                 <h3 className="text-sm sm:text-base font-bold font-display">
                   Upload Vehicle Photographs
                 </h3>
-                {cloudinaryStatus?.configured && (
+                {supabaseStorageStatus?.configured ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                    Supabase Storage Ready
+                  </span>
+                ) : cloudinaryStatus?.configured ? (
                   <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-500/30 px-2 py-0.5 rounded-md">
                     Cloudinary Ready
                   </span>
-                )}
+                ) : null}
               </div>
               <p className="text-xs text-slate-300">
-                Photos upload immediately to Cloudinary in the background while you fill out vehicle details. Spot #1 is your Cover Photo.
+                Photos upload immediately in the background while you fill out vehicle details. Spot #1 is your Cover Photo.
               </p>
             </div>
 
@@ -1452,7 +1492,13 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
                         {item.status === 'done' && item.uploadedUrl && (
                           <div className="absolute bottom-2 right-2 bg-emerald-600/95 text-white text-[10px] font-mono px-2 py-0.5 rounded-md font-bold flex items-center gap-1 shadow">
                             <CheckCircle2 size={11} />
-                            <span>{item.publicId ? 'Cloudinary' : 'Ready'}</span>
+                            <span>
+                              {item.storagePath || item.storageBucket
+                                ? 'Supabase'
+                                : item.publicId
+                                ? 'Cloudinary'
+                                : 'Ready'}
+                            </span>
                           </div>
                         )}
 
@@ -2061,10 +2107,10 @@ export default function AdminAddCarTab({ editingCar, onSuccess, onCancel }: Admi
               ) : (
                 <span className="text-xs text-slate-400 font-mono">
                   {activeCount > 0
-                    ? `Uploading ${activeCount} photograph(s) to Cloudinary — publish unlocks automatically on completion.`
+                    ? `Uploading ${activeCount} photograph(s) — publish unlocks automatically on completion.`
                     : failedCount > 0
                     ? 'Resolve failed photo upload(s) above before publishing.'
-                    : 'All changes save directly to Cloud Firestore and appear on Jite Auto Deals immediately.'}
+                    : 'All changes save directly to the database and appear on Jite Auto Deals immediately.'}
                 </span>
               )}
 

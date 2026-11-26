@@ -1,5 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import {
+  isSupabaseServerConfigured,
+  hasSupabaseServiceRole,
+  supabaseRest,
+  mapVehicleRowToApp,
+} from '../lib/supabase-rest.js';
 
 const DEFAULT_BRAND_IMAGE =
   'https://res.cloudinary.com/xh0efm5e/image/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/v1790903435/wide_cinematic_high_contrast_promotional_banner.jpg';
@@ -751,7 +757,31 @@ async function fetchVehicleById(docId) {
   }
 }
 
+async function fetchAllVehiclesFromSupabase() {
+  if (!isSupabaseServerConfigured()) return [];
+  const now = Date.now();
+  if (firestoreVehiclesCache && now - firestoreVehiclesCacheTime < FIRESTORE_CACHE_TTL_MS) {
+    return firestoreVehiclesCache;
+  }
+  try {
+    const rows = await supabaseRest('vehicles?select=*&status=neq.Hidden&order=created_at.desc', {
+      useServiceRole: hasSupabaseServiceRole(),
+    });
+    const mapped = (Array.isArray(rows) ? rows : []).map((r) => mapVehicleRowToApp(r)).filter(Boolean);
+    if (mapped.length > 0) {
+      firestoreVehiclesCache = mapped;
+      firestoreVehiclesCacheTime = now;
+    }
+    return mapped;
+  } catch {
+    return firestoreVehiclesCache || [];
+  }
+}
+
 async function fetchAllVehicles() {
+  if (isSupabaseServerConfigured()) {
+    return fetchAllVehiclesFromSupabase();
+  }
   const now = Date.now();
   if (firestoreVehiclesCache && now - firestoreVehiclesCacheTime < FIRESTORE_CACHE_TTL_MS) {
     return firestoreVehiclesCache;
@@ -793,6 +823,43 @@ async function fetchAllVehicles() {
 
 async function fetchSingleVehicle(cleanId, fallbackVehicles = []) {
   if (!cleanId) return null;
+
+  if (isSupabaseServerConfigured()) {
+    try {
+      const useSvc = hasSupabaseServiceRole();
+      const exactRows = await supabaseRest(
+        `vehicles?or=(id.eq.${encodeURIComponent(cleanId)},slug.eq.${encodeURIComponent(cleanId)})&select=*&limit=5`,
+        { useServiceRole: useSvc }
+      );
+      if (Array.isArray(exactRows) && exactRows.length > 0) {
+        const mapped = exactRows.map((r) => mapVehicleRowToApp(r)).filter(Boolean);
+        const exact = findVehicleInList(mapped, cleanId) || mapped[0];
+        if (exact) return exact;
+      }
+
+      const yearMatch = cleanId.match(/\b(19[89]\d|20[0-3]\d)\b/);
+      if (yearMatch) {
+        const yearRows = await supabaseRest(
+          `vehicles?year=eq.${parseInt(yearMatch[1], 10)}&select=*`,
+          { useServiceRole: useSvc }
+        );
+        if (Array.isArray(yearRows) && yearRows.length > 0) {
+          const matched = findVehicleInList(
+            yearRows.map((r) => mapVehicleRowToApp(r)).filter(Boolean),
+            cleanId
+          );
+          if (matched) return matched;
+        }
+      }
+
+      const allSb = await fetchAllVehiclesFromSupabase();
+      const matched = findVehicleInList(allSb.length > 0 ? allSb : fallbackVehicles, cleanId);
+      if (matched) return matched;
+      return null;
+    } catch {
+      return findVehicleInList(fallbackVehicles, cleanId) || null;
+    }
+  }
 
   // 1. Targeted prefix range query on `id`
   const prefixMatches = await queryVehiclesByIdPrefix(cleanId);

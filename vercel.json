@@ -106,6 +106,14 @@
       "destination": "/api/data?resource=editorial-posts"
     },
     {
+      "source": "/api/analytics/:action*",
+      "destination": "/api/data?resource=analytics&action=:action*"
+    },
+    {
+      "source": "/api/analytics",
+      "destination": "/api/data?resource=analytics"
+    },
+    {
       "source": "/api/cloudinary-sign",
       "destination": "/api/cloudinary?action=sign"
     },

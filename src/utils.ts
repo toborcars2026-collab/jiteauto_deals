@@ -9,6 +9,7 @@ import {
 const loadFirestore = () => import('firebase/firestore');
 const loadStorage = () => import('firebase/storage');
 const loadFirebaseCore = () => import('./firebase');
+const loadSupabaseCore = () => import('./lib/supabase');
 const loadAdminAuth = () => import('./services/adminAuth');
 
 // LocalStorage Keys (used as fast instant local cache / offline fallback)
@@ -793,16 +794,77 @@ export function getVehicleDetailSrcSet(url: string | undefined | null): string |
 // CLOUD FIRESTORE INTEGRATION & REAL-TIME SYNC
 // ============================================================================
 
+function syncVehiclesCache(list: Vehicle[]): void {
+  activeVehiclesCache = list;
+  try {
+    localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
+  } catch {}
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
+  }
+}
+
 /**
- * Subscribes in real-time to the Cloud Firestore `vehicles` collection.
+ * Subscribes in real-time to the active database (`vehicles` table in Supabase or collection in Firestore).
  * Any update (add, edit, delete) anywhere immediately updates all connected devices.
  */
 export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): () => void {
   let cancelled = false;
   let innerUnsubscribe: (() => void) | null = null;
 
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ collection, onSnapshot }, { db }]) => {
+  loadSupabaseCore()
+    .then(async ({ isSupabaseClientConfigured, getSupabaseClient }) => {
+      if (cancelled) return;
+      if (isSupabaseClientConfigured()) {
+        fetchVehicles()
+          .then((list) => {
+            if (!cancelled) onUpdate(list);
+          })
+          .catch(() => {
+            if (!cancelled) onUpdate(getVehicles());
+          });
+
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          const channel = sbClient
+            .channel('public-vehicles-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'vehicles' },
+              () => {
+                fetchVehicles()
+                  .then((list) => {
+                    if (!cancelled) onUpdate(list);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'vehicle_images' },
+              () => {
+                fetchVehicles()
+                  .then((list) => {
+                    if (!cancelled) onUpdate(list);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .subscribe();
+
+          innerUnsubscribe = () => {
+            try {
+              sbClient.removeChannel(channel);
+            } catch {}
+          };
+        }
+        return;
+      }
+
+      const [{ collection, onSnapshot }, { db }] = await Promise.all([
+        loadFirestore(),
+        loadFirebaseCore(),
+      ]);
       if (cancelled) return;
       const vehiclesCol = collection(db, 'vehicles');
       innerUnsubscribe = onSnapshot(
@@ -818,15 +880,7 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
             list.push(normalized);
           });
 
-          activeVehiclesCache = list;
-          try {
-            localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
-          } catch {}
-
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
-          }
-
+          syncVehiclesCache(list);
           onUpdate(list);
         },
         (error) => {
@@ -836,7 +890,7 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
       );
     })
     .catch((e) => {
-      console.warn('[Firestore] Real-time vehicles subscription setup fallback:', e);
+      console.warn('[Vehicles] Real-time subscription setup fallback:', e);
       if (!cancelled) onUpdate(getVehicles());
     });
 
@@ -847,9 +901,34 @@ export function subscribeToVehicles(onUpdate: (vehicles: Vehicle[]) => void): ()
 }
 
 /**
- * Fetches all vehicles from Cloud Firestore (with fallback to local storage cache).
+ * Fetches all vehicles from Supabase PostgreSQL / API (or Cloud Firestore fallback).
  */
 export async function fetchVehicles(): Promise<Vehicle[]> {
+  try {
+    const { isSupabaseClientConfigured } = await loadSupabaseCore();
+    if (isSupabaseClientConfigured()) {
+      const headers: Record<string, string> = {};
+      try {
+        const { getActiveAdminBearerToken } = await loadAdminAuth();
+        const token = await getActiveAdminBearerToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      } catch {}
+
+      const res = await fetch('/api/vehicles', { headers, cache: 'no-store' });
+      if (res.ok) {
+        const srvList = (await res.json()) as Vehicle[];
+        if (Array.isArray(srvList)) {
+          const normalized = srvList.map(normalizeVehicleData);
+          syncVehiclesCache(normalized);
+          return normalized;
+        }
+      }
+      return getVehicles();
+    }
+  } catch {
+    return getVehicles();
+  }
+
   try {
     const [{ collection, getDocs }, { db }] = await Promise.all([
       loadFirestore(),
@@ -869,15 +948,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     });
 
     const list = Array.from(byId.values());
-    activeVehiclesCache = list;
-    try {
-      localStorage.setItem(VEHICLES_KEY, JSON.stringify(list));
-    } catch {}
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: list }));
-    }
-
+    syncVehiclesCache(list);
     return list;
   } catch (error) {
     try {
@@ -886,13 +957,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
         const srvList = (await res.json()) as Vehicle[];
         if (Array.isArray(srvList)) {
           const normalized = srvList.map(normalizeVehicleData);
-          activeVehiclesCache = normalized;
-          try {
-            localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
-          } catch {}
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
-          }
+          syncVehiclesCache(normalized);
           return normalized;
         }
       }
@@ -903,9 +968,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 /**
- * Fast targeted fetch for a single vehicle by slug or ID directly from Firestore.
- * Queries only the vehicle required by the current slug/ID (by exact ID, ID prefix, or model year)
- * without downloading the entire catalogue unless needed.
+ * Fast targeted fetch for a single vehicle by slug or ID.
  */
 export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | null> {
   if (!identifier) return null;
@@ -915,6 +978,21 @@ export async function fetchSingleVehicle(identifier: string): Promise<Vehicle | 
     .replace(/^\/?(vehicles|car|v)\/?/, '')
     .replace(/\/+$/, '');
   if (!clean) return null;
+
+  try {
+    const { isSupabaseClientConfigured } = await loadSupabaseCore();
+    if (isSupabaseClientConfigured()) {
+      const cachedList = activeVehiclesCache.length > 0 ? activeVehiclesCache : getVehicles();
+      const fromCache = cachedList.length > 0 ? findVehicleBySlugOrId(cachedList, clean) : undefined;
+      if (fromCache) return fromCache;
+
+      const list = await fetchVehicles();
+      return findVehicleBySlugOrId(list, clean) || null;
+    }
+  } catch {
+    const cachedList = activeVehiclesCache.length > 0 ? activeVehiclesCache : getVehicles();
+    return findVehicleBySlugOrId(cachedList, clean) || null;
+  }
 
   const [{ collection, doc, getDoc, getDocs, query, where, limit }, { db }] = await Promise.all([
     loadFirestore(),
@@ -1627,8 +1705,10 @@ export async function uploadVehicleImageFile(
     onProgress(5, 0, uploadBlob.size, optimizedResult.statusNote);
   }
 
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabaseStorage = isSupabaseClientConfigured();
   const { auth, storage } = await loadFirebaseCore();
-  const isStorageReady = auth.currentUser ? await isFirebaseStorageReachable() : false;
+  const isStorageReady = !useSupabaseStorage && auth.currentUser ? await isFirebaseStorageReachable() : false;
 
   if (isStorageReady) {
     try {
@@ -1722,6 +1802,299 @@ export async function uploadVehicleImageFile(
   });
 }
 
+export interface SupabaseStorageStatus {
+  configured: boolean;
+  supabaseConfigured: boolean;
+  bucket: string;
+  maxFileSizeBytes: number;
+}
+
+export interface SupabaseStorageUploadResult {
+  secureUrl: string;
+  publicId: string;
+  storageBucket: string;
+  storagePath: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  format?: string;
+  uploadedAt: string;
+  statusNote?: string;
+}
+
+let cachedSupabaseStorageStatus: SupabaseStorageStatus | null = null;
+let lastSupabaseStorageCheckMs = 0;
+
+export async function getSupabaseStorageStatus(forceRefresh = false): Promise<SupabaseStorageStatus> {
+  const now = Date.now();
+  if (!forceRefresh && cachedSupabaseStorageStatus && now - lastSupabaseStorageCheckMs < 30000) {
+    return cachedSupabaseStorageStatus;
+  }
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/upload-vehicle-image?action=status', {
+    method: 'GET',
+    headers,
+    cache: 'no-store',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Failed to verify Supabase Storage status (HTTP ${res.status}).`);
+  }
+  const status: SupabaseStorageStatus = {
+    configured: Boolean(data?.configured),
+    supabaseConfigured: Boolean(data?.supabaseConfigured ?? data?.configured),
+    bucket: String(data?.bucket || 'vehicle-images'),
+    maxFileSizeBytes: Number(data?.maxFileSizeBytes) || 15 * 1024 * 1024,
+  };
+  cachedSupabaseStorageStatus = status;
+  lastSupabaseStorageCheckMs = now;
+  return status;
+}
+
+export async function uploadVehicleImageToSupabase(params: {
+  file: File | Blob;
+  vehicleId: string;
+  slotIndex: number;
+  onProgress?: (
+    progressPercent: number,
+    bytesTransferred?: number,
+    totalBytes?: number,
+    statusNote?: string,
+    stage?: 'optimizing' | 'signing' | 'uploading' | 'done'
+  ) => void;
+  onRegisterAbort?: (abortFn: () => void) => void;
+}): Promise<SupabaseStorageUploadResult> {
+  const { file, vehicleId, slotIndex, onProgress, onRegisterAbort } = params;
+  const cleanId =
+    (vehicleId || 'car')
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') || `car-${Date.now().toString(36)}`;
+
+  let aborted = false;
+  let activeXhr: XMLHttpRequest | null = null;
+  if (onRegisterAbort) {
+    onRegisterAbort(() => {
+      aborted = true;
+      if (activeXhr) {
+        try {
+          activeXhr.abort();
+        } catch {}
+      }
+    });
+  }
+
+  onProgress?.(5, 0, file.size, 'Preparing photograph...', 'optimizing');
+
+  const optimizedResult = await optimizeVehicleImage(file, 2048, 2048, 0.86);
+  if (aborted) throw new Error('Upload cancelled.');
+
+  const uploadBlob = optimizedResult.blob;
+  if (uploadBlob.size > 15 * 1024 * 1024) {
+    throw new Error('Image exceeds the 15MB maximum upload limit even after optimization.');
+  }
+
+  const contentType = optimizedResult.mimeType || (file as File).type || 'image/jpeg';
+  const format = contentType.includes('webp')
+    ? 'webp'
+    : contentType.includes('png')
+    ? 'png'
+    : contentType.includes('avif')
+    ? 'avif'
+    : 'jpg';
+
+  onProgress?.(12, 0, uploadBlob.size, optimizedResult.statusNote, 'signing');
+
+  const authHeaders = await getAdminAuthHeaders();
+  if (!authHeaders['Authorization'] && !authHeaders['x-firebase-id-token']) {
+    throw new Error('Administrator authentication required. Please sign in again.');
+  }
+
+  const signRes = await fetch('/api/upload-vehicle-image?action=sign-supabase', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      vehicleId: cleanId,
+      contentType,
+      slot: slotIndex + 1,
+    }),
+  });
+
+  const signData = await signRes.json().catch(() => ({}));
+  if (!signRes.ok || !signData?.signedUrl || !signData?.publicUrl) {
+    throw new Error(signData?.error || `Failed to initialize Supabase Storage upload (HTTP ${signRes.status}).`);
+  }
+
+  if (aborted) throw new Error('Upload cancelled.');
+
+  onProgress?.(18, 0, uploadBlob.size, optimizedResult.statusNote, 'uploading');
+
+  const uploadedViaSignedPut = await new Promise<boolean>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+    xhr.open('PUT', signData.signedUrl, true);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.timeout = 90000;
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable && evt.total > 0) {
+          const pct = Math.min(98, Math.max(18, Math.round((evt.loaded / evt.total) * 100)));
+          onProgress(pct, evt.loaded, evt.total, optimizedResult.statusNote, 'uploading');
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      activeXhr = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    };
+
+    xhr.onabort = () => {
+      activeXhr = null;
+      reject(new Error('Upload cancelled.'));
+    };
+
+    xhr.onerror = () => {
+      activeXhr = null;
+      resolve(false);
+    };
+
+    xhr.ontimeout = () => {
+      activeXhr = null;
+      resolve(false);
+    };
+
+    xhr.send(uploadBlob);
+  });
+
+  if (aborted) throw new Error('Upload cancelled.');
+
+  if (uploadedViaSignedPut) {
+    onProgress?.(100, uploadBlob.size, uploadBlob.size, optimizedResult.statusNote, 'done');
+    return {
+      secureUrl: signData.publicUrl,
+      publicId: signData.path,
+      storageBucket: signData.bucket || 'vehicle-images',
+      storagePath: signData.path,
+      width: optimizedResult.width || undefined,
+      height: optimizedResult.height || undefined,
+      bytes: uploadBlob.size,
+      format,
+      uploadedAt: new Date().toISOString(),
+      statusNote: optimizedResult.statusNote,
+    };
+  }
+
+  // Fallback via server base64 relay -> Supabase Storage bucket
+  const base64Data = await readBlobAsDataUrl(uploadBlob);
+  if (aborted) throw new Error('Upload cancelled.');
+
+  const serverData = await new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+    xhr.open('POST', '/api/upload-vehicle-image', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (authHeaders['Authorization']) {
+      xhr.setRequestHeader('Authorization', authHeaders['Authorization']);
+    }
+    xhr.timeout = 90000;
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable && evt.total > 0) {
+          const pct = Math.min(98, Math.max(20, Math.round((evt.loaded / evt.total) * 100)));
+          onProgress(pct, evt.loaded, evt.total, optimizedResult.statusNote, 'uploading');
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      activeXhr = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch (err: any) {
+          reject(new Error('Invalid upload response: ' + (err?.message || err)));
+        }
+      } else {
+        reject(new Error(`Supabase Storage upload failed (HTTP ${xhr.status}).`));
+      }
+    };
+
+    xhr.onabort = () => {
+      activeXhr = null;
+      reject(new Error('Upload cancelled.'));
+    };
+
+    xhr.onerror = () => {
+      activeXhr = null;
+      reject(new Error('Network interruption during Supabase Storage upload.'));
+    };
+
+    xhr.ontimeout = () => {
+      activeXhr = null;
+      reject(new Error('Upload timed out. Please retry.'));
+    };
+
+    xhr.send(
+      JSON.stringify({
+        vehicleId: cleanId,
+        base64Data,
+        filename: `img_${slotIndex + 1}.${format}`,
+      })
+    );
+  });
+
+  if (!serverData?.url) {
+    throw new Error('Supabase Storage did not return an uploaded image URL.');
+  }
+
+  onProgress?.(100, uploadBlob.size, uploadBlob.size, optimizedResult.statusNote, 'done');
+  return {
+    secureUrl: serverData.url,
+    publicId: serverData.publicId || serverData.storagePath || '',
+    storageBucket: serverData.storageBucket || signData.bucket || 'vehicle-images',
+    storagePath: serverData.storagePath || serverData.publicId || '',
+    width: optimizedResult.width || undefined,
+    height: optimizedResult.height || undefined,
+    bytes: Number(serverData.size) || uploadBlob.size,
+    format,
+    uploadedAt: new Date().toISOString(),
+    statusNote: optimizedResult.statusNote,
+  };
+}
+
+export async function deleteVehicleSupabaseAssets(params: {
+  vehicleId: string;
+  storagePaths?: string[];
+  imageUrls?: string[];
+}): Promise<{ success: boolean; deleted: string[]; skippedShared?: string[] }> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/upload-vehicle-image?action=delete-supabase', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Supabase Storage cleanup failed (HTTP ${res.status}).`);
+  }
+  return data;
+}
+
 // ============================================================================
 // CLOUDINARY SIGNED DIRECT BROWSER-TO-CLOUDINARY UPLOAD & CLEANUP ENGINE
 // ============================================================================
@@ -1752,21 +2125,25 @@ export interface CloudinaryUploadResult {
 }
 
 async function getAdminAuthHeaders(): Promise<Record<string, string>> {
-  const { auth } = await loadFirebaseCore();
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
-  const bearerToken =
-    (await getActiveAdminBearerToken()) ||
-    (auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null);
+  const bearerToken = await getActiveAdminBearerToken();
 
   const headers: Record<string, string> = {};
   if (bearerToken) {
     headers['Authorization'] = `Bearer ${bearerToken}`;
   }
-  if (auth.currentUser) {
-    try {
-      const fbToken = await auth.currentUser.getIdToken();
-      if (fbToken) headers['x-firebase-id-token'] = fbToken;
-    } catch {}
+  if (!isSupabaseClientConfigured()) {
+    const { auth } = await loadFirebaseCore();
+    if (auth.currentUser) {
+      try {
+        const fbToken = await auth.currentUser.getIdToken();
+        if (fbToken) {
+          if (!headers['Authorization']) headers['Authorization'] = `Bearer ${fbToken}`;
+          headers['x-firebase-id-token'] = fbToken;
+        }
+      } catch {}
+    }
   }
   return headers;
 }
@@ -2001,10 +2378,10 @@ export async function uploadVehicleImageDataUrl(
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const filename = `vehicle-images/${cleanId}/img_${index + 1}_${uniqueId}.jpg`;
 
-  const [{ auth, storage }, isStorageReady] = await Promise.all([
-    loadFirebaseCore(),
-    isFirebaseStorageReachable(),
-  ]);
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabaseStorage = isSupabaseClientConfigured();
+  const { auth, storage } = await loadFirebaseCore();
+  const isStorageReady = !useSupabaseStorage ? await isFirebaseStorageReachable() : false;
 
   if (isStorageReady) {
     try {
@@ -2026,7 +2403,9 @@ export async function uploadVehicleImageDataUrl(
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken =
     (await getActiveAdminBearerToken()) ||
-    (auth.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null);
+    (!useSupabaseStorage && auth.currentUser
+      ? await auth.currentUser.getIdToken().catch(() => null)
+      : null);
   const response = await fetch('/api/upload-vehicle-image', {
     method: 'POST',
     headers: {
@@ -2096,58 +2475,54 @@ export async function runConcurrentQueue<T, R>(
 }
 
 /**
- * Saves a single vehicle directly into Cloud Firestore and verifies the write on the server.
+ * Saves a single vehicle into Supabase PostgreSQL (or Cloud Firestore fallback) and verifies the write.
  * Returns the confirmed Vehicle object.
  */
 export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle> {
   const normalized = normalizeVehicleData(vehicle);
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (auth.currentUser) {
-    try {
-      const { doc, setDoc, getDoc } = await loadFirestore();
-      const docRef = doc(db, 'vehicles', normalized.id);
-      const payload = cleanFirestoreData(normalized);
-      await setDoc(docRef, payload);
-
-      const verifySnap = await getDoc(docRef);
-      if (!verifySnap.exists()) {
-        throw new Error(`Firestore document write verification failed for vehicle ${normalized.id}`);
-      }
-
-      const confirmedData = normalizeVehicleData({
-        ...(verifySnap.data() as Vehicle),
-        id: verifySnap.id,
-      });
-
-      if (bearerToken) {
-        fetch('/api/vehicles/upsert', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${bearerToken}`,
-          },
-          body: JSON.stringify(confirmedData),
-        }).catch(() => {});
-      }
-
-      const current = getVehicles().filter((v) => v.id !== confirmedData.id);
-      current.unshift(confirmedData);
-      activeVehiclesCache = current;
+  if (!useSupabase) {
+    const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+    if (auth.currentUser) {
       try {
-        localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
-      } catch {}
+        const { doc, setDoc, getDoc } = await loadFirestore();
+        const docRef = doc(db, 'vehicles', normalized.id);
+        const payload = cleanFirestoreData(normalized);
+        await setDoc(docRef, payload);
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
+        const verifySnap = await getDoc(docRef);
+        if (!verifySnap.exists()) {
+          throw new Error(`Firestore document write verification failed for vehicle ${normalized.id}`);
+        }
+
+        const confirmedData = normalizeVehicleData({
+          ...(verifySnap.data() as Vehicle),
+          id: verifySnap.id,
+        });
+
+        if (bearerToken) {
+          fetch('/api/vehicles/upsert', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${bearerToken}`,
+            },
+            body: JSON.stringify(confirmedData),
+          }).catch(() => {});
+        }
+
+        const current = getVehicles().filter((v) => v.id !== confirmedData.id);
+        current.unshift(confirmedData);
+        syncVehiclesCache(current);
+        return confirmedData;
+      } catch (error) {
+        console.error('[Firestore] Save Vehicle Error:', error);
+        handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
       }
-
-      return confirmedData;
-    } catch (error) {
-      console.error('[Firestore] Save Vehicle Error:', error);
-      handleFirestoreError(error, OperationType.WRITE, `vehicles/${normalized.id}`);
     }
   }
 
@@ -2165,20 +2540,13 @@ export async function saveVehicleToFirestore(vehicle: Vehicle): Promise<Vehicle>
   });
   const resData = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(resData?.error || `Failed to save vehicle to Cloud Firestore (HTTP ${res.status}).`);
+    throw new Error(resData?.error || `Failed to save vehicle to database (HTTP ${res.status}).`);
   }
 
   const confirmedVehicle = normalizeVehicleData(resData?.vehicle || normalized);
   const current = getVehicles().filter((v) => v.id !== confirmedVehicle.id);
   current.unshift(confirmedVehicle);
-  activeVehiclesCache = current;
-  try {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
-  } catch {}
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
-  }
+  syncVehiclesCache(current);
 
   return confirmedVehicle;
 }
@@ -2209,47 +2577,47 @@ export async function unpublishVehicle(vehicleId: string): Promise<Vehicle> {
 }
 
 export async function deleteVehicleFromFirestore(id: string): Promise<void> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
 
-  if (auth.currentUser) {
-    try {
-      const { doc, deleteDoc } = await loadFirestore();
-      const docRef = doc(db, 'vehicles', id);
-      await deleteDoc(docRef);
-      if (bearerToken) {
-        fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${bearerToken}` },
-        }).catch(() => {});
+  if (!useSupabase) {
+    const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+    if (auth.currentUser) {
+      try {
+        const { doc, deleteDoc } = await loadFirestore();
+        const docRef = doc(db, 'vehicles', id);
+        await deleteDoc(docRef);
+        if (bearerToken) {
+          fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${bearerToken}` },
+          }).catch(() => {});
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
+      const current = getVehicles().filter((v) => v.id !== id);
+      syncVehiclesCache(current);
+      return;
     }
-  } else {
-    if (!bearerToken) {
-      throw new Error('Administrator session expired. Please sign in again to delete vehicles.');
-    }
-    const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${bearerToken}` },
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.error || `Failed to delete vehicle from Cloud Firestore (HTTP ${res.status}).`);
-    }
+  }
+
+  if (!bearerToken) {
+    throw new Error('Administrator session expired. Please sign in again to delete vehicles.');
+  }
+  const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error || `Failed to delete vehicle from database (HTTP ${res.status}).`);
   }
 
   const current = getVehicles().filter((v) => v.id !== id);
-  activeVehiclesCache = current;
-  try {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(current));
-  } catch {}
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: current }));
-  }
+  syncVehiclesCache(current);
 }
 
 export async function syncVehiclesFromFirestore(): Promise<Vehicle[]> {
@@ -2262,27 +2630,25 @@ export async function resetFirestoreVehiclesToDefault(): Promise<Vehicle[]> {
 
 export function saveVehicles(vehicles: Vehicle[]): void {
   const normalized = vehicles.map(normalizeVehicleData);
+  syncVehiclesCache(normalized);
 
-  try {
-    localStorage.setItem(VEHICLES_KEY, JSON.stringify(normalized));
-  } catch {}
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vehiclesUpdated', { detail: normalized }));
-  }
-
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ doc, writeBatch }, { db }]) => {
-      const batch = writeBatch(db);
-      normalized.forEach((v) => {
-        const docRef = doc(db, 'vehicles', v.id);
-        batch.set(docRef, v);
-      });
-      return batch.commit();
+  loadSupabaseCore()
+    .then(({ isSupabaseClientConfigured }) => {
+      if (isSupabaseClientConfigured()) return;
+      Promise.all([loadFirestore(), loadFirebaseCore()])
+        .then(([{ doc, writeBatch }, { db }]) => {
+          const batch = writeBatch(db);
+          normalized.forEach((v) => {
+            const docRef = doc(db, 'vehicles', v.id);
+            batch.set(docRef, v);
+          });
+          return batch.commit();
+        })
+        .catch((err) => {
+          console.warn('[Firestore] Batch save background error:', err);
+        });
     })
-    .catch((err) => {
-      console.warn('[Firestore] Batch save background error:', err);
-    });
+    .catch(() => {});
 }
 
 export function deleteVehicle(id: string): void {
@@ -2297,15 +2663,54 @@ export function deleteVehicle(id: string): void {
 }
 
 // ============================================================================
-// LEADS & INQUIRIES FIRESTORE INTEGRATION
+// LEADS & INQUIRIES DATABASE INTEGRATION (Supabase / Firestore)
 // ============================================================================
 
 export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void {
   let cancelled = false;
   let innerUnsubscribe: (() => void) | null = null;
 
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ collection, onSnapshot }, { db }]) => {
+  loadSupabaseCore()
+    .then(async ({ isSupabaseClientConfigured, getSupabaseClient }) => {
+      if (cancelled) return;
+      if (isSupabaseClientConfigured()) {
+        fetchLeads()
+          .then((list) => {
+            if (!cancelled) onUpdate(list);
+          })
+          .catch(() => {
+            if (!cancelled) onUpdate(getLeads());
+          });
+
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          const channel = sbClient
+            .channel('admin-enquiries-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'customer_enquiries' },
+              () => {
+                fetchLeads()
+                  .then((list) => {
+                    if (!cancelled) onUpdate(list);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .subscribe();
+          innerUnsubscribe = () => {
+            try {
+              sbClient.removeChannel(channel);
+            } catch {}
+          };
+        }
+        return;
+      }
+
+      const [{ collection, onSnapshot }, { db }] = await Promise.all([
+        loadFirestore(),
+        loadFirebaseCore(),
+      ]);
       if (cancelled) return;
       const leadsCol = collection(db, 'leads');
       innerUnsubscribe = onSnapshot(
@@ -2338,8 +2743,11 @@ export function subscribeToLeads(onUpdate: (leads: Lead[]) => void): () => void 
 }
 
 export async function fetchLeads(): Promise<Lead[]> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { auth, db } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+
+  if (useSupabase || !auth.currentUser) {
     const { getActiveAdminBearerToken } = await loadAdminAuth();
     const token = await getActiveAdminBearerToken();
     if (token) {
@@ -2425,12 +2833,17 @@ export function saveLead(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Lead 
     body: JSON.stringify(newLead),
   }).catch(() => {});
 
-  const payload = cleanFirestoreData(newLead);
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'leads', newLead.id), payload))
-    .catch((err) => {
-      console.warn('[Firestore] Error saving lead to Firestore:', err);
-    });
+  loadSupabaseCore()
+    .then(({ isSupabaseClientConfigured }) => {
+      if (isSupabaseClientConfigured()) return;
+      const payload = cleanFirestoreData(newLead);
+      Promise.all([loadFirestore(), loadFirebaseCore()])
+        .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'leads', newLead.id), payload))
+        .catch((err) => {
+          console.warn('[Firestore] Error saving lead to Firestore:', err);
+        });
+    })
+    .catch(() => {});
 
   return newLead;
 }
@@ -2444,12 +2857,15 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
 
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    loadFirebaseCore()
-      .then(async ({ auth, db }) => {
-        if (auth.currentUser) {
-          const { doc, updateDoc } = await loadFirestore();
-          await updateDoc(doc(db, 'leads', leadId), payload);
-          return;
+    loadSupabaseCore()
+      .then(async ({ isSupabaseClientConfigured }) => {
+        if (!isSupabaseClientConfigured()) {
+          const { auth, db } = await loadFirebaseCore();
+          if (auth.currentUser) {
+            const { doc, updateDoc } = await loadFirestore();
+            await updateDoc(doc(db, 'leads', leadId), payload);
+            return;
+          }
         }
         const { getActiveAdminBearerToken } = await loadAdminAuth();
         const token = await getActiveAdminBearerToken();
@@ -2465,7 +2881,7 @@ export function updateLead(leadId: string, updates: Partial<Lead>): Lead[] {
         }
       })
       .catch((err) => {
-        console.warn('[Firestore] Error updating lead in Firestore:', err);
+        console.warn('[Leads] Error updating lead:', err);
       });
   }
 
@@ -2476,8 +2892,47 @@ export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): 
   let cancelled = false;
   let innerUnsubscribe: (() => void) | null = null;
 
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ collection, onSnapshot }, { db }]) => {
+  loadSupabaseCore()
+    .then(async ({ isSupabaseClientConfigured, getSupabaseClient }) => {
+      if (cancelled) return;
+      if (isSupabaseClientConfigured()) {
+        fetchInquiries()
+          .then((list) => {
+            if (!cancelled) onUpdate(list);
+          })
+          .catch(() => {
+            if (!cancelled) onUpdate(getInquiries());
+          });
+
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          const channel = sbClient
+            .channel('admin-bookings-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'inspection_bookings' },
+              () => {
+                fetchInquiries()
+                  .then((list) => {
+                    if (!cancelled) onUpdate(list);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .subscribe();
+          innerUnsubscribe = () => {
+            try {
+              sbClient.removeChannel(channel);
+            } catch {}
+          };
+        }
+        return;
+      }
+
+      const [{ collection, onSnapshot }, { db }] = await Promise.all([
+        loadFirestore(),
+        loadFirebaseCore(),
+      ]);
       if (cancelled) return;
       const inqCol = collection(db, 'inquiries');
       innerUnsubscribe = onSnapshot(
@@ -2510,8 +2965,11 @@ export function subscribeToInquiries(onUpdate: (inquiries: Inquiry[]) => void): 
 }
 
 export async function fetchInquiries(): Promise<Inquiry[]> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { auth, db } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+
+  if (useSupabase || !auth.currentUser) {
     const { getActiveAdminBearerToken } = await loadAdminAuth();
     const token = await getActiveAdminBearerToken();
     if (token) {
@@ -2581,12 +3039,17 @@ export function saveInquiry(inquiry: Omit<Inquiry, 'id' | 'createdAt' | 'status'
     body: JSON.stringify(newInquiry),
   }).catch(() => {});
 
-  const payload = cleanFirestoreData(newInquiry);
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'inquiries', newInquiry.id), payload))
-    .catch((err) => {
-      console.warn('[Firestore] Error saving inquiry to Firestore:', err);
-    });
+  loadSupabaseCore()
+    .then(({ isSupabaseClientConfigured }) => {
+      if (isSupabaseClientConfigured()) return;
+      const payload = cleanFirestoreData(newInquiry);
+      Promise.all([loadFirestore(), loadFirebaseCore()])
+        .then(([{ doc, setDoc }, { db }]) => setDoc(doc(db, 'inquiries', newInquiry.id), payload))
+        .catch((err) => {
+          console.warn('[Firestore] Error saving inquiry to Firestore:', err);
+        });
+    })
+    .catch(() => {});
 
   return newInquiry;
 }
@@ -2600,12 +3063,15 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
 
   const payload = cleanFirestoreData(updates);
   if (Object.keys(payload).length > 0) {
-    loadFirebaseCore()
-      .then(async ({ auth, db }) => {
-        if (auth.currentUser) {
-          const { doc, updateDoc } = await loadFirestore();
-          await updateDoc(doc(db, 'inquiries', inquiryId), payload);
-          return;
+    loadSupabaseCore()
+      .then(async ({ isSupabaseClientConfigured }) => {
+        if (!isSupabaseClientConfigured()) {
+          const { auth, db } = await loadFirebaseCore();
+          if (auth.currentUser) {
+            const { doc, updateDoc } = await loadFirestore();
+            await updateDoc(doc(db, 'inquiries', inquiryId), payload);
+            return;
+          }
         }
         const { getActiveAdminBearerToken } = await loadAdminAuth();
         const token = await getActiveAdminBearerToken();
@@ -2621,7 +3087,7 @@ export function updateInquiry(inquiryId: string, updates: Partial<Inquiry>): Inq
         }
       })
       .catch((err) => {
-        console.warn('[Firestore] Error updating inquiry in Firestore:', err);
+        console.warn('[Inquiries] Error updating inquiry:', err);
       });
   }
 
@@ -2661,6 +3127,26 @@ export function getBusinessSettings(): BusinessSettings {
 
 export async function fetchBusinessSettings(): Promise<BusinessSettings> {
   try {
+    const { isSupabaseClientConfigured } = await loadSupabaseCore();
+    if (isSupabaseClientConfigured()) {
+      const res = await fetch('/api/business-settings', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.settings && typeof json.settings === 'object') {
+          const merged = { ...DEFAULT_BUSINESS_SETTINGS, ...json.settings } as BusinessSettings;
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        }
+      }
+      return getBusinessSettings();
+    }
+  } catch {
+    return getBusinessSettings();
+  }
+
+  try {
     const [{ doc, getDoc, setDoc }, { db }] = await Promise.all([
       loadFirestore(),
       loadFirebaseCore(),
@@ -2687,8 +3173,47 @@ export function subscribeToBusinessSettings(onUpdate: (settings: BusinessSetting
   let cancelled = false;
   let innerUnsubscribe: (() => void) | null = null;
 
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ doc, onSnapshot, setDoc }, { db }]) => {
+  loadSupabaseCore()
+    .then(async ({ isSupabaseClientConfigured, getSupabaseClient }) => {
+      if (cancelled) return;
+      if (isSupabaseClientConfigured()) {
+        fetchBusinessSettings()
+          .then((data) => {
+            if (!cancelled) onUpdate(data);
+          })
+          .catch(() => {
+            if (!cancelled) onUpdate(getBusinessSettings());
+          });
+
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          const channel = sbClient
+            .channel('public-business-settings-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'website_settings', filter: 'key=eq.business' },
+              () => {
+                fetchBusinessSettings()
+                  .then((data) => {
+                    if (!cancelled) onUpdate(data);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .subscribe();
+          innerUnsubscribe = () => {
+            try {
+              sbClient.removeChannel(channel);
+            } catch {}
+          };
+        }
+        return;
+      }
+
+      const [{ doc, onSnapshot, setDoc }, { db }] = await Promise.all([
+        loadFirestore(),
+        loadFirebaseCore(),
+      ]);
       if (cancelled) return;
       const docRef = doc(db, 'settings', 'business');
       innerUnsubscribe = onSnapshot(
@@ -2733,31 +3258,35 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
   } catch {}
 
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (auth.currentUser) {
-    try {
-      const { doc, setDoc } = await loadFirestore();
-      const docRef = doc(db, 'settings', 'business');
-      const payload = cleanFirestoreData(updated);
-      await setDoc(docRef, payload, { merge: true });
-      if (bearerToken) {
-        fetch('/api/business-settings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${bearerToken}`,
-          },
-          body: JSON.stringify(updated),
-        }).catch(() => {});
+  if (!useSupabase) {
+    const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+    if (auth.currentUser) {
+      try {
+        const { doc, setDoc } = await loadFirestore();
+        const docRef = doc(db, 'settings', 'business');
+        const payload = cleanFirestoreData(updated);
+        await setDoc(docRef, payload, { merge: true });
+        if (bearerToken) {
+          fetch('/api/business-settings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${bearerToken}`,
+            },
+            body: JSON.stringify(updated),
+          }).catch(() => {});
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'settings/business');
+        throw error;
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'settings/business');
-      throw error;
+      return updated;
     }
-    return updated;
   }
 
   if (!bearerToken) {
@@ -2781,7 +3310,7 @@ export async function saveBusinessSettingsToFirestore(settings: Partial<Business
 }
 
 // ============================================================================
-// EDITORIAL & AUTOMOTIVE INSIGHTS FIRESTORE INTEGRATION (settings/editorial)
+// EDITORIAL & AUTOMOTIVE INSIGHTS DATABASE INTEGRATION
 // ============================================================================
 
 export const DEFAULT_EDITORIAL_POSTS: EditorialPost[] = [
@@ -2844,6 +3373,25 @@ export function getEditorialPosts(): EditorialPost[] {
 
 export async function fetchEditorialPosts(): Promise<EditorialPost[]> {
   try {
+    const { isSupabaseClientConfigured } = await loadSupabaseCore();
+    if (isSupabaseClientConfigured()) {
+      const res = await fetch('/api/editorial-posts', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json?.posts) && json.posts.length > 0) {
+          try {
+            localStorage.setItem(EDITORIAL_KEY, JSON.stringify(json.posts));
+          } catch {}
+          return json.posts as EditorialPost[];
+        }
+      }
+      return getEditorialPosts();
+    }
+  } catch {
+    return getEditorialPosts();
+  }
+
+  try {
     const [{ doc, getDoc }, { db }] = await Promise.all([
       loadFirestore(),
       loadFirebaseCore(),
@@ -2869,8 +3417,47 @@ export function subscribeToEditorialPosts(onUpdate: (posts: EditorialPost[]) => 
   let cancelled = false;
   let innerUnsubscribe: (() => void) | null = null;
 
-  Promise.all([loadFirestore(), loadFirebaseCore()])
-    .then(([{ doc, onSnapshot }, { db }]) => {
+  loadSupabaseCore()
+    .then(async ({ isSupabaseClientConfigured, getSupabaseClient }) => {
+      if (cancelled) return;
+      if (isSupabaseClientConfigured()) {
+        fetchEditorialPosts()
+          .then((posts) => {
+            if (!cancelled) onUpdate(posts);
+          })
+          .catch(() => {
+            if (!cancelled) onUpdate(getEditorialPosts());
+          });
+
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          const channel = sbClient
+            .channel('public-editorial-posts-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'website_settings', filter: 'key=eq.editorial' },
+              () => {
+                fetchEditorialPosts()
+                  .then((posts) => {
+                    if (!cancelled) onUpdate(posts);
+                  })
+                  .catch(() => {});
+              }
+            )
+            .subscribe();
+          innerUnsubscribe = () => {
+            try {
+              sbClient.removeChannel(channel);
+            } catch {}
+          };
+        }
+        return;
+      }
+
+      const [{ doc, onSnapshot }, { db }] = await Promise.all([
+        loadFirestore(),
+        loadFirebaseCore(),
+      ]);
       if (cancelled) return;
       const docRef = doc(db, 'settings', 'editorial');
       innerUnsubscribe = onSnapshot(
@@ -2915,37 +3502,41 @@ export async function saveEditorialPostsToFirestore(posts: EditorialPost[]): Pro
     localStorage.setItem(EDITORIAL_KEY, JSON.stringify(sanitized));
   } catch {}
 
-  const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (auth.currentUser) {
-    try {
-      const { doc, setDoc } = await loadFirestore();
-      const docRef = doc(db, 'settings', 'editorial');
-      await setDoc(
-        docRef,
-        {
-          posts: sanitized,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      if (bearerToken) {
-        fetch('/api/editorial-posts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${bearerToken}`,
+  if (!useSupabase) {
+    const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
+    if (auth.currentUser) {
+      try {
+        const { doc, setDoc } = await loadFirestore();
+        const docRef = doc(db, 'settings', 'editorial');
+        await setDoc(
+          docRef,
+          {
+            posts: sanitized,
+            updatedAt: new Date().toISOString(),
           },
-          body: JSON.stringify({ posts: sanitized }),
-        }).catch(() => {});
+          { merge: true }
+        );
+        if (bearerToken) {
+          fetch('/api/editorial-posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${bearerToken}`,
+            },
+            body: JSON.stringify({ posts: sanitized }),
+          }).catch(() => {});
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
+        throw error;
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'settings/editorial');
-      throw error;
+      return sanitized;
     }
-    return sanitized;
   }
 
   if (!bearerToken) {
@@ -3020,8 +3611,9 @@ async function mirrorVehicleQuickPatch(
 }
 
 export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus): Promise<void> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+  if (isSupabaseClientConfigured() || !auth.currentUser) {
     await mirrorVehicleQuickPatch(vehicleId, { status }, true);
     return;
   }
@@ -3041,8 +3633,9 @@ export async function saveVehicleStatus(vehicleId: string, status: VehicleStatus
 
 export async function saveVehiclePrice(vehicleId: string, newPrice: number): Promise<void> {
   const price = Number(newPrice) || 0;
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+  if (isSupabaseClientConfigured() || !auth.currentUser) {
     await mirrorVehicleQuickPatch(vehicleId, { price }, true);
     return;
   }
@@ -3061,8 +3654,9 @@ export async function saveVehiclePrice(vehicleId: string, newPrice: number): Pro
 }
 
 export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean): Promise<void> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+  if (isSupabaseClientConfigured() || !auth.currentUser) {
     await mirrorVehicleQuickPatch(vehicleId, { isFeatured }, true);
     return;
   }
@@ -3082,8 +3676,9 @@ export async function saveVehicleFeatured(vehicleId: string, isFeatured: boolean
 
 export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boolean, slideshowOrder?: number): Promise<void> {
   const patch = typeof slideshowOrder === 'number' ? { inSlideshow, slideshowOrder } : { inSlideshow };
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
-  if (!auth.currentUser) {
+  if (isSupabaseClientConfigured() || !auth.currentUser) {
     await mirrorVehicleQuickPatch(vehicleId, patch, true);
     return;
   }
@@ -3106,11 +3701,13 @@ export async function saveVehicleSlideshow(vehicleId: string, inSlideshow: boole
 }
 
 export async function saveLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (!auth.currentUser) {
+  if (useSupabase || !auth.currentUser) {
     if (!bearerToken) return;
     const res = await fetch('/api/leads/status', {
       method: 'POST',
@@ -3151,11 +3748,13 @@ export async function saveLeadStatus(leadId: string, status: LeadStatus): Promis
 }
 
 export async function saveInquiryStatus(inquiryId: string, status: LeadStatus): Promise<void> {
+  const { isSupabaseClientConfigured } = await loadSupabaseCore();
+  const useSupabase = isSupabaseClientConfigured();
   const { auth, db, OperationType, handleFirestoreError } = await loadFirebaseCore();
   const { getActiveAdminBearerToken } = await loadAdminAuth();
   const bearerToken = await getActiveAdminBearerToken();
 
-  if (!auth.currentUser) {
+  if (useSupabase || !auth.currentUser) {
     if (!bearerToken) return;
     const res = await fetch('/api/inquiries/status', {
       method: 'POST',

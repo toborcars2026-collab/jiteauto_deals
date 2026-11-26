@@ -1,12 +1,24 @@
 import fs from 'fs';
 import path from 'path';
-import { verifyRequestAdmin } from './admin-auth.js';
+import { verifyRequestAdmin, extractBearerToken } from './admin-auth.js';
 import {
   firestoreGetDocument,
   firestorePatchDocument,
   firestoreDeleteDocument,
   firestoreQueryCollection,
 } from './firestore-rest.js';
+import {
+  isSupabaseServerConfigured,
+  hasSupabaseServiceRole,
+  supabaseRest,
+  mapVehicleRowToApp,
+  mapAppVehicleToRow,
+  buildVehicleImageRows,
+  mapEnquiryRowToApp,
+  mapAppLeadToEnquiryRow,
+  mapBookingRowToApp,
+  mapAppInquiryToBookingRow,
+} from '../lib/supabase-rest.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
 
@@ -24,6 +36,11 @@ const RESOURCE_FILES = {
     repo: path.join(DATA_DIR, 'editorial_posts.json'),
     tmp: '/tmp/jite_editorial_posts.json',
     fallback: [],
+  },
+  analytics: {
+    repo: path.join(DATA_DIR, 'analytics.json'),
+    tmp: '/tmp/jite_analytics.json',
+    fallback: {},
   },
 };
 
@@ -96,7 +113,7 @@ function setHeaders(req, res, isPrivate = false) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-firebase-id-token'
+    'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token'
   );
 }
 
@@ -104,7 +121,7 @@ function parseRouteParams(req) {
   const urlObj = new URL(req.url || '/', 'http://localhost');
   const resource = String(req.query?.resource || urlObj.searchParams.get('resource') || '').toLowerCase();
   const action = String(req.query?.action || urlObj.searchParams.get('action') || '').trim();
-  return { resource, action, actionLower: action.toLowerCase() };
+  return { resource, action, actionLower: action.toLowerCase(), urlObj };
 }
 
 function decodeUnicodeEscapes(str) {
@@ -146,6 +163,30 @@ function normalizeVehicle(v) {
   return copy;
 }
 
+async function fetchVehiclesFromSupabase({ includeHidden = false } = {}) {
+  const useSvc = hasSupabaseServiceRole();
+  const filter = includeHidden ? '' : '&status=neq.Hidden';
+  const [rows, imgRows] = await Promise.all([
+    supabaseRest(`vehicles?select=*${filter}&order=created_at.desc`, { useServiceRole: useSvc }),
+    supabaseRest('vehicle_images?select=*&order=position.asc', { useServiceRole: useSvc }).catch(
+      () => []
+    ),
+  ]);
+
+  const imgMap = new Map();
+  if (Array.isArray(imgRows)) {
+    for (const img of imgRows) {
+      if (!img?.vehicle_id) continue;
+      if (!imgMap.has(img.vehicle_id)) imgMap.set(img.vehicle_id, []);
+      imgMap.get(img.vehicle_id).push(img);
+    }
+  }
+
+  return (Array.isArray(rows) ? rows : [])
+    .map((r) => normalizeVehicle(mapVehicleRowToApp(r, imgMap.get(r.id) || [])))
+    .filter((v) => v && v.id);
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setHeaders(req, res, false);
@@ -155,14 +196,39 @@ export default async function handler(req, res) {
   }
 
   const { resource, action, actionLower } = parseRouteParams(req);
+  const supabaseActive = isSupabaseServerConfigured();
 
   try {
     // ------------------------------------------------------------------------
-    // VEHICLES (Cloud Firestore Authoritative + Local Mirror)
+    // VEHICLES (Supabase PostgreSQL / Cloud Firestore Authoritative + Local Mirror)
     // ------------------------------------------------------------------------
     if (resource === 'vehicles') {
       if (req.method === 'GET' && !actionLower) {
-        setHeaders(req, res, false);
+        let isAdminViewer = false;
+        if (extractBearerToken(req)) {
+          const check = await verifyRequestAdmin(req).catch(() => ({ authorized: false }));
+          isAdminViewer = Boolean(check?.authorized);
+        }
+        setHeaders(req, res, isAdminViewer);
+
+        if (supabaseActive) {
+          try {
+            const vehicles = await fetchVehiclesFromSupabase({ includeHidden: isAdminViewer });
+            writeStore('vehicles', vehicles);
+            res.statusCode = 200;
+            res.end(JSON.stringify(vehicles));
+            return;
+          } catch {
+            const cached = readStore('vehicles');
+            const list = (Array.isArray(cached) ? cached : [])
+              .map(normalizeVehicle)
+              .filter((v) => v && v.id && (isAdminViewer || v.status !== 'Hidden'));
+            res.statusCode = 200;
+            res.end(JSON.stringify(list));
+            return;
+          }
+        }
+
         try {
           const fsVehicles = await firestoreQueryCollection('vehicles');
           const normalized = fsVehicles.map(normalizeVehicle).filter((v) => v && v.id);
@@ -197,9 +263,17 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({ error: 'Missing vehicle id' }));
           return;
         }
-        if (adminCheck.firebaseIdToken) {
+
+        if (supabaseActive) {
+          await supabaseRest(`vehicles?id=eq.${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: hasSupabaseServiceRole(),
+          });
+        } else if (adminCheck.firebaseIdToken) {
           await firestoreDeleteDocument(`vehicles/${id}`, adminCheck.firebaseIdToken);
         }
+
         const rawDeleted = readStore('deleted');
         const deletedSet = new Set(Array.isArray(rawDeleted) ? rawDeleted : []);
         deletedSet.add(id);
@@ -238,7 +312,36 @@ export default async function handler(req, res) {
             updatedAt: nowIso,
           });
 
-          if (adminCheck.firebaseIdToken) {
+          if (supabaseActive) {
+            const useSvc = hasSupabaseServiceRole();
+            const accessToken = adminCheck.supabaseAccessToken || '';
+            const rowPayload = mapAppVehicleToRow(vehicle);
+            await supabaseRest('vehicles', {
+              method: 'POST',
+              headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+              accessToken,
+              useServiceRole: useSvc,
+              body: rowPayload,
+            });
+
+            // Synchronize normalized vehicle_images table rows cleanly
+            await supabaseRest(`vehicle_images?vehicle_id=eq.${encodeURIComponent(vehicle.id)}`, {
+              method: 'DELETE',
+              accessToken,
+              useServiceRole: useSvc,
+            }).catch(() => {});
+
+            const imageRows = buildVehicleImageRows(vehicle);
+            if (imageRows.length > 0) {
+              await supabaseRest('vehicle_images', {
+                method: 'POST',
+                headers: { Prefer: 'resolution=merge-duplicates' },
+                accessToken,
+                useServiceRole: useSvc,
+                body: imageRows,
+              }).catch(() => {});
+            }
+          } else if (adminCheck.firebaseIdToken) {
             try {
               await firestorePatchDocument(`vehicles/${vehicle.id}`, vehicle, adminCheck.firebaseIdToken);
             } catch (fsErr) {
@@ -286,7 +389,13 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({ error: 'Missing vehicle id' }));
             return;
           }
-          if (adminCheck.firebaseIdToken) {
+          if (supabaseActive) {
+            await supabaseRest(`vehicles?id=eq.${encodeURIComponent(id)}`, {
+              method: 'DELETE',
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+            });
+          } else if (adminCheck.firebaseIdToken) {
             await firestoreDeleteDocument(`vehicles/${id}`, adminCheck.firebaseIdToken);
           }
           const rawDeleted = readStore('deleted');
@@ -305,11 +414,12 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // LEADS & INQUIRIES (Cloud Firestore Authoritative + Local Mirror)
+    // LEADS (customer_enquiries) & INQUIRIES (inspection_bookings)
     // ------------------------------------------------------------------------
     if (resource === 'leads' || resource === 'inquiries') {
       const storeKey = resource;
       const collectionName = resource;
+      const sbTable = resource === 'leads' ? 'customer_enquiries' : 'inspection_bookings';
 
       if (req.method === 'GET' && !actionLower) {
         setHeaders(req, res, true);
@@ -320,7 +430,23 @@ export default async function handler(req, res) {
           return;
         }
 
-        if (adminCheck.firebaseIdToken) {
+        if (supabaseActive) {
+          try {
+            const rows = await supabaseRest(`${sbTable}?select=*&order=created_at.desc`, {
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+            });
+            const mapped = (Array.isArray(rows) ? rows : [])
+              .map((r) => (resource === 'leads' ? mapEnquiryRowToApp(r) : mapBookingRowToApp(r)))
+              .filter(Boolean);
+            writeStore(storeKey, mapped);
+            res.statusCode = 200;
+            res.end(JSON.stringify(mapped));
+            return;
+          } catch {
+            // Fall through to local mirror
+          }
+        } else if (adminCheck.firebaseIdToken) {
           try {
             const fsItems = await firestoreQueryCollection(collectionName, {
               idToken: adminCheck.firebaseIdToken,
@@ -351,20 +477,47 @@ export default async function handler(req, res) {
         setHeaders(req, res, false);
         const body = await readJsonBody(req);
         const item = body && typeof body === 'object' ? body : null;
-        if (!item || typeof item.id !== 'string' || !item.id.trim()) {
+        const cleanName = typeof item?.name === 'string' ? item.name.trim() : '';
+        const cleanPhone = typeof item?.phone === 'string' ? item.phone.trim() : '';
+
+        if (!item || typeof item.id !== 'string' || !item.id.trim() || !cleanName || cleanPhone.length < 6) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'Invalid submission payload' }));
+          res.end(JSON.stringify({ error: 'Valid name, phone number, and submission ID are required.' }));
           return;
         }
-        try {
-          await firestorePatchDocument(`${collectionName}/${item.id}`, item, '');
-        } catch {
-          // Client SDK also writes directly to Firestore
+
+        // Server-enforced initial workflow status on public submissions
+        const sanitizedItem = {
+          ...item,
+          name: cleanName,
+          phone: cleanPhone,
+          status: 'New',
+          createdAt: item.createdAt || new Date().toISOString(),
+        };
+
+        if (supabaseActive) {
+          const rowPayload =
+            resource === 'leads'
+              ? mapAppLeadToEnquiryRow(sanitizedItem)
+              : mapAppInquiryToBookingRow(sanitizedItem);
+          await supabaseRest(sbTable, {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates' },
+            useServiceRole: hasSupabaseServiceRole(),
+            body: rowPayload,
+          });
+        } else {
+          try {
+            await firestorePatchDocument(`${collectionName}/${sanitizedItem.id}`, sanitizedItem, '');
+          } catch {
+            // Client SDK also writes directly to Firestore
+          }
         }
+
         const existing = readStore(storeKey);
         const list = Array.isArray(existing) ? existing : [];
-        if (!list.some((x) => x && x.id === item.id)) {
-          list.unshift(item);
+        if (!list.some((x) => x && x.id === sanitizedItem.id)) {
+          list.unshift(sanitizedItem);
           writeStore(storeKey, list);
         }
         res.statusCode = 200;
@@ -394,7 +547,14 @@ export default async function handler(req, res) {
             return;
           }
           const nowIso = new Date().toISOString();
-          if (adminCheck.firebaseIdToken) {
+          if (supabaseActive) {
+            await supabaseRest(`${sbTable}?id=eq.${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+              body: { status, updated_at: nowIso },
+            });
+          } else if (adminCheck.firebaseIdToken) {
             await firestorePatchDocument(
               `${collectionName}/${id}`,
               { status, updatedAt: nowIso },
@@ -421,9 +581,25 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({ error: 'Missing id or updates' }));
             return;
           }
-          const patchPayload = { ...updates, updatedAt: new Date().toISOString() };
+          const nowIso = new Date().toISOString();
+          const patchPayload = { ...updates, updatedAt: nowIso };
           delete patchPayload.id;
-          if (adminCheck.firebaseIdToken) {
+
+          if (supabaseActive) {
+            const sbPatch = { updated_at: nowIso };
+            if (typeof patchPayload.status === 'string') sbPatch.status = patchPayload.status;
+            if (typeof patchPayload.notes === 'string') sbPatch.notes = patchPayload.notes;
+            if (typeof patchPayload.aiSummary === 'string') sbPatch.ai_summary = patchPayload.aiSummary;
+            if (typeof patchPayload.preferredDate === 'string') sbPatch.preferred_date = patchPayload.preferredDate;
+            if (typeof patchPayload.preferredTime === 'string') sbPatch.preferred_time = patchPayload.preferredTime;
+            if (typeof patchPayload.message === 'string') sbPatch.message = patchPayload.message;
+            await supabaseRest(`${sbTable}?id=eq.${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+              body: sbPatch,
+            });
+          } else if (adminCheck.firebaseIdToken) {
             await firestorePatchDocument(
               `${collectionName}/${id}`,
               patchPayload,
@@ -452,22 +628,39 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // BUSINESS SETTINGS (Cloud Firestore Authoritative + Local Mirror)
+    // BUSINESS SETTINGS (Supabase website_settings[business] / Firestore)
     // ------------------------------------------------------------------------
     if (resource === 'business-settings') {
       if (req.method === 'GET') {
         setHeaders(req, res, false);
-        try {
-          const fsDoc = await firestoreGetDocument('settings/business');
-          if (fsDoc) {
-            delete fsDoc._docId;
-            writeStore('business-settings', fsDoc);
-            res.statusCode = 200;
-            res.end(JSON.stringify({ settings: fsDoc }));
-            return;
+        if (supabaseActive) {
+          try {
+            const rows = await supabaseRest('website_settings?key=eq.business&select=data,updated_at', {
+              useServiceRole: hasSupabaseServiceRole(),
+            });
+            const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+            if (row && row.data && Object.keys(row.data).length > 0) {
+              writeStore('business-settings', row.data);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ settings: row.data }));
+              return;
+            }
+          } catch {
+            // Fall through to local cache
           }
-        } catch {
-          // Fall back to local cache
+        } else {
+          try {
+            const fsDoc = await firestoreGetDocument('settings/business');
+            if (fsDoc) {
+              delete fsDoc._docId;
+              writeStore('business-settings', fsDoc);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ settings: fsDoc }));
+              return;
+            }
+          } catch {
+            // Fall back to local cache
+          }
         }
         const settings = readStore('business-settings');
         res.statusCode = 200;
@@ -491,10 +684,23 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({ error: 'Invalid settings payload' }));
           return;
         }
-        const settings = { ...rawSettings, updatedAt: new Date().toISOString() };
+        const nowIso = new Date().toISOString();
+        const settings = { ...rawSettings, updatedAt: nowIso };
         delete settings._docId;
 
-        if (adminCheck.firebaseIdToken) {
+        if (supabaseActive) {
+          await supabaseRest('website_settings', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates' },
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: hasSupabaseServiceRole(),
+            body: {
+              key: 'business',
+              data: settings,
+              updated_at: nowIso,
+            },
+          });
+        } else if (adminCheck.firebaseIdToken) {
           await firestorePatchDocument('settings/business', settings, adminCheck.firebaseIdToken);
         }
         writeStore('business-settings', settings);
@@ -505,21 +711,39 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // EDITORIAL POSTS (Cloud Firestore Authoritative + Local Mirror)
+    // EDITORIAL POSTS (Supabase website_settings[editorial] / Firestore)
     // ------------------------------------------------------------------------
     if (resource === 'editorial-posts') {
       if (req.method === 'GET') {
         setHeaders(req, res, false);
-        try {
-          const fsDoc = await firestoreGetDocument('settings/editorial');
-          if (fsDoc && Array.isArray(fsDoc.posts)) {
-            writeStore('editorial-posts', fsDoc.posts);
-            res.statusCode = 200;
-            res.end(JSON.stringify({ posts: fsDoc.posts }));
-            return;
+        if (supabaseActive) {
+          try {
+            const rows = await supabaseRest('website_settings?key=eq.editorial&select=data,updated_at', {
+              useServiceRole: hasSupabaseServiceRole(),
+            });
+            const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+            const posts = Array.isArray(row?.data?.posts) ? row.data.posts : null;
+            if (posts) {
+              writeStore('editorial-posts', posts);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ posts }));
+              return;
+            }
+          } catch {
+            // Fall through to local cache
           }
-        } catch {
-          // Fall back to local cache
+        } else {
+          try {
+            const fsDoc = await firestoreGetDocument('settings/editorial');
+            if (fsDoc && Array.isArray(fsDoc.posts)) {
+              writeStore('editorial-posts', fsDoc.posts);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ posts: fsDoc.posts }));
+              return;
+            }
+          } catch {
+            // Fall back to local cache
+          }
         }
         const posts = readStore('editorial-posts');
         res.statusCode = 200;
@@ -543,7 +767,19 @@ export default async function handler(req, res) {
           return;
         }
         const nowIso = new Date().toISOString();
-        if (adminCheck.firebaseIdToken) {
+        if (supabaseActive) {
+          await supabaseRest('website_settings', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates' },
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: hasSupabaseServiceRole(),
+            body: {
+              key: 'editorial',
+              data: { posts, updatedAt: nowIso },
+              updated_at: nowIso,
+            },
+          });
+        } else if (adminCheck.firebaseIdToken) {
           await firestorePatchDocument(
             'settings/editorial',
             { posts, updatedAt: nowIso },
@@ -557,6 +793,145 @@ export default async function handler(req, res) {
       }
     }
 
+    // ------------------------------------------------------------------------
+    // FUNNEL ANALYTICS (Admin read/reset + Lightweight public counter sync)
+    // ------------------------------------------------------------------------
+    if (resource === 'analytics') {
+      if (req.method === 'GET') {
+        setHeaders(req, res, true);
+        const adminCheck = await verifyRequestAdmin(req);
+        if (!adminCheck.authorized) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: 'Unauthorized administrator access required.' }));
+          return;
+        }
+        if (supabaseActive) {
+          try {
+            const rows = await supabaseRest('website_settings?key=eq.analytics&select=data,updated_at', {
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+            });
+            const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+            if (row?.data) {
+              writeStore('analytics', row.data);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ analytics: row.data }));
+              return;
+            }
+          } catch {
+            // Fall through
+          }
+        }
+        res.statusCode = 200;
+        res.end(JSON.stringify({ analytics: readStore('analytics') || {} }));
+        return;
+      }
+
+      if (req.method === 'POST') {
+        const body = await readJsonBody(req);
+        if (actionLower === 'reset') {
+          setHeaders(req, res, true);
+          const adminCheck = await verifyRequestAdmin(req);
+          if (!adminCheck.authorized) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: 'Unauthorized administrator access required.' }));
+            return;
+          }
+          const nowIso = new Date().toISOString();
+          const blank = { updatedAt: nowIso, lastUpdated: nowIso };
+          if (supabaseActive && hasSupabaseServiceRole()) {
+            await supabaseRest('website_settings', {
+              method: 'POST',
+              headers: { Prefer: 'resolution=merge-duplicates' },
+              body: { key: 'analytics', data: blank, updated_at: nowIso },
+            });
+          }
+          writeStore('analytics', blank);
+          res.statusCode = 200;
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+
+        // Public funnel counter increment
+        setHeaders(req, res, false);
+        const field = typeof body?.field === 'string' ? body.field.trim() : '';
+        const allowedCounters = new Set([
+          'visitors',
+          'aiOpened',
+          'aiConversations',
+          'vehicleSearches',
+          'vehiclesViewed',
+          'vehicleSaves',
+          'compareActions',
+          'enquiriesStarted',
+          'leadsSubmitted',
+          'whatsAppClicks',
+          'interestedClicks',
+          'callClicks',
+          'sourcingRequests',
+          'filterUsage',
+          'findMyCarSubmissions',
+          'sourceSubmissions',
+        ]);
+        if (!allowedCounters.has(field)) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Invalid analytics counter field' }));
+          return;
+        }
+        let current = readStore('analytics') || {};
+        if (supabaseActive && hasSupabaseServiceRole()) {
+          try {
+            const rows = await supabaseRest('website_settings?key=eq.analytics&select=data');
+            if (Array.isArray(rows) && rows[0]?.data) {
+              current = { ...rows[0].data };
+            }
+          } catch {
+            // Use local fallback
+          }
+        }
+        const nowIso = new Date().toISOString();
+        const next = {
+          ...current,
+          [field]: (Number(current[field]) || 0) + 1,
+          lastUpdated: nowIso,
+          updatedAt: nowIso,
+        };
+        if (typeof body?.brandKey === 'string' && body.brandKey.trim()) {
+          const bk = body.brandKey.trim().slice(0, 40);
+          next.mostSearchedBrands = {
+            ...(current.mostSearchedBrands || {}),
+            [bk]: (Number(current.mostSearchedBrands?.[bk]) || 0) + 1,
+          };
+        }
+        if (typeof body?.vehicleViewKey === 'string' && body.vehicleViewKey.trim()) {
+          const vk = body.vehicleViewKey.trim().slice(0, 80);
+          next.topViewedVehicles = {
+            ...(current.topViewedVehicles || {}),
+            [vk]: (Number(current.topViewedVehicles?.[vk]) || 0) + 1,
+          };
+        }
+        if (typeof body?.vehicleEnquiryKey === 'string' && body.vehicleEnquiryKey.trim()) {
+          const ek = body.vehicleEnquiryKey.trim().slice(0, 80);
+          next.topEnquiryVehicles = {
+            ...(current.topEnquiryVehicles || {}),
+            [ek]: (Number(current.topEnquiryVehicles?.[ek]) || 0) + 1,
+          };
+        }
+
+        writeStore('analytics', next);
+        if (supabaseActive && hasSupabaseServiceRole()) {
+          await supabaseRest('website_settings', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates' },
+            body: { key: 'analytics', data: next, updated_at: nowIso },
+          }).catch(() => {});
+        }
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+        return;
+      }
+    }
+
     setHeaders(req, res, false);
     res.statusCode = 404;
     res.end(JSON.stringify({ error: 'Resource not found' }));
@@ -566,3 +941,4 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: err?.message || 'Internal server error' }));
   }
 }
+

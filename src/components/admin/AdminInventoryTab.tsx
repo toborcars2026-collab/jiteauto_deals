@@ -30,6 +30,7 @@ import {
   saveVehicleSlideshow,
   deleteVehicleFromFirestore,
   deleteVehicle,
+  deleteVehicleSupabaseAssets,
   deleteVehicleCloudinaryAssets,
   getVehicleShareUrl,
   getOptimizedImageUrl,
@@ -210,19 +211,33 @@ export default function AdminInventoryTab({
       let cleanupSummary = '';
       if (cleanupCloudinaryOnDelete && (car.images?.length || car.imageMetadata?.length)) {
         try {
+          const storagePaths = (car.imageMetadata || [])
+            .map((m) => m.storagePath)
+            .filter((sp): sp is string => Boolean(sp));
           const publicIds = (car.imageMetadata || [])
             .map((m) => m.publicId)
             .filter((pid): pid is string => Boolean(pid && !pid.startsWith('external_')));
-          const cleanupRes = await deleteVehicleCloudinaryAssets({
-            vehicleId: car.id,
-            publicIds,
-            imageUrls: car.images || [],
-          });
-          if (cleanupRes.deleted?.length) {
-            cleanupSummary = ` Cleaned up ${cleanupRes.deleted.length} unshared Cloudinary image(s).`;
+
+          const [sbCleanup, cldCleanup] = await Promise.all([
+            deleteVehicleSupabaseAssets({
+              vehicleId: car.id,
+              storagePaths,
+              imageUrls: car.images || [],
+            }).catch(() => null),
+            deleteVehicleCloudinaryAssets({
+              vehicleId: car.id,
+              publicIds,
+              imageUrls: car.images || [],
+            }).catch(() => null),
+          ]);
+
+          const totalDeleted =
+            (sbCleanup?.deleted?.length || 0) + (cldCleanup?.deleted?.length || 0);
+          if (totalDeleted > 0) {
+            cleanupSummary = ` Cleaned up ${totalDeleted} unshared cloud image(s).`;
           }
         } catch {
-          // Vehicle record was deleted cleanly; non-blocking if Cloudinary cleanup skipped
+          // Vehicle record was deleted cleanly; non-blocking if asset cleanup skipped
         }
       }
 
@@ -234,7 +249,7 @@ export default function AdminInventoryTab({
       setVehicles((prev) => prev.filter((v) => v.id !== car.id));
       deleteVehicle(car.id);
       setConfirmDeleteCar(null);
-      showFeedback(`Listing "${car.make} ${car.model}" deleted from Cloud Firestore.${cleanupSummary}`);
+      showFeedback(`Listing "${car.make} ${car.model}" deleted from database.${cleanupSummary}`);
     } catch (err: any) {
       showError(`Failed to delete vehicle: ${err?.message || err}`);
     } finally {
@@ -586,7 +601,7 @@ export default function AdminInventoryTab({
                       disabled={isDeleting}
                       onClick={() => handleRequestDeleteCar(car)}
                       className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1.5 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Delete Listing permanently from Firestore"
+                      title="Delete listing permanently from database"
                     >
                       {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                     </button>
@@ -611,7 +626,7 @@ export default function AdminInventoryTab({
                   Permanently Delete Listing?
                 </h3>
                 <p className="text-xs text-slate-600 mt-1">
-                  This removes <strong>{confirmDeleteCar.year} {confirmDeleteCar.make} {confirmDeleteCar.model}</strong> from Cloud Firestore and your live Jite Auto Deals website.
+                  This removes <strong>{confirmDeleteCar.year} {confirmDeleteCar.make} {confirmDeleteCar.model}</strong> from the database and your live Jite Auto Deals website.
                 </p>
               </div>
             </div>
@@ -624,7 +639,7 @@ export default function AdminInventoryTab({
                 className="mt-0.5 h-4 w-4 rounded text-amber-500 focus:ring-amber-400"
               />
               <span className="text-xs text-slate-700 leading-relaxed">
-                <strong className="block text-slate-900">Clean up unshared Cloudinary photos</strong>
+                <strong className="block text-slate-900">Clean up unshared cloud photos</strong>
                 Safely removes photos stored specifically for this vehicle while automatically protecting any shared photos used by other listings.
               </span>
             </label>

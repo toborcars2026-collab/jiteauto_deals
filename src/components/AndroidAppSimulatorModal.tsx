@@ -24,9 +24,7 @@ import {
   Download
 } from 'lucide-react';
 import { Vehicle, BusinessSettings } from '../types';
-import { formatCurrency, getWhatsAppLink, getBusinessPhoneDisplay } from '../utils';
-import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { formatCurrency, getWhatsAppLink, saveInquiry } from '../utils';
 
 interface AndroidAppSimulatorModalProps {
   isOpen: boolean;
@@ -110,8 +108,8 @@ export default function AndroidAppSimulatorModal({
       setIsSubmitting(true);
       setFormError(null);
 
-      // Save to shared Firestore /inquiries collection
-      const docRef = await addDoc(collection(db, 'inquiries'), {
+      // Save to backend bookings/inquiries store (Supabase or Firestore)
+      const savedInquiry = saveInquiry({
         name: fullName.trim(),
         phone: whatsappNum.trim(),
         vehicleId: inspectingVehicle.id,
@@ -123,12 +121,10 @@ export default function AndroidAppSimulatorModal({
         preferredTime: inspTime,
         preferredContact: 'WhatsApp',
         readyToBuy: 'Immediate',
-        status: 'New',
-        createdAt: new Date().toISOString(),
         message: `Android Native App inspection booking for ${inspectingVehicle.year} ${inspectingVehicle.make} ${inspectingVehicle.model} in ${inspectingVehicle.location}.`
       });
 
-      setBookingSuccess(`Inspection request confirmed! Reference ID: ${docRef.id.slice(0, 8)}`);
+      setBookingSuccess(`Inspection request confirmed! Reference ID: ${savedInquiry.id.slice(0, 8)}`);
 
       // WhatsApp handoff
       const msg = `Hello Tobor Jite! I just booked an inspection via the Jite Auto Deals Android App for:\n\n🚗 *${inspectingVehicle.year} ${inspectingVehicle.make} ${inspectingVehicle.model}*\n💰 Price: ${formatCurrency(inspectingVehicle.price)}\n📍 Location: ${inspectingVehicle.location}\n📅 Date: ${inspDate}\n⏰ Time: ${inspTime}\n👤 Name: ${fullName}\n📱 WhatsApp: ${whatsappNum}\n\nLooking forward to the physical verification.`;
@@ -174,7 +170,7 @@ To build in Android Studio:
                   Jite Auto Deals — Official Android Native Mobile App
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                  Shared Firestore Active
+                  Live Sync Active
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">

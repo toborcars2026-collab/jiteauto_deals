@@ -5,6 +5,8 @@ export type VehicleStatus = 'Available' | 'Reserved' | 'Sold' | 'Hidden' | 'Acti
 export interface VehicleImageRecord {
   vehicleId: string;
   publicId: string;
+  storageBucket?: string;
+  storagePath?: string;
   secureUrl: string;
   position: number;
   isCover: boolean;
@@ -180,8 +182,9 @@ export interface AdminProfile {
   lastLoginAt?: string;
   createdAt?: string;
   updatedAt?: string;
-  authMode?: 'server-credentials' | 'google-firebase';
+  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
   firebaseSynced?: boolean;
+  supabaseSynced?: boolean;
   envManaged?: boolean;
 }
 
@@ -194,7 +197,7 @@ export interface AdminAuditLogEntry {
   details: string;
   authMethod?: string;
   timestamp: string;
-  source?: 'firestore' | 'security-server';
+  source?: 'firestore' | 'supabase' | 'security-server';
 }
 
 export interface AdminInvite {
@@ -209,7 +212,7 @@ export interface AdminInvite {
 
 export interface SecurityDiagnosticStatus {
   checkedAt: string;
-  authMode?: 'server-credentials' | 'google-firebase';
+  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
   firebaseAuthOk: boolean;
   firebaseAuthSummary: string;
   databaseConnected: boolean;

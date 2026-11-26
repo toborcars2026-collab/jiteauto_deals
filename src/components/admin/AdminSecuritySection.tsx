@@ -41,7 +41,7 @@ import {
 } from '../../services/adminAuth';
 
 interface AdminSecuritySectionProps {
-  authMode?: 'server-credentials' | 'google-firebase';
+  authMode?: 'server-credentials' | 'google-firebase' | 'supabase';
   currentUser?: {
     uid?: string;
     email?: string | null;
@@ -65,7 +65,10 @@ export default function AdminSecuritySection({
   onSignOut,
 }: AdminSecuritySectionProps) {
   const user = auth.currentUser;
+  const isSupabaseMode =
+    authMode === 'supabase' || adminProfile?.authMode === 'supabase';
   const isServerCredsMode =
+    isSupabaseMode ||
     authMode === 'server-credentials' ||
     adminProfile?.authMode === 'server-credentials' ||
     !user;
@@ -75,7 +78,11 @@ export default function AdminSecuritySection({
     ['password'];
   const hasPasswordLinked = isServerCredsMode ? true : providerIds.includes('password');
   const hasGoogleLinked = !isServerCredsMode && providerIds.includes('google.com');
-  const canManageAdmins = !isServerCredsMode || Boolean(adminProfile?.firebaseSynced);
+  const canManageAdmins =
+    isSupabaseMode ||
+    !isServerCredsMode ||
+    Boolean(adminProfile?.firebaseSynced) ||
+    Boolean(adminProfile?.supabaseSynced);
   const activeUid = user?.uid || adminProfile?.uid || currentUser?.uid || '';
   const activeEmail = user?.email || adminProfile?.email || currentUser?.email || '';
 
@@ -493,7 +500,11 @@ export default function AdminSecuritySection({
                   <span className="text-sm font-bold text-slate-900 truncate">
                     {activeEmail || 'Authenticated Session'}
                   </span>
-                  {isServerCredsMode ? (
+                  {isSupabaseMode ? (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                      Supabase Synced
+                    </span>
+                  ) : isServerCredsMode ? (
                     adminProfile?.firebaseSynced ? (
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
                         Cloud Synced
@@ -894,7 +905,9 @@ export default function AdminSecuritySection({
             className="bg-white p-4 rounded-xl border border-amber-300 space-y-3"
           >
             <p className="text-xs text-slate-600 leading-relaxed">
-              Authorize a trusted collaborator by entering their email and full name. Leave the Firebase UID blank to send a pre-authorized email invitation (redeemed when they sign in with their verified Google account), or enter an existing Firebase Auth UID directly.
+              {isSupabaseMode
+                ? 'Authorize a trusted collaborator by entering their email and full name. Leave the User UUID blank to record an email invitation, or enter an existing Supabase Auth User UUID directly.'
+                : 'Authorize a trusted collaborator by entering their email and full name. Leave the Firebase UID blank to send a pre-authorized email invitation (redeemed when they sign in with their verified Google account), or enter an existing Firebase Auth UID directly.'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <input
@@ -915,7 +928,7 @@ export default function AdminSecuritySection({
               />
               <input
                 type="text"
-                placeholder="Firebase Auth UID (Optional)"
+                placeholder={isSupabaseMode ? 'Supabase User UUID (Optional)' : 'Firebase Auth UID (Optional)'}
                 value={newAdminUid}
                 onChange={(e) => setNewAdminUid(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] text-xs font-mono text-slate-900"
@@ -1042,7 +1055,9 @@ export default function AdminSecuritySection({
                           {invite.displayName || 'Invited Administrator'} ({invite.email})
                         </p>
                         <p className="text-[11px] font-mono text-slate-500">
-                          Pre-authorized for verified Google sign-in
+                          {isSupabaseMode
+                            ? 'Pre-authorized administrator email invitation'
+                            : 'Pre-authorized for verified Google sign-in'}
                         </p>
                       </div>
                       <button
@@ -1149,7 +1164,9 @@ export default function AdminSecuritySection({
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
-                    {diagnostics.authMode === 'server-credentials'
+                    {diagnostics.authMode === 'supabase'
+                      ? 'Supabase Authentication'
+                      : diagnostics.authMode === 'server-credentials'
                       ? 'Server Authentication'
                       : 'Firebase Authentication'}
                   </span>

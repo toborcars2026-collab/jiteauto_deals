@@ -9,6 +9,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { isSupabaseClientConfigured } from '../lib/supabase';
 import { AdminAuditLogEntry } from '../types';
 import { getActiveAdminBearerToken } from './adminAuth';
 
@@ -20,11 +21,11 @@ export interface RecordAuditInput {
 }
 
 /**
- * Writes an immutable administrator security or operational audit event to Cloud Firestore
- * (either directly via Firebase Web SDK or via verified backend endpoint).
+ * Writes an immutable administrator security or operational audit event to Supabase / Cloud Firestore
+ * (either via verified backend endpoint or Firebase Web SDK when active).
  */
 export async function recordAdminAuditLog(input: RecordAuditInput): Promise<void> {
-  const user = auth.currentUser;
+  const user = !isSupabaseClientConfigured() ? auth.currentUser : null;
   if (user) {
     try {
       await addDoc(collection(db, 'admin_audit_logs'), {
@@ -64,12 +65,12 @@ export async function recordAdminAuditLog(input: RecordAuditInput): Promise<void
 }
 
 /**
- * Fetches server security logs and Cloud Firestore audit logs across both Google and Email/Password modes.
+ * Fetches server security logs and database audit logs across Supabase, server-credentials, and Google modes.
  */
 export async function fetchAdminAuditLogs(maxEntries = 50): Promise<AdminAuditLogEntry[]> {
   const results: AdminAuditLogEntry[] = [];
 
-  if (auth.currentUser) {
+  if (!isSupabaseClientConfigured() && auth.currentUser) {
     try {
       const q = query(
         collection(db, 'admin_audit_logs'),

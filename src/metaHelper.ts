@@ -1267,10 +1267,84 @@ export async function queryVehiclesByYearFromFirestoreRest(year: number): Promis
   }
 }
 
-/**
- * Targeted single-vehicle lookup from Firestore REST API.
- * Queries only the required vehicle (by exact/prefix ID or model year) without fetching the entire inventory unless needed.
- */
+async function fetchSingleVehicleFromSupabaseRest(cleanId: string): Promise<Vehicle | null> {
+  if (typeof process === 'undefined' || !process.env) return null;
+  const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+  const rawKey =
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    '';
+  const sbUrl = rawUrl.trim().replace(/\/+$/, '');
+  const sbKey = rawKey.trim();
+  if (!sbUrl || !sbKey || /^MY_/i.test(sbUrl) || /^MY_/i.test(sbKey)) return null;
+
+  const mapRow = (row: any): Vehicle | null => {
+    if (!row || !row.id) return null;
+    return {
+      id: String(row.id),
+      make: String(row.make || ''),
+      model: String(row.model || ''),
+      year: Number(row.year) || 2020,
+      price: Number(row.price) || 0,
+      mileage: typeof row.mileage === 'number' && row.mileage > 0 ? row.mileage : undefined,
+      transmission: row.transmission || 'Automatic',
+      fuelType: row.fuel_type || 'Petrol',
+      bodyType: row.body_type || 'SUV',
+      location: row.location || '',
+      dealership: row.dealership || undefined,
+      images: Array.isArray(row.images) ? row.images : [],
+      description: decodeUnicodeEscapes(row.description || ''),
+      engine: row.engine || undefined,
+      color: row.color || '',
+      condition: row.condition || 'Foreign Used',
+      isFeatured: row.is_featured !== false,
+      inSlideshow: Boolean(row.in_slideshow),
+      slideshowOrder: Number(row.slideshow_order) || 0,
+      status: row.status || 'Available',
+      createdAt: row.created_at || undefined,
+      updatedAt: row.updated_at || undefined,
+    };
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const headers = {
+      apikey: sbKey,
+      Authorization: `Bearer ${sbKey}`,
+      Accept: 'application/json',
+    };
+
+    const exactRes = await fetch(
+      `${sbUrl}/rest/v1/vehicles?or=(id.eq.${encodeURIComponent(cleanId)},slug.eq.${encodeURIComponent(cleanId)})&select=*&limit=5`,
+      { headers, signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    if (exactRes.ok) {
+      const rows = await exactRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const mapped = rows.map(mapRow).filter((v): v is Vehicle => Boolean(v));
+        const hit = findVehicleInList(mapped, cleanId) || mapped[0];
+        if (hit) return hit;
+      }
+    }
+
+    const allRes = await fetch(`${sbUrl}/rest/v1/vehicles?select=*&status=neq.Hidden&limit=300`, {
+      headers,
+    });
+    if (allRes.ok) {
+      const rows = await allRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const mapped = rows.map(mapRow).filter((v): v is Vehicle => Boolean(v));
+        return findVehicleInList(mapped, cleanId) || null;
+      }
+    }
+  } catch {
+    // Non-blocking
+  }
+  return null;
+}
+
 export async function fetchSingleVehicleFromFirestoreRest(
   identifier: string,
   fallbackVehicles: Vehicle[] = []
@@ -1281,6 +1355,9 @@ export async function fetchSingleVehicleFromFirestoreRest(
     .replace(/^\/?(vehicles|car|v)\/?/, '')
     .replace(/\/+$/, '');
   if (!cleanId) return null;
+
+  const sbHit = await fetchSingleVehicleFromSupabaseRest(cleanId);
+  if (sbHit) return sbHit;
 
   // 1. Fast targeted prefix range query on `id` (covers exact IDs and modern slug-suffixed IDs like "2013-dodge-charger-munh8e3k" in 1 query)
   const prefixMatches = await queryVehiclesByIdPrefixFromFirestoreRest(cleanId);

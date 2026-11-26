@@ -13,6 +13,18 @@ import {
   firebaseAuthRefreshToken,
   firebaseAuthSendPasswordReset,
 } from './firestore-rest.js';
+import {
+  isSupabaseServerConfigured,
+  hasSupabaseServiceRole,
+  supabaseRest,
+  supabaseAuthSignIn,
+  supabaseAuthRefreshToken,
+  supabaseAuthGetUser,
+  supabaseAuthUpdateSelf,
+  supabaseSendPasswordReset,
+  supabaseAdminCreateUser,
+  supabaseAdminUpdateUser,
+} from '../lib/supabase-rest.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
 const AUTH_STORE_FILE = path.join(DATA_DIR, 'admin_auth.json');
@@ -608,15 +620,113 @@ export function extractBearerToken(req) {
   return null;
 }
 
-/**
- * Reusable verification helper for protected server endpoints (/api/vehicles, /api/upload-vehicle-image, etc.).
- * Verifies Google Firebase RS256 ID Tokens (stateless across Vercel & AI Studio) OR Server HMAC Bearer tokens.
- */
+async function fetchSupabaseBootstrapSafe() {
+  if (!isSupabaseServerConfigured()) return null;
+  try {
+    const rows = await supabaseRest('admin_bootstrap?id=eq.true&select=*');
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function checkSupabaseAdminAuthorization(accessToken, sbUser) {
+  if (!sbUser?.id) {
+    return { authorized: false, revoked: false, role: null, profile: null };
+  }
+  const useSvc = hasSupabaseServiceRole();
+  try {
+    const profiles = await supabaseRest(
+      `admin_profiles?id=eq.${encodeURIComponent(sbUser.id)}&select=*`,
+      { accessToken, useServiceRole: useSvc }
+    );
+    const profile = Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null;
+    if (profile) {
+      const isActive = profile.active !== false;
+      const role = profile.role === 'owner' ? 'owner' : 'admin';
+      return {
+        authorized: isActive,
+        revoked: !isActive,
+        role,
+        profile,
+        hasProfile: true,
+        invited: false,
+      };
+    }
+  } catch {
+    // Continue checking bootstrap/invites
+  }
+
+  try {
+    const bootstrap = await fetchSupabaseBootstrapSafe();
+    if (bootstrap && bootstrap.primary_admin_id === sbUser.id) {
+      return {
+        authorized: true,
+        revoked: false,
+        role: 'owner',
+        profile: null,
+        hasProfile: false,
+        invited: false,
+      };
+    }
+  } catch {
+    // Ignore
+  }
+
+  const emailLower = String(sbUser.email || '').trim().toLowerCase();
+  if (emailLower && sbUser.email_confirmed_at) {
+    try {
+      const invites = await supabaseRest(
+        `admin_invites?email_lower=eq.${encodeURIComponent(emailLower)}&active=eq.true&select=*`,
+        { accessToken, useServiceRole: useSvc }
+      );
+      if (Array.isArray(invites) && invites.length > 0) {
+        return {
+          authorized: true,
+          revoked: false,
+          role: 'admin',
+          profile: null,
+          hasProfile: false,
+          invited: true,
+          invite: invites[0],
+        };
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return { authorized: false, revoked: false, role: null, profile: null };
+}
+
+async function writeSupabaseAuditSafe({ action, actorUid, actorEmail, status, details, authMethod }) {
+  if (!isSupabaseServerConfigured()) return;
+  try {
+    await supabaseRest('admin_audit_logs', {
+      method: 'POST',
+      body: {
+        action: String(action || 'ADMIN_EVENT').slice(0, 100),
+        actor_uid: String(actorUid || 'admin'),
+        actor_email: String(actorEmail || ''),
+        status: ['success', 'failure', 'warning'].includes(status) ? status : 'success',
+        details: String(details || '').slice(0, 500),
+        auth_method: String(authMethod || 'password'),
+      },
+    });
+  } catch {
+    // Non-blocking audit log write
+  }
+}
+
 export async function verifyRequestAdmin(req) {
   const bearerToken = extractBearerToken(req) || req.body?.idToken;
   const sidecarFirebaseToken =
     typeof req.headers?.['x-firebase-id-token'] === 'string'
       ? req.headers['x-firebase-id-token'].trim()
+      : '';
+  const sidecarSupabaseToken =
+    typeof req.headers?.['x-supabase-access-token'] === 'string'
+      ? req.headers['x-supabase-access-token'].trim()
       : '';
 
   const token = bearerToken;
@@ -630,8 +740,21 @@ export async function verifyRequestAdmin(req) {
       return { authorized: false, error: 'Session expired or invalid. Please sign in again.' };
     }
 
+    let attachedSupabaseToken = null;
+    if (sidecarSupabaseToken && isSupabaseServerConfigured()) {
+      try {
+        const sbUser = await supabaseAuthGetUser(sidecarSupabaseToken);
+        const sbAuth = await checkSupabaseAdminAuthorization(sidecarSupabaseToken, sbUser);
+        if (sbAuth.authorized) {
+          attachedSupabaseToken = sidecarSupabaseToken;
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
     let attachedFirebaseToken = null;
-    if (sidecarFirebaseToken && !sidecarFirebaseToken.startsWith('srv.')) {
+    if (!attachedSupabaseToken && sidecarFirebaseToken && !sidecarFirebaseToken.startsWith('srv.')) {
       try {
         const fbDecoded = await verifyFirebaseIdToken(sidecarFirebaseToken);
         const fsAuth = await checkFirestoreAdminAuthorization(sidecarFirebaseToken, fbDecoded);
@@ -650,11 +773,51 @@ export async function verifyRequestAdmin(req) {
       fullName: verified.fullName,
       emailVerified: true,
       role: verified.role || 'owner',
-      authMode: 'server-credentials',
+      authMode: attachedSupabaseToken ? 'supabase' : 'server-credentials',
       envManaged: Boolean(verified.envManaged),
       signInProvider: 'password',
+      supabaseAccessToken: attachedSupabaseToken,
       firebaseIdToken: attachedFirebaseToken,
     };
+  }
+
+  // Prefer Supabase JWT verification whenever Supabase backend is configured
+  if (isSupabaseServerConfigured()) {
+    try {
+      const sbUser = await supabaseAuthGetUser(token);
+      if (sbUser) {
+        const sbAuth = await checkSupabaseAdminAuthorization(token, sbUser);
+        if (!sbAuth.authorized) {
+          return {
+            authorized: false,
+            error: sbAuth.revoked
+              ? 'This administrator account has been revoked.'
+              : 'This account does not have administrator access.',
+          };
+        }
+        return {
+          authorized: true,
+          uid: sbUser.id,
+          email: sbAuth.profile?.email || sbUser.email || '',
+          fullName:
+            sbAuth.profile?.full_name ||
+            sbUser.user_metadata?.full_name ||
+            'Primary Administrator',
+          emailVerified: Boolean(sbUser.email_confirmed_at),
+          role: sbAuth.role || 'owner',
+          authMode: 'supabase',
+          signInProvider: 'password',
+          inactivityTimeoutMinutes:
+            typeof sbAuth.profile?.inactivity_timeout_minutes === 'number'
+              ? sbAuth.profile.inactivity_timeout_minutes
+              : 30,
+          supabaseAccessToken: token,
+          firebaseIdToken: null,
+        };
+      }
+    } catch {
+      // Fall through to Firebase check only if token is a Firebase RS256 token during migration
+    }
   }
 
   try {
@@ -734,7 +897,7 @@ function setSecurityHeaders(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token'
+    'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token, x-supabase-access-token'
   );
 }
 
@@ -782,9 +945,42 @@ export default async function handler(req, res) {
   try {
     // ------------------------------------------------------------------------
     // 1. GET /api/admin-auth?action=status
-    //    Detects live configuration across Firebase Cloud + local store + env
+    //    Detects live configuration across Supabase, Firebase, local store & env
     // ------------------------------------------------------------------------
     if (action === 'status' && req.method === 'GET') {
+      const supabaseActive = isSupabaseServerConfigured();
+      if (supabaseActive) {
+        const sbBootstrap = await fetchSupabaseBootstrapSafe();
+        let hasOwnerRow = false;
+        if (hasSupabaseServiceRole()) {
+          try {
+            const owners = await supabaseRest(
+              'admin_profiles?role=eq.owner&active=eq.true&select=id&limit=1'
+            );
+            hasOwnerRow = Array.isArray(owners) && owners.length > 0;
+          } catch {
+            hasOwnerRow = false;
+          }
+        }
+        const setupSecretRequired = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
+        const isBootstrapped = Boolean(sbBootstrap?.setup_completed || hasOwnerRow);
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            configured: isBootstrapped,
+            bootstrapped: isBootstrapped,
+            backend: 'supabase',
+            supabaseConfigured: true,
+            envManaged: false,
+            envOverridden: Boolean(sbBootstrap?.dashboard_override),
+            setupSecretRequired,
+            firebaseAuthConfigured: false,
+          })
+        );
+        return;
+      }
+
       const cfg = resolveConfiguredServerCredentials();
       const stored = readServerCredentialStore();
       const bootstrapDoc = await fetchBootstrapDocSafe();
@@ -798,6 +994,8 @@ export default async function handler(req, res) {
         JSON.stringify({
           configured: isBootstrapped,
           bootstrapped: isBootstrapped,
+          backend: 'firebase',
+          supabaseConfigured: false,
           envManaged: Boolean(cfg.envManaged),
           envOverridden: Boolean(cfg.envOverridden || bootstrapDoc?.dashboardOverride),
           setupSecretRequired,
@@ -809,18 +1007,161 @@ export default async function handler(req, res) {
 
     // ------------------------------------------------------------------------
     // 2. POST /api/admin-auth?action=setup
-    //    One-time initial setup (locked once bootstrapped anywhere)
+    //    One-time initial owner setup (locked once bootstrapped)
     // ------------------------------------------------------------------------
     if (action === 'setup' && req.method === 'POST') {
-      const cfg = resolveConfiguredServerCredentials();
-      const stored = readServerCredentialStore();
-      const bootstrapDoc = await fetchBootstrapDocSafe();
       const body = await readJsonBody(req);
       const rawSecret = (process.env.ADMIN_SETUP_SECRET || '').trim();
       const configuredSecret = isPlaceholderEnvValue(rawSecret) ? '' : rawSecret;
       const providedSecret = req.headers?.['x-admin-setup-secret'] || body.setupSecret || '';
       const hasValidSetupSecret =
         Boolean(configuredSecret) && safeTimingEqual(String(providedSecret), configuredSecret);
+
+      const supabaseActive = isSupabaseServerConfigured();
+      if (supabaseActive) {
+        const sbBootstrap = await fetchSupabaseBootstrapSafe();
+        let hasOwnerRow = false;
+        if (hasSupabaseServiceRole()) {
+          try {
+            const owners = await supabaseRest(
+              'admin_profiles?role=eq.owner&active=eq.true&select=id&limit=1'
+            );
+            hasOwnerRow = Array.isArray(owners) && owners.length > 0;
+          } catch {
+            hasOwnerRow = false;
+          }
+        }
+        const alreadyBootstrapped = Boolean(sbBootstrap?.setup_completed || hasOwnerRow);
+        if (alreadyBootstrapped && !hasValidSetupSecret) {
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              code: 'ALREADY_CONFIGURED',
+              error:
+                'Administrator credentials are already configured. Please sign in with your email and password or manage credentials inside Security Settings.',
+            })
+          );
+          return;
+        }
+        if (configuredSecret && !hasValidSetupSecret) {
+          recordFailedAttempt(clientIp);
+          res.statusCode = 403;
+          res.end(
+            JSON.stringify({
+              success: false,
+              code: 'INVALID_SETUP_SECRET',
+              error: 'Setup authorization secret is invalid or missing.',
+            })
+          );
+          return;
+        }
+
+        const fullName = String(body?.fullName || '').trim() || 'Primary Administrator';
+        const email = String(body?.email || '').trim();
+        const password = String(body?.password || '');
+
+        if (!email || !email.includes('@')) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: 'Please enter a valid email address.' }));
+          return;
+        }
+        const pwCheck = validatePasswordPolicy(password);
+        if (!pwCheck.valid) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ success: false, error: pwCheck.error }));
+          return;
+        }
+        if (!hasSupabaseServiceRole()) {
+          res.statusCode = 500;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'SUPABASE_SERVICE_ROLE_KEY is required on the server to complete initial owner setup.',
+            })
+          );
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const createdUser = await supabaseAdminCreateUser({
+          email,
+          password,
+          emailConfirm: true,
+          userMetadata: { full_name: fullName },
+          appMetadata: { role: 'owner' },
+        });
+
+        await supabaseRest('admin_profiles', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates' },
+          body: {
+            id: createdUser.id,
+            email,
+            full_name: fullName,
+            role: 'owner',
+            active: true,
+            inactivity_timeout_minutes: 30,
+            auth_methods: ['password'],
+            last_login_at: nowIso,
+            created_at: nowIso,
+            updated_at: nowIso,
+          },
+        });
+
+        await supabaseRest('admin_bootstrap', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates' },
+          body: {
+            id: true,
+            setup_completed: true,
+            primary_admin_id: createdUser.id,
+            dashboard_override: true,
+            setup_completed_at: nowIso,
+            password_updated_at: nowIso,
+            updated_at: nowIso,
+          },
+        });
+
+        const session = await supabaseAuthSignIn(email, password);
+        await writeSupabaseAuditSafe({
+          action: 'ADMIN_OWNER_SETUP_COMPLETED',
+          actorUid: createdUser.id,
+          actorEmail: email,
+          status: 'success',
+          details: 'Primary owner administrator account created in Supabase Auth.',
+          authMethod: 'password',
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: session.accessToken,
+            expiresAt: session.expiresAt,
+            supabaseAccessToken: session.accessToken,
+            supabaseRefreshToken: session.refreshToken,
+            supabaseExpiresAt: session.expiresAt,
+            admin: {
+              uid: createdUser.id,
+              email,
+              displayName: fullName,
+              role: 'owner',
+              authMode: 'supabase',
+              supabaseSynced: true,
+              envManaged: false,
+              inactivityTimeoutMinutes: 30,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            },
+          })
+        );
+        return;
+      }
+
+      const cfg = resolveConfiguredServerCredentials();
+      const stored = readServerCredentialStore();
+      const bootstrapDoc = await fetchBootstrapDocSafe();
 
       const alreadyBootstrapped = Boolean(
         cfg.configured || stored.bootstrapped || bootstrapDoc?.setupCompleted
@@ -964,6 +1305,140 @@ export default async function handler(req, res) {
           })
         );
         return;
+      }
+
+      if (isSupabaseServerConfigured()) {
+        try {
+          const sbLogin = await supabaseAuthSignIn(email, password);
+          const sbAuth = await checkSupabaseAdminAuthorization(sbLogin.accessToken, sbLogin.user);
+          if (!sbAuth.authorized) {
+            const attempts = recordFailedAttempt(clientIp);
+            pushSecurityEvent({
+              action: 'UNAUTHORIZED_ADMIN_LOGIN',
+              status: attempts >= 5 ? 'warning' : 'failure',
+              actorEmailMasked: maskEmailForAudit(email),
+              ipTag: hashIpForAudit(clientIp),
+              details: 'Signed in Supabase account does not belong to an authorized administrator.',
+            });
+            res.statusCode = 403;
+            res.end(
+              JSON.stringify({
+                success: false,
+                code: 'ACCESS_DENIED',
+                error: sbAuth.revoked
+                  ? 'This administrator account has been revoked.'
+                  : 'This account does not have administrator access.',
+              })
+            );
+            return;
+          }
+
+          clearRateLimit(clientIp);
+          const nowIso = new Date().toISOString();
+          const resolvedName =
+            sbAuth.profile?.full_name ||
+            sbAuth.invite?.display_name ||
+            sbLogin.user?.user_metadata?.full_name ||
+            'Primary Administrator';
+          const resolvedTimeout =
+            typeof sbAuth.profile?.inactivity_timeout_minutes === 'number'
+              ? sbAuth.profile.inactivity_timeout_minutes
+              : 30;
+          const resolvedRole = sbAuth.role || 'owner';
+          const resolvedEmail = sbLogin.user.email || email;
+
+          if (hasSupabaseServiceRole()) {
+            supabaseRest('admin_profiles', {
+              method: 'POST',
+              headers: { Prefer: 'resolution=merge-duplicates' },
+              body: {
+                id: sbLogin.user.id,
+                email: resolvedEmail,
+                full_name: resolvedName,
+                role: resolvedRole,
+                active: true,
+                inactivity_timeout_minutes: resolvedTimeout,
+                auth_methods: Array.from(
+                  new Set([
+                    ...(Array.isArray(sbAuth.profile?.auth_methods) ? sbAuth.profile.auth_methods : []),
+                    'password',
+                  ])
+                ),
+                last_login_at: nowIso,
+                created_at: sbAuth.profile?.created_at || nowIso,
+                updated_at: nowIso,
+              },
+            }).catch(() => {});
+          }
+
+          pushSecurityEvent({
+            action: 'LOGIN_SUCCESS',
+            status: 'success',
+            actorEmailMasked: maskEmailForAudit(resolvedEmail),
+            ipTag: hashIpForAudit(clientIp),
+            details: 'Administrator signed in via Supabase Auth.',
+          });
+
+          await writeSupabaseAuditSafe({
+            action: 'LOGIN_SUCCESS',
+            actorUid: sbLogin.user.id,
+            actorEmail: resolvedEmail,
+            status: 'success',
+            details: 'Administrator signed in with Email and Password (Supabase Auth).',
+            authMethod: 'password',
+          });
+
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              success: true,
+              token: sbLogin.accessToken,
+              expiresAt: sbLogin.expiresAt,
+              supabaseAccessToken: sbLogin.accessToken,
+              supabaseRefreshToken: sbLogin.refreshToken,
+              supabaseExpiresAt: sbLogin.expiresAt,
+              admin: {
+                uid: sbLogin.user.id,
+                email: resolvedEmail,
+                displayName: resolvedName,
+                role: resolvedRole,
+                authMode: 'supabase',
+                supabaseSynced: true,
+                envManaged: false,
+                inactivityTimeoutMinutes: resolvedTimeout,
+                createdAt: sbAuth.profile?.created_at || nowIso,
+                updatedAt: sbAuth.profile?.updated_at || nowIso,
+                lastLoginAt: nowIso,
+              },
+            })
+          );
+          return;
+        } catch (sbErr) {
+          const attempts = recordFailedAttempt(clientIp);
+          const sbErrMsg = String(sbErr?.code || sbErr?.message || 'INVALID_CREDENTIALS');
+          pushSecurityEvent({
+            action: 'LOGIN_FAILED',
+            status: attempts >= 5 ? 'warning' : 'failure',
+            actorEmailMasked: maskEmailForAudit(email),
+            ipTag: hashIpForAudit(clientIp),
+            details:
+              attempts >= 5
+                ? 'Repeated invalid password attempts triggered 5-minute cooldown.'
+                : `Supabase sign-in rejected (${sbErrMsg}).`,
+          });
+          const updatedRate = checkRateLimit(clientIp);
+          res.statusCode = updatedRate.allowed ? 401 : 429;
+          res.end(
+            JSON.stringify({
+              success: false,
+              code: updatedRate.allowed ? 'INVALID_CREDENTIALS' : 'RATE_LIMITED',
+              error: updatedRate.allowed
+                ? 'The email or password you entered is incorrect. Please try again.'
+                : `Too many failed attempts. Please wait ${updatedRate.waitSeconds} seconds.`,
+            })
+          );
+          return;
+        }
       }
 
       const bootstrapDoc = await fetchBootstrapDocSafe();
@@ -1264,6 +1739,34 @@ export default async function handler(req, res) {
         return;
       }
 
+      if (isSupabaseServerConfigured() && body?.provider !== 'firebase') {
+        try {
+          const refreshed = await supabaseAuthRefreshToken(refreshToken);
+          const sbAuth = await checkSupabaseAdminAuthorization(refreshed.accessToken, refreshed.user);
+          if (!sbAuth.authorized) {
+            res.statusCode = 403;
+            res.end(JSON.stringify({ success: false, error: 'Administrator access revoked.' }));
+            return;
+          }
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              success: true,
+              token: refreshed.accessToken,
+              expiresAt: refreshed.expiresAt,
+              supabaseAccessToken: refreshed.accessToken,
+              supabaseRefreshToken: refreshed.refreshToken,
+              supabaseExpiresAt: refreshed.expiresAt,
+            })
+          );
+          return;
+        } catch (err) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ success: false, error: err?.message || 'Session refresh failed.' }));
+          return;
+        }
+      }
+
       try {
         const refreshed = await firebaseAuthRefreshToken(refreshToken);
         const decoded = await verifyFirebaseIdToken(refreshed.idToken);
@@ -1335,6 +1838,170 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({ success: false, error: pwCheck.error }));
           return;
         }
+      }
+
+      if (isSupabaseServerConfigured() && (adminCheck.authMode === 'supabase' || adminCheck.supabaseAccessToken)) {
+        const activeUid = adminCheck.uid;
+        const currentEmail = adminCheck.email || '';
+        let nextAccessToken = adminCheck.supabaseAccessToken || '';
+        let nextRefreshToken = String(body?.supabaseRefreshToken || '').trim();
+        let nextExpiresAt = 0;
+
+        if (wantsPasswordChange || wantsEmailChange) {
+          const currentPassword = String(body?.currentPassword || '');
+          if (!currentPassword) {
+            res.statusCode = 403;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Please enter your current password to verify your identity.',
+              })
+            );
+            return;
+          }
+          try {
+            const reauth = await supabaseAuthSignIn(currentEmail, currentPassword);
+            nextAccessToken = reauth.accessToken;
+            nextRefreshToken = reauth.refreshToken;
+            nextExpiresAt = reauth.expiresAt;
+          } catch {
+            res.statusCode = 403;
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: 'Your current password could not be verified. Please try again.',
+              })
+            );
+            return;
+          }
+        }
+
+        const nextEmail = wantsEmailChange ? body.newEmail.trim() : currentEmail;
+        const nextFullName =
+          (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2
+            ? body.fullName.trim()
+            : adminCheck.fullName) || 'Primary Administrator';
+        const nextTimeout =
+          typeof body?.inactivityTimeoutMinutes === 'number' &&
+          body.inactivityTimeoutMinutes >= 5 &&
+          body.inactivityTimeoutMinutes <= 180
+            ? body.inactivityTimeoutMinutes
+            : adminCheck.inactivityTimeoutMinutes || 30;
+
+        const authUpdates = {};
+        if (wantsPasswordChange) authUpdates.password = body.newPassword;
+        if (wantsEmailChange) {
+          authUpdates.email = nextEmail;
+          if (hasSupabaseServiceRole()) authUpdates.email_confirm = true;
+        }
+        if (typeof body?.fullName === 'string' && body.fullName.trim().length >= 2) {
+          authUpdates.user_metadata = { full_name: nextFullName };
+        }
+
+        if (Object.keys(authUpdates).length > 0) {
+          try {
+            if (hasSupabaseServiceRole()) {
+              await supabaseAdminUpdateUser(activeUid, authUpdates);
+            } else {
+              await supabaseAuthUpdateSelf(nextAccessToken, {
+                ...(wantsPasswordChange ? { password: body.newPassword } : {}),
+                ...(wantsEmailChange ? { email: nextEmail } : {}),
+                ...(authUpdates.user_metadata ? { data: authUpdates.user_metadata } : {}),
+              });
+            }
+          } catch (updErr) {
+            const msg = String(updErr?.message || 'Failed to update Supabase credentials.');
+            res.statusCode = updErr?.status === 422 || msg.toLowerCase().includes('exists') ? 409 : 400;
+            res.end(JSON.stringify({ success: false, error: msg }));
+            return;
+          }
+        }
+
+        // Re-sign in automatically when password or email changed so caller gets a valid fresh token
+        if (wantsPasswordChange || wantsEmailChange) {
+          const passwordForSession = wantsPasswordChange ? body.newPassword : String(body?.currentPassword || '');
+          try {
+            const freshSession = await supabaseAuthSignIn(nextEmail, passwordForSession);
+            nextAccessToken = freshSession.accessToken;
+            nextRefreshToken = freshSession.refreshToken;
+            nextExpiresAt = freshSession.expiresAt;
+          } catch {
+            // Keep existing token if Supabase requires email confirmation before sign-in
+          }
+        }
+
+        const nowIso = new Date().toISOString();
+        await Promise.allSettled([
+          supabaseRest(`admin_profiles?id=eq.${encodeURIComponent(activeUid)}`, {
+            method: 'PATCH',
+            accessToken: nextAccessToken,
+            useServiceRole: hasSupabaseServiceRole(),
+            body: {
+              email: nextEmail,
+              full_name: nextFullName,
+              inactivity_timeout_minutes: nextTimeout,
+              updated_at: nowIso,
+            },
+          }),
+          ...(hasSupabaseServiceRole()
+            ? [
+                supabaseRest('admin_bootstrap?id=eq.true', {
+                  method: 'PATCH',
+                  body: {
+                    setup_completed: true,
+                    primary_admin_id: activeUid,
+                    dashboard_override: true,
+                    updated_at: nowIso,
+                    ...(wantsPasswordChange ? { password_updated_at: nowIso } : {}),
+                  },
+                }),
+              ]
+            : []),
+        ]);
+
+        const actionLabel = wantsPasswordChange
+          ? 'PASSWORD_CHANGED'
+          : wantsEmailChange
+          ? 'EMAIL_CHANGED'
+          : 'PROFILE_UPDATED';
+        const actionDetail = wantsPasswordChange
+          ? 'Administrator password updated cleanly in Supabase Auth.'
+          : wantsEmailChange
+          ? `Administrator login email updated to ${nextEmail} in Supabase Auth.`
+          : `Updated administrator profile ("${nextFullName}", timeout ${nextTimeout} min).`;
+
+        await writeSupabaseAuditSafe({
+          action: actionLabel,
+          actorUid: activeUid,
+          actorEmail: nextEmail,
+          status: 'success',
+          details: actionDetail,
+          authMethod: 'password',
+        });
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            token: nextAccessToken,
+            expiresAt: nextExpiresAt || Date.now() + 3600 * 1000,
+            supabaseAccessToken: nextAccessToken,
+            supabaseRefreshToken: nextRefreshToken,
+            ...(nextExpiresAt ? { supabaseExpiresAt: nextExpiresAt } : {}),
+            admin: {
+              uid: activeUid,
+              email: nextEmail,
+              displayName: nextFullName,
+              role: adminCheck.role || 'owner',
+              authMode: 'supabase',
+              supabaseSynced: true,
+              envManaged: false,
+              inactivityTimeoutMinutes: nextTimeout,
+              updatedAt: nowIso,
+            },
+          })
+        );
+        return;
       }
 
       let activeFirebaseIdToken = adminCheck.firebaseIdToken || '';
@@ -1627,6 +2294,25 @@ export default async function handler(req, res) {
       }
 
       try {
+        if (isSupabaseServerConfigured()) {
+          await supabaseSendPasswordReset(email);
+          pushSecurityEvent({
+            action: 'PASSWORD_RESET_DISPATCHED',
+            status: 'success',
+            actorEmailMasked: maskEmailForAudit(email),
+            ipTag: hashIpForAudit(clientIp),
+            details: 'Password recovery email dispatched via Supabase Authentication.',
+          });
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              success: true,
+              message: `If an administrator account exists for ${email}, a password reset link has been sent. Check your inbox (and spam folder).`,
+            })
+          );
+          return;
+        }
+
         await firebaseAuthSendPasswordReset(email);
         pushSecurityEvent({
           action: 'PASSWORD_RESET_DISPATCHED',
@@ -1644,7 +2330,7 @@ export default async function handler(req, res) {
         );
       } catch (err) {
         const code = String(err?.code || err?.message || '');
-        if (code.includes('TOO_MANY_ATTEMPTS')) {
+        if (code.includes('TOO_MANY_ATTEMPTS') || err?.status === 429) {
           res.statusCode = 429;
           res.end(
             JSON.stringify({
@@ -1693,6 +2379,7 @@ export default async function handler(req, res) {
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           signInProvider: adminCheck.signInProvider,
+          supabaseSynced: Boolean(adminCheck.supabaseAccessToken),
           firebaseSynced: Boolean(adminCheck.firebaseIdToken),
           bootstrapped: true,
         })
@@ -1718,21 +2405,32 @@ export default async function handler(req, res) {
         ipTag: hashIpForAudit(clientIp),
         details: String(body?.details || '').slice(0, 500),
       });
-      await writeFirestoreAuditSafe(adminCheck.firebaseIdToken, {
-        action: body?.action,
-        actorUid: adminCheck.uid,
-        actorEmail: adminCheck.email,
-        status: body?.status,
-        details: body?.details,
-        authMethod: body?.authMethod || adminCheck.signInProvider || 'password',
-      });
+      if (isSupabaseServerConfigured()) {
+        await writeSupabaseAuditSafe({
+          action: body?.action,
+          actorUid: adminCheck.uid,
+          actorEmail: adminCheck.email,
+          status: body?.status,
+          details: body?.details,
+          authMethod: body?.authMethod || adminCheck.signInProvider || 'password',
+        });
+      } else {
+        await writeFirestoreAuditSafe(adminCheck.firebaseIdToken, {
+          action: body?.action,
+          actorUid: adminCheck.uid,
+          actorEmail: adminCheck.email,
+          status: body?.status,
+          details: body?.details,
+          authMethod: body?.authMethod || adminCheck.signInProvider || 'password',
+        });
+      }
       res.statusCode = 200;
       res.end(JSON.stringify({ success: true }));
       return;
     }
 
     // ------------------------------------------------------------------------
-    // 9. GET /api/admin-auth?action=audit-logs (Admin-only, merged Firestore + server events)
+    // 9. GET /api/admin-auth?action=audit-logs (Admin-only, merged DB + server events)
     // ------------------------------------------------------------------------
     if (action === 'audit-logs' && req.method === 'GET') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -1746,7 +2444,34 @@ export default async function handler(req, res) {
       const maxEntries = Math.min(100, Math.max(5, Number(urlObj.searchParams.get('limit')) || 50));
       const entries = [];
 
-      if (adminCheck.firebaseIdToken) {
+      if (isSupabaseServerConfigured()) {
+        try {
+          const rows = await supabaseRest(
+            `admin_audit_logs?select=*&order=created_at.desc&limit=${maxEntries}`,
+            {
+              accessToken: adminCheck.supabaseAccessToken || '',
+              useServiceRole: hasSupabaseServiceRole(),
+            }
+          );
+          if (Array.isArray(rows)) {
+            for (const item of rows) {
+              entries.push({
+                id: String(item.id),
+                action: String(item.action || 'ADMIN_EVENT'),
+                actorUid: String(item.actor_uid || ''),
+                actorEmail: typeof item.actor_email === 'string' ? item.actor_email : undefined,
+                status: item.status || 'success',
+                details: String(item.details || ''),
+                authMethod: typeof item.auth_method === 'string' ? item.auth_method : undefined,
+                timestamp: String(item.created_at || new Date().toISOString()),
+                source: 'supabase',
+              });
+            }
+          }
+        } catch {
+          // Non-blocking fallback
+        }
+      } else if (adminCheck.firebaseIdToken) {
         try {
           const fsLogs = await firestoreQueryCollection('admin_audit_logs', {
             idToken: adminCheck.firebaseIdToken,
@@ -1793,7 +2518,7 @@ export default async function handler(req, res) {
     }
 
     // ------------------------------------------------------------------------
-    // 10. Access Registry (admins & admin_invites via Firestore REST)
+    // 10. Access Registry (admin_profiles / admin_invites)
     // ------------------------------------------------------------------------
     if (action === 'access-registry' && req.method === 'GET') {
       const adminCheck = await verifyRequestAdmin(req);
@@ -1806,7 +2531,45 @@ export default async function handler(req, res) {
       let admins = [];
       let invites = [];
 
-      if (adminCheck.firebaseIdToken) {
+      if (isSupabaseServerConfigured()) {
+        const useSvc = hasSupabaseServiceRole();
+        const [sbAdmins, sbInvites] = await Promise.all([
+          supabaseRest('admin_profiles?select=*', {
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: useSvc,
+          }).catch(() => []),
+          supabaseRest('admin_invites?select=*', {
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: useSvc,
+          }).catch(() => []),
+        ]);
+        if (Array.isArray(sbAdmins)) {
+          admins = sbAdmins.map((d) => ({
+            uid: d.id,
+            email: String(d.email || ''),
+            displayName: typeof d.full_name === 'string' ? d.full_name : undefined,
+            role: d.role === 'owner' ? 'owner' : 'admin',
+            authMethods: Array.isArray(d.auth_methods) ? d.auth_methods : ['password'],
+            active: d.active !== false,
+            inactivityTimeoutMinutes:
+              typeof d.inactivity_timeout_minutes === 'number' ? d.inactivity_timeout_minutes : 30,
+            lastLoginAt: typeof d.last_login_at === 'string' ? d.last_login_at : undefined,
+            createdAt: typeof d.created_at === 'string' ? d.created_at : undefined,
+            updatedAt: typeof d.updated_at === 'string' ? d.updated_at : undefined,
+          }));
+        }
+        if (Array.isArray(sbInvites)) {
+          invites = sbInvites.map((d) => ({
+            email: String(d.email || d.email_lower),
+            displayName: typeof d.display_name === 'string' ? d.display_name : undefined,
+            role: 'admin',
+            active: d.active !== false,
+            invitedByUid: typeof d.invited_by_uid === 'string' ? d.invited_by_uid : undefined,
+            createdAt: typeof d.created_at === 'string' ? d.created_at : undefined,
+            updatedAt: typeof d.updated_at === 'string' ? d.updated_at : undefined,
+          }));
+        }
+      } else if (adminCheck.firebaseIdToken) {
         const [fsAdmins, fsInvites] = await Promise.all([
           firestoreQueryCollection('admins', { idToken: adminCheck.firebaseIdToken }).catch(() => []),
           firestoreQueryCollection('admin_invites', { idToken: adminCheck.firebaseIdToken }).catch(
@@ -1856,12 +2619,23 @@ export default async function handler(req, res) {
 
     if (action === 'authorize-admin' && req.method === 'POST') {
       const adminCheck = await verifyRequestAdmin(req);
-      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+      if (!adminCheck.authorized) {
         res.statusCode = 401;
         res.end(
           JSON.stringify({
             success: false,
             error: 'Cloud-synced administrator session required.',
+          })
+        );
+        return;
+      }
+
+      if (adminCheck.role !== 'owner') {
+        res.statusCode = 403;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Only the primary business owner can authorize additional administrators.',
           })
         );
         return;
@@ -1885,10 +2659,67 @@ export default async function handler(req, res) {
       }
 
       const nowIso = new Date().toISOString();
+      if (isSupabaseServerConfigured()) {
+        const useSvc = hasSupabaseServiceRole();
+        if (cleanUid) {
+          await supabaseRest('admin_profiles', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates' },
+            accessToken: adminCheck.supabaseAccessToken || '',
+            useServiceRole: useSvc,
+            body: {
+              id: cleanUid,
+              email: cleanEmail,
+              full_name: cleanName,
+              role: cleanRole,
+              active: true,
+              auth_methods: ['password'],
+              created_at: nowIso,
+              updated_at: nowIso,
+            },
+          });
+          res.statusCode = 200;
+          res.end(JSON.stringify({ success: true, mode: 'uid' }));
+          return;
+        }
+
+        const emailLower = cleanEmail.toLowerCase();
+        await supabaseRest('admin_invites', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates' },
+          accessToken: adminCheck.supabaseAccessToken || '',
+          useServiceRole: useSvc,
+          body: {
+            email_lower: emailLower,
+            email: cleanEmail,
+            display_name: cleanName,
+            role: 'admin',
+            active: true,
+            invited_by_uid: adminCheck.uid || null,
+            created_at: nowIso,
+            updated_at: nowIso,
+          },
+        });
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true, mode: 'invite' }));
+        return;
+      }
+
+      if (!adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: 'Cloud-synced administrator session required.',
+          })
+        );
+        return;
+      }
+
       if (cleanUid) {
         if (cleanUid.length < 6) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ success: false, error: 'Firebase Auth UID appears too short.' }));
+          res.end(JSON.stringify({ success: false, error: 'Auth UID appears too short.' }));
           return;
         }
         await firestorePatchDocument(
@@ -1931,9 +2762,14 @@ export default async function handler(req, res) {
 
     if (action === 'toggle-admin' && req.method === 'POST') {
       const adminCheck = await verifyRequestAdmin(req);
-      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+      if (!adminCheck.authorized) {
         res.statusCode = 401;
         res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+      if (adminCheck.role !== 'owner') {
+        res.statusCode = 403;
+        res.end(JSON.stringify({ success: false, error: 'Owner permissions required.' }));
         return;
       }
       const body = await readJsonBody(req);
@@ -1967,6 +2803,24 @@ export default async function handler(req, res) {
         return;
       }
 
+      if (isSupabaseServerConfigured()) {
+        await supabaseRest(`admin_profiles?id=eq.${encodeURIComponent(targetUid)}`, {
+          method: 'PATCH',
+          accessToken: adminCheck.supabaseAccessToken || '',
+          useServiceRole: hasSupabaseServiceRole(),
+          body: { active, updated_at: new Date().toISOString() },
+        });
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+        return;
+      }
+
+      if (!adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+
       await firestorePatchDocument(
         `admins/${targetUid}`,
         { active, updatedAt: new Date().toISOString() },
@@ -1980,9 +2834,14 @@ export default async function handler(req, res) {
 
     if (action === 'remove-invite' && req.method === 'POST') {
       const adminCheck = await verifyRequestAdmin(req);
-      if (!adminCheck.authorized || !adminCheck.firebaseIdToken) {
+      if (!adminCheck.authorized) {
         res.statusCode = 401;
         res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
+        return;
+      }
+      if (adminCheck.role !== 'owner') {
+        res.statusCode = 403;
+        res.end(JSON.stringify({ success: false, error: 'Owner permissions required.' }));
         return;
       }
       const body = await readJsonBody(req);
@@ -1990,6 +2849,21 @@ export default async function handler(req, res) {
       if (!emailLower) {
         res.statusCode = 400;
         res.end(JSON.stringify({ success: false, error: 'Missing invitation email.' }));
+        return;
+      }
+      if (isSupabaseServerConfigured()) {
+        await supabaseRest(`admin_invites?email_lower=eq.${encodeURIComponent(emailLower)}`, {
+          method: 'DELETE',
+          accessToken: adminCheck.supabaseAccessToken || '',
+          useServiceRole: hasSupabaseServiceRole(),
+        });
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+        return;
+      }
+      if (!adminCheck.firebaseIdToken) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized.' }));
         return;
       }
       await firestoreDeleteDocument(`admin_invites/${emailLower}`, adminCheck.firebaseIdToken);
@@ -2073,6 +2947,29 @@ export default async function handler(req, res) {
         return;
       }
 
+      if (isSupabaseServerConfigured()) {
+        const sbBootstrap = await fetchSupabaseBootstrapSafe();
+        const setupSecretConfigured = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            success: true,
+            backend: 'supabase',
+            uid: adminCheck.uid,
+            role: adminCheck.role,
+            authMode: adminCheck.authMode,
+            emailVerified: adminCheck.emailVerified,
+            supabaseSynced: Boolean(adminCheck.supabaseAccessToken),
+            firebaseSynced: false,
+            dashboardOverrideActive: Boolean(sbBootstrap?.dashboard_override),
+            serverCredentialsConfigured: Boolean(sbBootstrap?.setup_completed),
+            envManaged: false,
+            setupSecretConfigured,
+          })
+        );
+        return;
+      }
+
       const cfg = resolveConfiguredServerCredentials();
       const bootstrapDoc = await fetchBootstrapDocSafe();
       const setupSecretConfigured = !isPlaceholderEnvValue(process.env.ADMIN_SETUP_SECRET);
@@ -2081,10 +2978,12 @@ export default async function handler(req, res) {
       res.end(
         JSON.stringify({
           success: true,
+          backend: 'firebase',
           uid: adminCheck.uid,
           role: adminCheck.role,
           authMode: adminCheck.authMode,
           emailVerified: adminCheck.emailVerified,
+          supabaseSynced: false,
           firebaseSynced: Boolean(adminCheck.firebaseIdToken),
           dashboardOverrideActive: Boolean(bootstrapDoc?.dashboardOverride || cfg.dashboardOverride),
           serverCredentialsConfigured: cfg.configured || Boolean(bootstrapDoc?.setupCompleted),
@@ -2118,6 +3017,16 @@ export default async function handler(req, res) {
 }
 
 export async function getAdminAuthConfig() {
+  if (isSupabaseServerConfigured()) {
+    const sbBootstrap = await fetchSupabaseBootstrapSafe();
+    const isBootstrapped = Boolean(sbBootstrap?.setup_completed);
+    return {
+      bootstrapped: isBootstrapped,
+      configured: isBootstrapped,
+      envManaged: false,
+      backend: 'supabase',
+    };
+  }
   const cfg = resolveConfiguredServerCredentials();
   const bootstrapDoc = await fetchBootstrapDocSafe();
   const isBootstrapped = Boolean(cfg.configured || bootstrapDoc?.setupCompleted);
@@ -2125,6 +3034,7 @@ export async function getAdminAuthConfig() {
     bootstrapped: isBootstrapped,
     configured: isBootstrapped,
     envManaged: Boolean(cfg.envManaged),
+    backend: 'firebase',
   };
 }
 

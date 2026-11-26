@@ -8,6 +8,8 @@
 import { FunnelAnalyticsData } from '../types';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { isSupabaseClientConfigured } from '../lib/supabase';
+import { getActiveAdminBearerToken } from './adminAuth';
 
 const ANALYTICS_KEY = 'jite_funnel_analytics_v1';
 
@@ -48,30 +50,62 @@ export function getFunnelMetrics(): FunnelAnalyticsData {
   return DEFAULT_METRICS;
 }
 
-/**
- * Saves metrics to localStorage and periodically syncs to Firestore.
- */
-function saveFunnelMetrics(metrics: FunnelAnalyticsData): void {
+function saveLocalMetrics(metrics: FunnelAnalyticsData): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(ANALYTICS_KEY, JSON.stringify(metrics));
   } catch {}
+}
 
-  // Sync to Firestore settings/analytics non-blockingly
+/**
+ * Saves metrics to localStorage and syncs to Firestore when Firebase is the active backend.
+ */
+function saveFunnelMetrics(metrics: FunnelAnalyticsData): void {
+  if (typeof window === 'undefined') return;
+  saveLocalMetrics(metrics);
+
+  if (isSupabaseClientConfigured()) {
+    return;
+  }
+
+  // Sync to Firestore settings/analytics non-blockingly when Firebase is active
   try {
     const docRef = doc(db, 'settings', 'analytics');
     setDoc(docRef, metrics, { merge: true }).catch(() => {});
   } catch {}
 }
 
+function postSupabaseAnalyticsEvent(payload: {
+  field: string;
+  brandKey?: string;
+  vehicleViewKey?: string;
+  vehicleEnquiryKey?: string;
+}): void {
+  if (typeof window === 'undefined' || !isSupabaseClientConfigured()) return;
+  try {
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
+
 /**
  * Increments a specific funnel milestone.
  */
-export function trackFunnelEvent(event: keyof Omit<FunnelAnalyticsData, 'lastUpdated' | 'updatedAt' | 'topViewedVehicles' | 'topEnquiryVehicles' | 'mostSearchedBrands'>): void {
+export function trackFunnelEvent(
+  event: keyof Omit<
+    FunnelAnalyticsData,
+    'lastUpdated' | 'updatedAt' | 'topViewedVehicles' | 'topEnquiryVehicles' | 'mostSearchedBrands'
+  >
+): void {
   const current = getFunnelMetrics();
   (current as any)[event] = (((current as any)[event] as number) || 0) + 1;
   current.lastUpdated = new Date().toISOString();
   saveFunnelMetrics(current);
+  postSupabaseAnalyticsEvent({ field: String(event) });
 }
 
 /**
@@ -84,6 +118,7 @@ export function trackVehicleViewStats(vehicleTitle: string): void {
   current.topViewedVehicles[vehicleTitle] = (current.topViewedVehicles[vehicleTitle] || 0) + 1;
   current.lastUpdated = new Date().toISOString();
   saveFunnelMetrics(current);
+  postSupabaseAnalyticsEvent({ field: 'vehiclesViewed', vehicleViewKey: vehicleTitle });
 }
 
 /**
@@ -97,6 +132,7 @@ export function trackVehicleEnquiryStats(vehicleTitle: string): void {
   current.topEnquiryVehicles[vehicleTitle] = (current.topEnquiryVehicles[vehicleTitle] || 0) + 1;
   current.lastUpdated = new Date().toISOString();
   saveFunnelMetrics(current);
+  postSupabaseAnalyticsEvent({ field: 'enquiriesStarted', vehicleEnquiryKey: vehicleTitle });
 }
 
 /**
@@ -110,12 +146,34 @@ export function trackSearchBrandStats(brand: string): void {
   current.mostSearchedBrands[brand] = (current.mostSearchedBrands[brand] || 0) + 1;
   current.lastUpdated = new Date().toISOString();
   saveFunnelMetrics(current);
+  postSupabaseAnalyticsEvent({ field: 'vehicleSearches', brandKey: brand });
 }
 
 /**
- * Loads analytics from Firestore on admin boot.
+ * Loads analytics from Supabase (via /api/analytics) or Firestore on admin boot.
  */
 export async function syncFunnelFromFirestore(): Promise<FunnelAnalyticsData> {
+  if (isSupabaseClientConfigured()) {
+    try {
+      const token = await getActiveAdminBearerToken();
+      if (token) {
+        const res = await fetch('/api/analytics', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          const data = (payload?.analytics || {}) as FunnelAnalyticsData;
+          const merged = { ...getFunnelMetrics(), ...data };
+          saveLocalMetrics(merged);
+          return merged;
+        }
+      }
+    } catch {}
+    return getFunnelMetrics();
+  }
+
   try {
     const docRef = doc(db, 'settings', 'analytics');
     const snap = await getDoc(docRef);

@@ -9,7 +9,9 @@ import compression from "compression";
 import adminAuthHandler, { verifyRequestAdmin } from "./api/admin-auth.js";
 import cloudinaryHandler from "./api/cloudinary.js";
 import dataHandler from "./api/data.js";
+import uploadVehicleImageHandler from "./api/upload-vehicle-image.js";
 import { firestoreQueryCollection } from "./api/firestore-rest.js";
+import { isSupabaseServerConfigured, supabaseRest, mapVehicleRowToApp } from "./lib/supabase-rest.js";
 import renderPageHandler from "./api/render.js";
 
 const app = express();
@@ -203,60 +205,9 @@ app.get("/api/download-android-project", (_req, res) => {
   return res.status(404).json({ error: "Android package not found" });
 });
 
-// Direct vehicle image upload endpoint (Protected by Verified Admin Bearer Token)
-app.post("/api/upload-vehicle-image", requireVerifiedAdmin, (req, res) => {
-  try {
-    const { vehicleId, base64Data } = req.body || {};
-    if (!base64Data || typeof base64Data !== "string") {
-      return res.status(400).json({ error: "Missing base64Data image payload" });
-    }
-
-    const cleanVehicleId = (vehicleId || "car").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const vehicleUploadsDir = path.join(UPLOADS_DIR, "vehicles", cleanVehicleId);
-    if (!fs.existsSync(vehicleUploadsDir)) {
-      fs.mkdirSync(vehicleUploadsDir, { recursive: true });
-    }
-
-    const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
-    const mimeType = matches ? matches[1] : "image/jpeg";
-    if (!mimeType.startsWith("image/")) {
-      return res.status(400).json({ error: "Invalid image MIME type" });
-    }
-
-    const rawData = matches ? matches[2] : base64Data;
-    const buffer = Buffer.from(rawData, "base64");
-
-    if (buffer.length > 15 * 1024 * 1024) {
-      return res.status(400).json({ error: "Image file exceeds maximum 15MB limit" });
-    }
-
-    let ext = "jpg";
-    if (mimeType.includes("png")) ext = "png";
-    else if (mimeType.includes("webp")) ext = "webp";
-
-    const uniqueName = `img_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
-    const targetFilePath = path.join(vehicleUploadsDir, uniqueName);
-    fs.writeFileSync(targetFilePath, buffer);
-
-    // Return portable data URI when <= 750KB so photos uploaded in AI Studio also sync to Vercel
-    const portableDataUrl = base64Data.startsWith("data:")
-      ? base64Data
-      : `data:${mimeType};base64,${rawData}`;
-    const resolvedUrl =
-      buffer.length <= 750 * 1024
-        ? portableDataUrl
-        : `/uploads/vehicles/${cleanVehicleId}/${uniqueName}`;
-
-    return res.json({
-      success: true,
-      url: resolvedUrl,
-      size: buffer.length,
-      mimeType,
-    });
-  } catch (err: any) {
-    console.error("Upload error:", err);
-    return res.status(500).json({ error: "Failed to save uploaded image: " + err.message });
-  }
+// Direct vehicle image upload & Supabase Storage signing/cleanup endpoint
+app.all("/api/upload-vehicle-image", async (req, res) => {
+  return uploadVehicleImageHandler(req, res);
 });
 
 // Unified Cloud Firestore + Local Mirror API Routes (exact parity with Vercel api/data.js)
@@ -291,6 +242,12 @@ app.post("/api/vehicles/delete", async (req, res) => {
 
 app.post("/api/vehicles/reset", requireVerifiedAdmin, async (_req, res) => {
   try {
+    if (isSupabaseServerConfigured()) {
+      const rows = await supabaseRest("vehicles?select=*&order=created_at.desc");
+      const sbVehicles = (Array.isArray(rows) ? rows : []).map((r: any) => mapVehicleRowToApp(r)).filter(Boolean);
+      saveVehiclesStore(sbVehicles);
+      return res.json({ success: true, vehicles: sbVehicles });
+    }
     const fsVehicles = await firestoreQueryCollection("vehicles");
     saveVehiclesStore(fsVehicles);
     return res.json({ success: true, vehicles: fsVehicles });
@@ -327,6 +284,11 @@ app.all("/api/business-settings", async (req, res) => {
 
 app.all("/api/editorial-posts", async (req, res) => {
   req.query = { ...req.query, resource: "editorial-posts", action: "" };
+  return dataHandler(req, res);
+});
+
+app.all("/api/analytics", async (req, res) => {
+  req.query = { ...req.query, resource: "analytics", action: String(req.query?.action || "") };
   return dataHandler(req, res);
 });
 
