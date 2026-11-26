@@ -203,6 +203,14 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
+          var hadController = Boolean(navigator.serviceWorker.controller);
+          var reloadedOnControllerChange = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (hadController && !reloadedOnControllerChange) {
+              reloadedOnControllerChange = true;
+              window.location.reload();
+            }
+          });
           navigator.serviceWorker
             .register('/sw.js', { updateViaCache: 'none' })
             .then(function(reg) {

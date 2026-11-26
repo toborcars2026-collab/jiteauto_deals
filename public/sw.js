@@ -1,5 +1,5 @@
 // Service Worker for Jite Auto Deals PWA (Network-First HTML, Cache-Busting across deployments)
-const CACHE_NAME = 'jite-auto-v2';
+const CACHE_NAME = 'jite-auto-v3';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.png',
