@@ -14,6 +14,7 @@ import uploadVehicleImageHandler from "./api/upload-vehicle-image.js";
 import { firestoreQueryCollection } from "./api/firestore-rest.js";
 import { isSupabaseServerConfigured, supabaseRest, mapVehicleRowToApp } from "./lib/supabase-rest.js";
 import renderPageHandler from "./api/render.js";
+import resolveImageHandler from "./api/resolve-image.js";
 
 const app = express();
 const PORT = 3000;
@@ -173,27 +174,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/api/resolve-image", async (req, res) => {
-  const targetUrl = req.query.url as string;
-  if (!targetUrl) return res.status(400).json({ error: "Missing url parameter" });
-
-  try {
-    const parsed = new URL(targetUrl);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      return res.status(400).json({ error: "Invalid image URL protocol" });
-    }
-    if (targetUrl.includes("ibb.co/") && !targetUrl.includes("i.ibb.co/")) {
-      const response = await fetch(targetUrl);
-      const text = await response.text();
-      const match = text.match(/meta property="og:image" content="([^"]+)"/);
-      if (match && match[1]) {
-        return res.json({ resolvedUrl: match[1] });
-      }
-    }
-    return res.json({ resolvedUrl: targetUrl });
-  } catch {
-    return res.json({ resolvedUrl: targetUrl });
-  }
+app.all("/api/resolve-image", async (req, res) => {
+  return resolveImageHandler(req, res);
 });
 
 app.get("/api/download-android-project", (_req, res) => {

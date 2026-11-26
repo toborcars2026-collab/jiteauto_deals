@@ -2,24 +2,27 @@ import crypto from 'crypto';
 import { verifyRequestAdmin } from './admin-auth.js';
 import { readStore } from './data.js';
 import { firestoreQueryCollection } from './firestore-rest.js';
+import { applyCorsHeaders } from '../lib/cors.js';
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic', 'heif']);
-const ALLOWED_MIME_PREFIX = 'image/';
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/heic',
+  'image/heif',
+]);
 
 function setHeaders(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  const origin = req.headers?.origin;
-  if (origin && typeof origin === 'string') {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-firebase-id-token'
-  );
+  applyCorsHeaders(req, res, {
+    isPrivate: true,
+    methods: 'GET, POST, OPTIONS',
+    allowHeaders: 'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token',
+    extraNoSniff: true,
+  });
 }
 
 async function readJsonBody(req) {
@@ -200,9 +203,13 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (mimeType && !mimeType.startsWith(ALLOWED_MIME_PREFIX)) {
+    if (mimeType && !ALLOWED_MIME_TYPES.has(mimeType)) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: 'Only image files are allowed for vehicle uploads.' }));
+      res.end(
+        JSON.stringify({
+          error: 'Unsupported image MIME type. Only JPG, PNG, WebP, AVIF, or HEIC images are allowed.',
+        })
+      );
       return;
     }
 

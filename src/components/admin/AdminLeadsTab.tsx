@@ -17,6 +17,26 @@ export default function AdminLeadsTab({ leads, setLeads }: AdminLeadsTabProps) {
   const [statusFilter, setStatusFilter] = useState<'All' | LeadStatus>('All');
   const [typeFilter, setTypeFilter] = useState<'All' | 'find_car' | 'source_car'>('All');
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  const sanitizeSafeHttpUrl = (raw?: string) => {
+    if (!raw || typeof raw !== 'string') return '';
+    try {
+      const parsed = new URL(raw.trim());
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : '';
+    } catch {
+      return '';
+    }
+  };
+
+  const sanitizeSafeImageUrl = (raw?: string) => {
+    if (!raw || typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (/^data:image\/(?:jpeg|jpg|png|webp|avif);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+    return sanitizeSafeHttpUrl(trimmed);
+  };
 
   // Update Lead Status
   const handleUpdateStatus = async (id: string, newStatus: LeadStatus) => {
@@ -38,7 +58,8 @@ export default function AdminLeadsTab({ leads, setLeads }: AdminLeadsTabProps) {
   // Export Leads to CSV
   const handleExportCSV = () => {
     if (leads.length === 0) {
-      alert('No consultation leads available to export yet!');
+      setExportNotice('No consultation leads available to export yet.');
+      setTimeout(() => setExportNotice(null), 3500);
       return;
     }
     const headers = [
@@ -126,6 +147,12 @@ export default function AdminLeadsTab({ leads, setLeads }: AdminLeadsTabProps) {
           <span>Export Leads CSV</span>
         </button>
       </div>
+
+      {exportNotice && (
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+          {exportNotice}
+        </div>
+      )}
 
       {/* Filter & Search */}
       <div className="flex flex-col md:flex-row gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
@@ -292,36 +319,42 @@ export default function AdminLeadsTab({ leads, setLeads }: AdminLeadsTabProps) {
                 )}
 
                 {/* External Listing Link if present */}
-                {lead.sourceUrl && (
-                  <div className="text-xs flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                    <span className="text-slate-400 font-bold text-[10px] uppercase font-mono">Listing Link:</span>
-                    <a
-                      href={lead.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-amber-700 hover:text-amber-800 underline truncate max-w-xl inline-flex items-center gap-1 font-mono font-medium"
-                    >
-                      <ExternalLink size={12} />
-                      <span className="truncate">{lead.sourceUrl}</span>
-                    </a>
-                  </div>
-                )}
+                {(() => {
+                  const safeUrl = sanitizeSafeHttpUrl(lead.sourceUrl);
+                  return safeUrl ? (
+                    <div className="text-xs flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-slate-400 font-bold text-[10px] uppercase font-mono">Listing Link:</span>
+                      <a
+                        href={safeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-amber-700 hover:text-amber-800 underline truncate max-w-xl inline-flex items-center gap-1 font-mono font-medium"
+                      >
+                        <ExternalLink size={12} />
+                        <span className="truncate">{safeUrl}</span>
+                      </a>
+                    </div>
+                  ) : null;
+                })()}
 
                 {/* Screenshot preview if uploaded */}
-                {lead.sourceImage && (
-                  <div className="text-xs space-y-1.5">
-                    <span className="text-slate-400 font-bold text-[10px] uppercase font-mono">Attached Screenshot:</span>
-                    <div className="inline-block p-1 bg-white border border-slate-200 rounded-xl shadow-xs">
-                      <img
-                        src={lead.sourceImage}
-                        alt="Vehicle screenshot"
-                        className="h-28 w-auto max-w-xs object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() => setSelectedScreenshot(lead.sourceImage || null)}
-                        title="Click to view full screenshot"
-                      />
+                {(() => {
+                  const safeImg = sanitizeSafeImageUrl(lead.sourceImage);
+                  return safeImg ? (
+                    <div className="text-xs space-y-1.5">
+                      <span className="text-slate-400 font-bold text-[10px] uppercase font-mono">Attached Screenshot:</span>
+                      <div className="inline-block p-1 bg-white border border-slate-200 rounded-xl shadow-xs">
+                        <img
+                          src={safeImg}
+                          alt="Vehicle screenshot"
+                          className="h-28 w-auto max-w-xs object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setSelectedScreenshot(safeImg)}
+                          title="Click to view full screenshot"
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 {/* Internal Consultant Notes and Communication Actions */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">

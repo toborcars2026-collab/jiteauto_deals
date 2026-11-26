@@ -17,8 +17,10 @@ interface AdminSlideshowTabProps {
 export default function AdminSlideshowTab({ vehicles, setVehicles }: AdminSlideshowTabProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
 
   const showFeedback = (msg: string) => {
+    setErrorFeedback(null);
     setFeedback(msg);
     setTimeout(() => setFeedback(null), 3500);
   };
@@ -49,7 +51,7 @@ export default function AdminSlideshowTab({ vehicles, setVehicles }: AdminSlides
       );
       showFeedback(`${car.year} ${car.make} ${car.model} ${nextVal ? 'added to' : 'removed from'} Hero Slideshow.`);
     } catch (err: any) {
-      alert(`Failed to update slideshow: ${err?.message || err}`);
+      setErrorFeedback(`Failed to update slideshow: ${err?.message || err}`);
     } finally {
       setUpdatingId(null);
     }
@@ -70,7 +72,7 @@ export default function AdminSlideshowTab({ vehicles, setVehicles }: AdminSlides
       );
       showFeedback(`Updated slide position to #${newOrder} for ${car.make} ${car.model}.`);
     } catch (err: any) {
-      alert(`Failed to update order: ${err?.message || err}`);
+      setErrorFeedback(`Failed to update order: ${err?.message || err}`);
     } finally {
       setUpdatingId(null);
     }
@@ -92,6 +94,15 @@ export default function AdminSlideshowTab({ vehicles, setVehicles }: AdminSlides
         <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-bold flex items-center gap-2 animate-fadeIn">
           <CheckCircle2 size={16} className="text-purple-600 shrink-0" />
           <span>{feedback}</span>
+        </div>
+      )}
+
+      {errorFeedback && (
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold flex items-center justify-between gap-2 animate-fadeIn">
+          <span>{errorFeedback}</span>
+          <button type="button" onClick={() => setErrorFeedback(null)} className="underline text-rose-700 cursor-pointer">
+            Dismiss
+          </button>
         </div>
       )}
 

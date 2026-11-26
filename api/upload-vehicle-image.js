@@ -10,6 +10,15 @@ import {
   supabaseStorageDeleteObjects,
   extractSupabaseStoragePathFromUrl,
 } from '../lib/supabase-rest.js';
+import { applyCorsHeaders } from '../lib/cors.js';
+
+const ALLOWED_UPLOAD_MIMES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+]);
 
 export const config = {
   api: {
@@ -20,18 +29,12 @@ export const config = {
 };
 
 function setCorsHeaders(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  const origin = req.headers?.origin;
-  if (origin && typeof origin === 'string') {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token'
-  );
+  applyCorsHeaders(req, res, {
+    isPrivate: true,
+    methods: 'GET, POST, OPTIONS',
+    allowHeaders: 'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token',
+    extraNoSniff: true,
+  });
 }
 
 function getAction(req) {
@@ -227,11 +230,15 @@ export default async function handler(req, res) {
       return;
     }
 
-    const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+    const matches = base64Data.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
     const mimeType = (matches ? matches[1] : 'image/jpeg').toLowerCase();
-    if (!mimeType.startsWith('image/')) {
+    if (!ALLOWED_UPLOAD_MIMES.has(mimeType)) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: 'Invalid image MIME type' }));
+      res.end(
+        JSON.stringify({
+          error: 'Invalid or unsupported image MIME type. Only JPG, PNG, WebP, and AVIF images are allowed.',
+        })
+      );
       return;
     }
     const rawData = matches ? matches[2] : base64Data;

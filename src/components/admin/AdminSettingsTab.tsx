@@ -44,6 +44,7 @@ export default function AdminSettingsTab({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     fetchBusinessSettings().then((fetched) => {
@@ -86,10 +87,13 @@ export default function AdminSettingsTab({
   };
 
   const handleResetDefaults = () => {
-    if (confirm('Reset all business contact fields and copy back to official defaults?')) {
-      setSettings(DEFAULT_BUSINESS_SETTINGS);
-      if (saveSuccess) setSaveSuccess(false);
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
     }
+    setSettings(DEFAULT_BUSINESS_SETTINGS);
+    setConfirmReset(false);
+    if (saveSuccess) setSaveSuccess(false);
   };
 
   return (
@@ -154,13 +158,28 @@ export default function AdminSettingsTab({
                 Control the dealership name, consultant identity, WhatsApp line, phone numbers, and official copy across the entire website directly in Firestore.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleResetDefaults}
-              className="text-xs text-slate-500 hover:text-slate-900 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors shrink-0"
-            >
-              Reset to Defaults
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {confirmReset && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(false)}
+                  className="text-xs text-slate-500 hover:text-slate-900 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleResetDefaults}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                  confirmReset
+                    ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
+                    : 'text-slate-500 hover:text-slate-900 border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
+              >
+                {confirmReset ? 'Confirm Reset Defaults' : 'Reset to Defaults'}
+              </button>
+            </div>
           </div>
 
           {saveSuccess && (

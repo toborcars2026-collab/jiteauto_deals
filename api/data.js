@@ -19,6 +19,8 @@ import {
   mapBookingRowToApp,
   mapAppInquiryToBookingRow,
 } from '../lib/supabase-rest.js';
+import { applyCorsHeaders } from '../lib/cors.js';
+import { sanitizePublicHttpUrl, sanitizeImageSrcUrl } from '../lib/url-safety.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
 
@@ -100,21 +102,93 @@ async function readJsonBody(req) {
 }
 
 function setHeaders(req, res, isPrivate = false) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader(
-    'Cache-Control',
-    isPrivate ? 'no-store, no-cache, must-revalidate, private' : 'no-cache, must-revalidate'
-  );
-  const origin = req.headers?.origin;
-  if (origin && typeof origin === 'string') {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+  applyCorsHeaders(req, res, {
+    isPrivate,
+    methods: 'GET, POST, DELETE, PATCH, OPTIONS',
+    allowHeaders: 'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token',
+    extraNoSniff: true,
+  });
+}
+
+function sanitizeText(val, maxLen = 500) {
+  if (typeof val !== 'string') return '';
+  return val.trim().slice(0, maxLen);
+}
+
+function sanitizePublicSubmission(resource, item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return { error: 'Invalid submission payload.' };
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-firebase-id-token, x-supabase-access-token'
-  );
+  const id = sanitizeText(item.id, 80);
+  if (!/^[a-zA-Z0-9_-]{3,80}$/.test(id)) {
+    return { error: 'Valid submission ID is required.' };
+  }
+  const name = sanitizeText(item.name, 120);
+  const phone = sanitizeText(item.phone, 40);
+  if (!name || phone.replace(/\D/g, '').length < 6) {
+    return { error: 'Valid name and phone number are required.' };
+  }
+
+  const nowIso = new Date().toISOString();
+  const createdAtRaw = sanitizeText(item.createdAt, 40);
+  const createdAt = createdAtRaw && !Number.isNaN(Date.parse(createdAtRaw)) ? createdAtRaw : nowIso;
+
+  if (resource === 'leads') {
+    const rawSourceUrl = sanitizeText(item.sourceUrl, 1000);
+    const safeSourceUrl = rawSourceUrl ? sanitizePublicHttpUrl(rawSourceUrl, 1000) : '';
+    if (rawSourceUrl && !safeSourceUrl) {
+      return { error: 'External listing URL must start with http:// or https://.' };
+    }
+    const rawSourceImage = typeof item.sourceImage === 'string' ? item.sourceImage.trim() : '';
+    const safeSourceImage = rawSourceImage ? sanitizeImageSrcUrl(rawSourceImage, 4_000_000) : '';
+    if (rawSourceImage && !safeSourceImage) {
+      return { error: 'Attached screenshot must be a valid JPG, PNG, WebP, or AVIF image.' };
+    }
+    const rawBudget = Number(item.budget ?? 0);
+    const budget = Number.isFinite(rawBudget) && rawBudget >= 0 ? Math.min(rawBudget, 5_000_000_000) : 0;
+
+    return {
+      item: {
+        id,
+        name,
+        phone,
+        vehicleType: sanitizeText(item.vehicleType, 60) || 'Any',
+        budget,
+        brand: sanitizeText(item.brand, 120),
+        model: sanitizeText(item.model, 120),
+        location: sanitizeText(item.location, 120),
+        paymentMethod: item.paymentMethod === 'Financing' ? 'Financing' : 'Cash',
+        requirements: sanitizeText(item.requirements, 2000),
+        ...(safeSourceUrl ? { sourceUrl: safeSourceUrl } : {}),
+        ...(safeSourceImage ? { sourceImage: safeSourceImage } : {}),
+        type: item.type === 'source_car' ? 'source_car' : 'find_car',
+        aiSummary: sanitizeText(item.aiSummary, 1000),
+        status: 'New',
+        createdAt,
+      },
+    };
+  }
+
+  const rawVehiclePrice = Number(item.vehiclePrice ?? 0);
+  const vehiclePrice =
+    Number.isFinite(rawVehiclePrice) && rawVehiclePrice >= 0 ? Math.min(rawVehiclePrice, 5_000_000_000) : 0;
+
+  return {
+    item: {
+      id,
+      name,
+      phone,
+      vehicleId: sanitizeText(item.vehicleId, 80),
+      vehicleTitle: sanitizeText(item.vehicleTitle, 160),
+      vehiclePrice,
+      preferredDate: sanitizeText(item.preferredDate, 40),
+      preferredTime: sanitizeText(item.preferredTime, 40),
+      message: sanitizeText(item.message, 2000),
+      type: item.type === 'inspection' || item.type === 'whatsapp' || item.type === 'callback' ? item.type : 'inspection',
+      status: 'New',
+      createdAt,
+    },
+  };
 }
 
 function parseRouteParams(req) {
@@ -476,24 +550,13 @@ export default async function handler(req, res) {
       if (req.method === 'POST' && actionLower === 'submit') {
         setHeaders(req, res, false);
         const body = await readJsonBody(req);
-        const item = body && typeof body === 'object' ? body : null;
-        const cleanName = typeof item?.name === 'string' ? item.name.trim() : '';
-        const cleanPhone = typeof item?.phone === 'string' ? item.phone.trim() : '';
-
-        if (!item || typeof item.id !== 'string' || !item.id.trim() || !cleanName || cleanPhone.length < 6) {
+        const validation = sanitizePublicSubmission(resource, body);
+        if (validation.error || !validation.item) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'Valid name, phone number, and submission ID are required.' }));
+          res.end(JSON.stringify({ error: validation.error || 'Invalid submission data.' }));
           return;
         }
-
-        // Server-enforced initial workflow status on public submissions
-        const sanitizedItem = {
-          ...item,
-          name: cleanName,
-          phone: cleanPhone,
-          status: 'New',
-          createdAt: item.createdAt || new Date().toISOString(),
-        };
+        const sanitizedItem = validation.item;
 
         if (supabaseActive) {
           const rowPayload =

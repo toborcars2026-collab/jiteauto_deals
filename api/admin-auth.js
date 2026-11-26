@@ -25,6 +25,7 @@ import {
   supabaseAdminCreateUser,
   supabaseAdminUpdateUser,
 } from '../lib/supabase-rest.js';
+import { applyCorsHeaders } from '../lib/cors.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data_store');
 const AUTH_STORE_FILE = path.join(DATA_DIR, 'admin_auth.json');
@@ -884,21 +885,13 @@ function getAction(req) {
 }
 
 function setSecurityHeaders(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-
-  const origin = req.headers?.origin;
-  if (origin && typeof origin === 'string') {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token, x-supabase-access-token'
-  );
+  applyCorsHeaders(req, res, {
+    isPrivate: true,
+    methods: 'GET, POST, OPTIONS',
+    allowHeaders:
+      'Content-Type, Authorization, x-admin-setup-secret, x-firebase-id-token, x-supabase-access-token',
+    extraNoSniff: true,
+  });
 }
 
 async function fetchBootstrapDocSafe() {

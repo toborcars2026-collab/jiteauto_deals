@@ -8,3 +8,7 @@ coverage/
 !.env.example
 backups/
 *.backup.json
+data_store/admin_auth.json
+data_store/leads.json
+data_store/inquiries.json
+data_store/analytics.json

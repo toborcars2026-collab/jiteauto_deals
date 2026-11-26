@@ -214,13 +214,13 @@ export default function EditorialContentSection({
                 {activePost.body}
               </div>
 
-              {activePost.videoUrl && (
+              {activePost.videoUrl && /^https?:\/\//i.test(activePost.videoUrl.trim()) && (
                 <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between gap-4">
                   <span className="text-xs font-semibold text-slate-800">
                     Walkaround or video commentary attached for this guide.
                   </span>
                   <a
-                    href={activePost.videoUrl}
+                    href={activePost.videoUrl.trim()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-950 text-white text-xs font-bold hover:bg-amber-500 hover:text-slate-950 transition-colors shrink-0"

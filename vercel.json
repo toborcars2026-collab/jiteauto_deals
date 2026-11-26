@@ -54,44 +54,32 @@
   ],
   "rewrites": [
     {
-      "source": "/(assets|public)/:match*",
-      "destination": "/$1/:match*"
-    },
-    {
-      "source": "/(.*\\.(?:html|js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|json|webmanifest|txt|xml))",
-      "destination": "/$1"
-    },
-    {
       "source": "/api/resolve-image",
       "destination": "/api/resolve-image"
     },
     {
-      "source": "/api/ai/consultant",
-      "destination": "/api/ai-consultant"
+      "source": "/api/admin/auth/:action",
+      "destination": "/api/admin-auth?action=:action"
     },
     {
-      "source": "/api/admin/auth/:action*",
-      "destination": "/api/admin-auth?action=:action*"
-    },
-    {
-      "source": "/api/vehicles/:action*",
-      "destination": "/api/data?resource=vehicles&action=:action*"
+      "source": "/api/vehicles/:action",
+      "destination": "/api/data?resource=vehicles&action=:action"
     },
     {
       "source": "/api/vehicles",
       "destination": "/api/data?resource=vehicles"
     },
     {
-      "source": "/api/leads/:action*",
-      "destination": "/api/data?resource=leads&action=:action*"
+      "source": "/api/leads/:action",
+      "destination": "/api/data?resource=leads&action=:action"
     },
     {
       "source": "/api/leads",
       "destination": "/api/data?resource=leads"
     },
     {
-      "source": "/api/inquiries/:action*",
-      "destination": "/api/data?resource=inquiries&action=:action*"
+      "source": "/api/inquiries/:action",
+      "destination": "/api/data?resource=inquiries&action=:action"
     },
     {
       "source": "/api/inquiries",
@@ -106,8 +94,8 @@
       "destination": "/api/data?resource=editorial-posts"
     },
     {
-      "source": "/api/analytics/:action*",
-      "destination": "/api/data?resource=analytics&action=:action*"
+      "source": "/api/analytics/:action",
+      "destination": "/api/data?resource=analytics&action=:action"
     },
     {
       "source": "/api/analytics",
@@ -122,24 +110,60 @@
       "destination": "/api/cloudinary?action=delete"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "source": "/vehicles/:slug",
+      "destination": "/api/render?path=/vehicles/:slug"
     },
     {
-      "source": "/vehicles/:slug*",
-      "destination": "/api/render?path=/vehicles/:slug*"
+      "source": "/car/:slug",
+      "destination": "/api/render?path=/car/:slug"
     },
     {
-      "source": "/car/:slug*",
-      "destination": "/api/render?path=/car/:slug*"
+      "source": "/v/:slug",
+      "destination": "/api/render?path=/v/:slug"
     },
     {
-      "source": "/v/:slug*",
-      "destination": "/api/render?path=/v/:slug*"
+      "source": "/browse",
+      "destination": "/api/render?path=/browse"
     },
     {
-      "source": "/(browse|inventory|catalog|cars|find-car|find-my-car|source-car|source-a-car|how-it-works|about|admin)",
-      "destination": "/api/render?path=/$1"
+      "source": "/inventory",
+      "destination": "/api/render?path=/inventory"
+    },
+    {
+      "source": "/catalog",
+      "destination": "/api/render?path=/catalog"
+    },
+    {
+      "source": "/cars",
+      "destination": "/api/render?path=/cars"
+    },
+    {
+      "source": "/find-car",
+      "destination": "/api/render?path=/find-car"
+    },
+    {
+      "source": "/find-my-car",
+      "destination": "/api/render?path=/find-my-car"
+    },
+    {
+      "source": "/source-car",
+      "destination": "/api/render?path=/source-car"
+    },
+    {
+      "source": "/source-a-car",
+      "destination": "/api/render?path=/source-a-car"
+    },
+    {
+      "source": "/how-it-works",
+      "destination": "/api/render?path=/how-it-works"
+    },
+    {
+      "source": "/about",
+      "destination": "/api/render?path=/about"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/render?path=/admin"
     },
     {
       "source": "/(.*)",

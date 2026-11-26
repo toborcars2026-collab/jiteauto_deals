@@ -17,24 +17,26 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
   });
 
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const vehicleTypes = ['Sedan', 'SUV', 'Coupe', 'Hatchback', 'Truck', 'Crossover'];
   const popularBrands = ['Toyota', 'Lexus', 'Mercedes-Benz', 'Honda', 'Hyundai', 'Ford', 'Range Rover'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!formData.name || !formData.phone) {
-      alert('Please fill out your Name and Phone Number to connect you with a vehicle consultant.');
+      setFormError('Please fill out your Name and Phone Number to connect you with a vehicle consultant.');
       return;
     }
 
     if (!formData.budget || formData.budget < 3000000) {
-      alert('Minimum budget must be at least ₦3,000,000 (3 Million Naira). Please adjust your budget.');
+      setFormError('Minimum budget must be at least ₦3,000,000 (3 Million Naira). Please adjust your budget.');
       return;
     }
 
     if (formData.budget > 1000000000) {
-      alert('Maximum budget limit is ₦1,000,000,000 (1 Billion Naira). Please enter an amount within this limit.');
+      setFormError('Maximum budget limit is ₦1,000,000,000 (1 Billion Naira). Please enter an amount within this limit.');
       return;
     }
 
@@ -166,6 +168,12 @@ export default function HelpMeFindCar({ onOpenConsultantModal }: HelpMeFindCarPr
                     <h3 className="font-display text-xl font-bold text-white">Vehicle Specification Wizard</h3>
                     <p className="text-xs text-slate-400">Fill in your dream spec and we will search the market on your behalf.</p>
                   </div>
+
+                  {formError && (
+                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                      {formError}
+                    </div>
+                  )}
 
                   {/* Personal Info */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

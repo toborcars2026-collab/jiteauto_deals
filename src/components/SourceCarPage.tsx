@@ -57,15 +57,28 @@ export default function SourceCarPage({ onGoHome, onBrowseCars, businessSettings
 
   // Process file upload
   const handleFileProcess = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload a valid image file (PNG, JPG, WEBP).');
+    const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif']);
+    if (!allowedTypes.has(file.type.toLowerCase())) {
+      setFormErrors((prev) => ({
+        ...prev,
+        sourceImage: 'Please upload a valid image file (PNG, JPG, WEBP, or AVIF).',
+      }));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image size exceeds 10MB limit. Please upload a smaller screenshot.');
+      setFormErrors((prev) => ({
+        ...prev,
+        sourceImage: 'Image size exceeds 10MB limit. Please upload a smaller screenshot.',
+      }));
       return;
     }
 
+    setFormErrors((prev) => {
+      if (!prev.sourceImage) return prev;
+      const next = { ...prev };
+      delete next.sourceImage;
+      return next;
+    });
     setImageFileName(file.name);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -118,6 +131,17 @@ export default function SourceCarPage({ onGoHome, onBrowseCars, businessSettings
     const errors: Record<string, string> = {};
     if (!vehicleDetails.trim()) {
       errors.vehicleDetails = 'Please provide the vehicle make, model, or asking price.';
+    }
+    const trimmedUrl = sourceUrl.trim();
+    if (trimmedUrl) {
+      try {
+        const parsed = new URL(trimmedUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          errors.sourceUrl = 'Listing URL must start with http:// or https://.';
+        }
+      } catch {
+        errors.sourceUrl = 'Please enter a valid http:// or https:// listing URL.';
+      }
     }
     if (!fullName.trim()) {
       errors.fullName = 'Please enter your full name.';
@@ -291,10 +315,18 @@ export default function SourceCarPage({ onGoHome, onBrowseCars, businessSettings
                   <input
                     type="url"
                     value={sourceUrl}
-                    onChange={(e) => setSourceUrl(e.target.value)}
+                    onChange={(e) => {
+                      setSourceUrl(e.target.value);
+                      if (formErrors.sourceUrl) setFormErrors({ ...formErrors, sourceUrl: '' });
+                    }}
                     placeholder="https://instagram.com/p/... or https://facebook.com/marketplace/..."
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-amber-500 focus:outline-none"
+                    className={`w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none ${
+                      formErrors.sourceUrl ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-amber-500'
+                    }`}
                   />
+                  {formErrors.sourceUrl && (
+                    <p className="text-xs text-red-500 mt-1 font-medium">{formErrors.sourceUrl}</p>
+                  )}
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">Instagram Post</span>
                     <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">TikTok Video</span>
@@ -356,9 +388,9 @@ export default function SourceCarPage({ onGoHome, onBrowseCars, businessSettings
                         <div className="text-xs text-slate-600">
                           <label className="relative cursor-pointer font-bold text-amber-700 hover:text-amber-800">
                             <span>Click to browse photo</span>
-                            <input
+                          <input
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/webp,image/avif"
                               onChange={handleImageChange}
                               className="sr-only"
                             />
@@ -369,6 +401,12 @@ export default function SourceCarPage({ onGoHome, onBrowseCars, businessSettings
                       </div>
                     )}
                   </div>
+                  {formErrors.sourceImage && (
+                    <p className="text-xs text-red-500 mt-1.5 font-medium flex items-center gap-1">
+                      <AlertTriangle size={13} />
+                      <span>{formErrors.sourceImage}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
